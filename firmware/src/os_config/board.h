@@ -66,8 +66,6 @@
 #define GPIOA_SWDIO                     13
 #define GPIOA_SWCLK                     14
 
-#define GPIOA_USB_EN                    15
-
 /*
  * Port B
  */
@@ -82,7 +80,7 @@
 #define GPIOB_CAN2_RX                   5
 #define GPIOB_CAN2_TX                   6
 
-#define GPIOB_REQUIRE_GET_NODE_INFO     7
+#define GPIOB_BOOT_SKIP_GET_NODE_INFO   7
 
 #define GPIOB_CAN1_RX                   8
 #define GPIOB_CAN1_TX                   9
@@ -161,22 +159,22 @@
 /*
  * GPIOA
  */
-#define VAL_GPIOA_MODER             (PIN_MODE_INPUT(GPIOA_SENS_A) |\
-                                     PIN_MODE_INPUT(GPIOA_SENS_B) |\
-                                     PIN_MODE_INPUT(GPIOA_SENS_C) |\
+#define VAL_GPIOA_MODER             (PIN_MODE_ANALOG(GPIOA_SENS_A) |\
+                                     PIN_MODE_ANALOG(GPIOA_SENS_B) |\
+                                     PIN_MODE_ANALOG(GPIOA_SENS_C) |\
                                      PIN_MODE_INPUT(GPIOA_RCPWM) |\
-                                     PIN_MODE_INPUT(GPIOA_OC_ADJ) |\
-                                     PIN_MODE_INPUT(GPIOA_EN_GATE) |\
-                                     PIN_MODE_INPUT(GPIOA_DC_CAL) |\
-                                     PIN_MODE_INPUT(GPIOA_MOTOR_PWM_1N) |\
-                                     PIN_MODE_INPUT(GPIOA_MOTOR_PWM_1P) |\
-                                     PIN_MODE_INPUT(GPIOA_MOTOR_PWM_2P) |\
-                                     PIN_MODE_INPUT(GPIOA_MOTOR_PWM_3P) |\
-                                     PIN_MODE_INPUT(GPIOA_USB_DM) |\
-                                     PIN_MODE_INPUT(GPIOA_USB_DP) |\
-                                     PIN_MODE_INPUT(GPIOA_SWDIO) |\
-                                     PIN_MODE_INPUT(GPIOA_SWCLK) |\
-                                     PIN_MODE_INPUT(GPIOA_USB_EN))
+                                     PIN_MODE_OUTPUT(GPIOA_OC_ADJ) |\
+                                     PIN_MODE_OUTPUT(GPIOA_EN_GATE) |\
+                                     PIN_MODE_OUTPUT(GPIOA_DC_CAL) |\
+                                     PIN_MODE_ALTERNATE(GPIOA_MOTOR_PWM_1N) |\
+                                     PIN_MODE_ALTERNATE(GPIOA_MOTOR_PWM_1P) |\
+                                     PIN_MODE_ALTERNATE(GPIOA_MOTOR_PWM_2P) |\
+                                     PIN_MODE_ALTERNATE(GPIOA_MOTOR_PWM_3P) |\
+                                     PIN_MODE_ALTERNATE(GPIOA_USB_DM) |\
+                                     PIN_MODE_ALTERNATE(GPIOA_USB_DP) |\
+                                     PIN_MODE_ALTERNATE(GPIOA_SWDIO) |\
+                                     PIN_MODE_ALTERNATE(GPIOA_SWCLK) |\
+                                     PIN_MODE_INPUT(15))
 
 #define VAL_GPIOA_OTYPER            (PIN_OTYPE_PUSHPULL(GPIOA_SENS_A) |\
                                      PIN_OTYPE_PUSHPULL(GPIOA_SENS_B) |\
@@ -193,7 +191,7 @@
                                      PIN_OTYPE_PUSHPULL(GPIOA_USB_DP) |\
                                      PIN_OTYPE_PUSHPULL(GPIOA_SWDIO) |\
                                      PIN_OTYPE_PUSHPULL(GPIOA_SWCLK) |\
-                                     PIN_OTYPE_PUSHPULL(GPIOA_USB_EN))
+                                     PIN_OTYPE_PUSHPULL(15))
 
 #define VAL_GPIOA_OSPEEDR           (PIN_OSPEED_2M(GPIOA_SENS_A) |\
                                      PIN_OSPEED_2M(GPIOA_SENS_B) |\
@@ -202,32 +200,32 @@
                                      PIN_OSPEED_2M(GPIOA_OC_ADJ) |\
                                      PIN_OSPEED_2M(GPIOA_EN_GATE) |\
                                      PIN_OSPEED_2M(GPIOA_DC_CAL) |\
-                                     PIN_OSPEED_2M(GPIOA_MOTOR_PWM_1N) |\
-                                     PIN_OSPEED_2M(GPIOA_MOTOR_PWM_1P) |\
-                                     PIN_OSPEED_2M(GPIOA_MOTOR_PWM_2P) |\
-                                     PIN_OSPEED_2M(GPIOA_MOTOR_PWM_3P) |\
-                                     PIN_OSPEED_2M(GPIOA_USB_DM) |\
-                                     PIN_OSPEED_2M(GPIOA_USB_DP) |\
-                                     PIN_OSPEED_2M(GPIOA_SWDIO) |\
-                                     PIN_OSPEED_2M(GPIOA_SWCLK) |\
-                                     PIN_OSPEED_2M(GPIOA_USB_EN))
+                                     PIN_OSPEED_25M(GPIOA_MOTOR_PWM_1N) |\
+                                     PIN_OSPEED_25M(GPIOA_MOTOR_PWM_1P) |\
+                                     PIN_OSPEED_25M(GPIOA_MOTOR_PWM_2P) |\
+                                     PIN_OSPEED_25M(GPIOA_MOTOR_PWM_3P) |\
+                                     PIN_OSPEED_100M(GPIOA_USB_DM) |\
+                                     PIN_OSPEED_100M(GPIOA_USB_DP) |\
+                                     PIN_OSPEED_50M(GPIOA_SWDIO) |\
+                                     PIN_OSPEED_50M(GPIOA_SWCLK) |\
+                                     PIN_OSPEED_2M(15))
 
-#define VAL_GPIOA_PUPDR             (PIN_PUPDR_PULLDOWN(GPIOA_SENS_A) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOA_SENS_B) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOA_SENS_C) |\
+#define VAL_GPIOA_PUPDR             (PIN_PUPDR_FLOATING(GPIOA_SENS_A) |\
+                                     PIN_PUPDR_FLOATING(GPIOA_SENS_B) |\
+                                     PIN_PUPDR_FLOATING(GPIOA_SENS_C) |\
                                      PIN_PUPDR_PULLDOWN(GPIOA_RCPWM) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOA_OC_ADJ) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOA_EN_GATE) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOA_DC_CAL) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOA_MOTOR_PWM_1N) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOA_MOTOR_PWM_1P) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOA_MOTOR_PWM_2P) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOA_MOTOR_PWM_3P) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOA_USB_DM) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOA_USB_DP) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOA_SWDIO) |\
+                                     PIN_PUPDR_FLOATING(GPIOA_OC_ADJ) |\
+                                     PIN_PUPDR_FLOATING(GPIOA_EN_GATE) |\
+                                     PIN_PUPDR_FLOATING(GPIOA_DC_CAL) |\
+                                     PIN_PUPDR_FLOATING(GPIOA_MOTOR_PWM_1N) |\
+                                     PIN_PUPDR_FLOATING(GPIOA_MOTOR_PWM_1P) |\
+                                     PIN_PUPDR_FLOATING(GPIOA_MOTOR_PWM_2P) |\
+                                     PIN_PUPDR_FLOATING(GPIOA_MOTOR_PWM_3P) |\
+                                     PIN_PUPDR_FLOATING(GPIOA_USB_DM) |\
+                                     PIN_PUPDR_FLOATING(GPIOA_USB_DP) |\
+                                     PIN_PUPDR_PULLUP(GPIOA_SWDIO) |\
                                      PIN_PUPDR_PULLDOWN(GPIOA_SWCLK) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOA_USB_EN))
+                                     PIN_PUPDR_PULLDOWN(15))
 
 #define VAL_GPIOA_ODR               (PIN_ODR_LOW(GPIOA_SENS_A) |\
                                      PIN_ODR_LOW(GPIOA_SENS_B) |\
@@ -240,11 +238,11 @@
                                      PIN_ODR_LOW(GPIOA_MOTOR_PWM_1P) |\
                                      PIN_ODR_LOW(GPIOA_MOTOR_PWM_2P) |\
                                      PIN_ODR_LOW(GPIOA_MOTOR_PWM_3P) |\
-                                     PIN_ODR_LOW(GPIOA_USB_DM) |\
-                                     PIN_ODR_LOW(GPIOA_USB_DP) |\
-                                     PIN_ODR_LOW(GPIOA_SWDIO) |\
-                                     PIN_ODR_LOW(GPIOA_SWCLK) |\
-                                     PIN_ODR_LOW(GPIOA_USB_EN))
+                                     PIN_ODR_HIGH(GPIOA_USB_DM) |\
+                                     PIN_ODR_HIGH(GPIOA_USB_DP) |\
+                                     PIN_ODR_HIGH(GPIOA_SWDIO) |\
+                                     PIN_ODR_HIGH(GPIOA_SWCLK) |\
+                                     PIN_ODR_LOW(15))
 
 #define VAL_GPIOA_AFRL              (PIN_AFIO_AF(GPIOA_SENS_A,  0) |\
                                      PIN_AFIO_AF(GPIOA_SENS_B,  0) |\
@@ -253,30 +251,30 @@
                                      PIN_AFIO_AF(GPIOA_OC_ADJ,  0) |\
                                      PIN_AFIO_AF(GPIOA_EN_GATE,  0) |\
                                      PIN_AFIO_AF(GPIOA_DC_CAL,  0) |\
-                                     PIN_AFIO_AF(GPIOA_MOTOR_PWM_1N,  0) )
-#define VAL_GPIOA_AFRH              (PIN_AFIO_AF(GPIOA_MOTOR_PWM_1P,  0) |\
-                                     PIN_AFIO_AF(GPIOA_MOTOR_PWM_2P,  0) |\
-                                     PIN_AFIO_AF(GPIOA_MOTOR_PWM_3P, 0) |\
-                                     PIN_AFIO_AF(GPIOA_USB_DM, 0) |\
-                                     PIN_AFIO_AF(GPIOA_USB_DP, 0) |\
+                                     PIN_AFIO_AF(GPIOA_MOTOR_PWM_1N,  1) )
+#define VAL_GPIOA_AFRH              (PIN_AFIO_AF(GPIOA_MOTOR_PWM_1P,  1) |\
+                                     PIN_AFIO_AF(GPIOA_MOTOR_PWM_2P,  1) |\
+                                     PIN_AFIO_AF(GPIOA_MOTOR_PWM_3P, 1) |\
+                                     PIN_AFIO_AF(GPIOA_USB_DM, 10) |\
+                                     PIN_AFIO_AF(GPIOA_USB_DP, 10) |\
                                      PIN_AFIO_AF(GPIOA_SWDIO, 0) |\
                                      PIN_AFIO_AF(GPIOA_SWCLK, 0) |\
-                                     PIN_AFIO_AF(GPIOA_USB_EN, 0))
+                                     PIN_AFIO_AF(15, 0))
 
 /*
  * GPIOB
  */
-#define VAL_GPIOB_MODER             (PIN_MODE_INPUT(GPIOB_MOTOR_PWM_2N) |\
-                                     PIN_MODE_INPUT(GPIOB_MOTOR_PWM_3N) |\
-                                     PIN_MODE_INPUT(GPIOB_GAIN) |\
-                                     PIN_MODE_INPUT(GPIOB_TEST_2) |\
-                                     PIN_MODE_INPUT(GPIOB_TEST_3) |\
-                                     PIN_MODE_INPUT(GPIOB_CAN2_RX) |\
-                                     PIN_MODE_INPUT(GPIOB_CAN2_TX) |\
-                                     PIN_MODE_INPUT(GPIOB_REQUIRE_GET_NODE_INFO) |\
-                                     PIN_MODE_INPUT(GPIOB_CAN1_RX) |\
-                                     PIN_MODE_INPUT(GPIOB_CAN1_TX) |\
-                                     PIN_MODE_INPUT(GPIOB_UART_TX) |\
+#define VAL_GPIOB_MODER             (PIN_MODE_ALTERNATE(GPIOB_MOTOR_PWM_2N) |\
+                                     PIN_MODE_ALTERNATE(GPIOB_MOTOR_PWM_3N) |\
+                                     PIN_MODE_OUTPUT(GPIOB_GAIN) |\
+                                     PIN_MODE_OUTPUT(GPIOB_TEST_2) |\
+                                     PIN_MODE_OUTPUT(GPIOB_TEST_3) |\
+                                     PIN_MODE_ALTERNATE(GPIOB_CAN2_RX) |\
+                                     PIN_MODE_ALTERNATE(GPIOB_CAN2_TX) |\
+                                     PIN_MODE_INPUT(GPIOB_BOOT_SKIP_GET_NODE_INFO) |\
+                                     PIN_MODE_ALTERNATE(GPIOB_CAN1_RX) |\
+                                     PIN_MODE_ALTERNATE(GPIOB_CAN1_TX) |\
+                                     PIN_MODE_ALTERNATE(GPIOB_UART_TX) |\
                                      PIN_MODE_INPUT(11) |\
                                      PIN_MODE_INPUT(12) |\
                                      PIN_MODE_INPUT(13) |\
@@ -290,7 +288,7 @@
                                      PIN_OTYPE_PUSHPULL(GPIOB_TEST_3) |\
                                      PIN_OTYPE_PUSHPULL(GPIOB_CAN2_RX) |\
                                      PIN_OTYPE_PUSHPULL(GPIOB_CAN2_TX) |\
-                                     PIN_OTYPE_PUSHPULL(GPIOB_REQUIRE_GET_NODE_INFO) |\
+                                     PIN_OTYPE_PUSHPULL(GPIOB_BOOT_SKIP_GET_NODE_INFO) |\
                                      PIN_OTYPE_PUSHPULL(GPIOB_CAN1_RX) |\
                                      PIN_OTYPE_PUSHPULL(GPIOB_CAN1_TX) |\
                                      PIN_OTYPE_PUSHPULL(GPIOB_UART_TX) |\
@@ -300,16 +298,16 @@
                                      PIN_OTYPE_PUSHPULL(14) |\
                                      PIN_OTYPE_PUSHPULL(15))
 
-#define VAL_GPIOB_OSPEEDR           (PIN_OSPEED_2M(GPIOB_MOTOR_PWM_2N) |\
-                                     PIN_OSPEED_2M(GPIOB_MOTOR_PWM_3N) |\
+#define VAL_GPIOB_OSPEEDR           (PIN_OSPEED_25M(GPIOB_MOTOR_PWM_2N) |\
+                                     PIN_OSPEED_25M(GPIOB_MOTOR_PWM_3N) |\
                                      PIN_OSPEED_2M(GPIOB_GAIN) |\
-                                     PIN_OSPEED_2M(GPIOB_TEST_2) |\
-                                     PIN_OSPEED_2M(GPIOB_TEST_3) |\
-                                     PIN_OSPEED_2M(GPIOB_CAN2_RX) |\
-                                     PIN_OSPEED_2M(GPIOB_CAN2_TX) |\
-                                     PIN_OSPEED_2M(GPIOB_REQUIRE_GET_NODE_INFO) |\
-                                     PIN_OSPEED_2M(GPIOB_CAN1_RX) |\
-                                     PIN_OSPEED_2M(GPIOB_CAN1_TX) |\
+                                     PIN_OSPEED_25M(GPIOB_TEST_2) |\
+                                     PIN_OSPEED_25M(GPIOB_TEST_3) |\
+                                     PIN_OSPEED_25M(GPIOB_CAN2_RX) |\
+                                     PIN_OSPEED_25M(GPIOB_CAN2_TX) |\
+                                     PIN_OSPEED_2M(GPIOB_BOOT_SKIP_GET_NODE_INFO) |\
+                                     PIN_OSPEED_25M(GPIOB_CAN1_RX) |\
+                                     PIN_OSPEED_25M(GPIOB_CAN1_TX) |\
                                      PIN_OSPEED_2M(GPIOB_UART_TX) |\
                                      PIN_OSPEED_2M(11) |\
                                      PIN_OSPEED_2M(12) |\
@@ -317,17 +315,17 @@
                                      PIN_OSPEED_2M(14) |\
                                      PIN_OSPEED_2M(15))
 
-#define VAL_GPIOB_PUPDR             (PIN_PUPDR_PULLDOWN(GPIOB_MOTOR_PWM_2N) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOB_MOTOR_PWM_3N) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOB_GAIN) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOB_TEST_2) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOB_TEST_3) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOB_CAN2_RX) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOB_CAN2_TX) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOB_REQUIRE_GET_NODE_INFO) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOB_CAN1_RX) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOB_CAN1_TX) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOB_UART_TX) |\
+#define VAL_GPIOB_PUPDR             (PIN_PUPDR_FLOATING(GPIOB_MOTOR_PWM_2N) |\
+                                     PIN_PUPDR_FLOATING(GPIOB_MOTOR_PWM_3N) |\
+                                     PIN_PUPDR_FLOATING(GPIOB_GAIN) |\
+                                     PIN_PUPDR_FLOATING(GPIOB_TEST_2) |\
+                                     PIN_PUPDR_FLOATING(GPIOB_TEST_3) |\
+                                     PIN_PUPDR_PULLUP(GPIOB_CAN2_RX) |\
+                                     PIN_PUPDR_FLOATING(GPIOB_CAN2_TX) |\
+                                     PIN_PUPDR_PULLUP(GPIOB_BOOT_SKIP_GET_NODE_INFO) |\
+                                     PIN_PUPDR_PULLUP(GPIOB_CAN1_RX) |\
+                                     PIN_PUPDR_FLOATING(GPIOB_CAN1_TX) |\
+                                     PIN_PUPDR_FLOATING(GPIOB_UART_TX) |\
                                      PIN_PUPDR_PULLDOWN(11) |\
                                      PIN_PUPDR_PULLDOWN(12) |\
                                      PIN_PUPDR_PULLDOWN(13) |\
@@ -339,29 +337,29 @@
                                      PIN_ODR_LOW(GPIOB_GAIN) |\
                                      PIN_ODR_LOW(GPIOB_TEST_2) |\
                                      PIN_ODR_LOW(GPIOB_TEST_3) |\
-                                     PIN_ODR_LOW(GPIOB_CAN2_RX) |\
-                                     PIN_ODR_LOW(GPIOB_CAN2_TX) |\
-                                     PIN_ODR_LOW(GPIOB_REQUIRE_GET_NODE_INFO) |\
-                                     PIN_ODR_LOW(GPIOB_CAN1_RX) |\
-                                     PIN_ODR_LOW(GPIOB_CAN1_TX) |\
-                                     PIN_ODR_LOW(GPIOB_UART_TX) |\
+                                     PIN_ODR_HIGH(GPIOB_CAN2_RX) |\
+                                     PIN_ODR_HIGH(GPIOB_CAN2_TX) |\
+                                     PIN_ODR_LOW(GPIOB_BOOT_SKIP_GET_NODE_INFO) |\
+                                     PIN_ODR_HIGH(GPIOB_CAN1_RX) |\
+                                     PIN_ODR_HIGH(GPIOB_CAN1_TX) |\
+                                     PIN_ODR_HIGH(GPIOB_UART_TX) |\
                                      PIN_ODR_LOW(11) |\
                                      PIN_ODR_LOW(12) |\
                                      PIN_ODR_LOW(13) |\
                                      PIN_ODR_LOW(14) |\
                                      PIN_ODR_LOW(15))
 
-#define VAL_GPIOB_AFRL              (PIN_AFIO_AF(GPIOB_MOTOR_PWM_2N,  0) |\
-                                     PIN_AFIO_AF(GPIOB_MOTOR_PWM_3N,  0) |\
+#define VAL_GPIOB_AFRL              (PIN_AFIO_AF(GPIOB_MOTOR_PWM_2N,  1) |\
+                                     PIN_AFIO_AF(GPIOB_MOTOR_PWM_3N,  1) |\
                                      PIN_AFIO_AF(GPIOB_GAIN,  0) |\
                                      PIN_AFIO_AF(GPIOB_TEST_2,  0) |\
                                      PIN_AFIO_AF(GPIOB_TEST_3,  0) |\
-                                     PIN_AFIO_AF(GPIOB_CAN2_RX,  0) |\
-                                     PIN_AFIO_AF(GPIOB_CAN2_TX,  0) |\
-                                     PIN_AFIO_AF(GPIOB_REQUIRE_GET_NODE_INFO,  0) )
-#define VAL_GPIOB_AFRH              (PIN_AFIO_AF(GPIOB_CAN1_RX,  0) |\
-                                     PIN_AFIO_AF(GPIOB_CAN1_TX,  0) |\
-                                     PIN_AFIO_AF(GPIOB_UART_TX, 0) |\
+                                     PIN_AFIO_AF(GPIOB_CAN2_RX,  9) |\
+                                     PIN_AFIO_AF(GPIOB_CAN2_TX,  9) |\
+                                     PIN_AFIO_AF(GPIOB_BOOT_SKIP_GET_NODE_INFO,  0) )
+#define VAL_GPIOB_AFRH              (PIN_AFIO_AF(GPIOB_CAN1_RX,  9) |\
+                                     PIN_AFIO_AF(GPIOB_CAN1_TX,  9) |\
+                                     PIN_AFIO_AF(GPIOB_UART_TX, 7) |\
                                      PIN_AFIO_AF(11, 0) |\
                                      PIN_AFIO_AF(12, 0) |\
                                      PIN_AFIO_AF(13, 0) |\
@@ -371,19 +369,19 @@
 /*
  * GPIOC
  */
-#define VAL_GPIOC_MODER             (PIN_MODE_INPUT(GPIOC_TEMPERATURE_SENS) |\
-                                     PIN_MODE_INPUT(GPIOC_VBAT_SENS) |\
-                                     PIN_MODE_INPUT(GPIOC_CURRENT_2_SENS) |\
-                                     PIN_MODE_INPUT(GPIOC_CURRENT_1_SENS) |\
+#define VAL_GPIOC_MODER             (PIN_MODE_ANALOG(GPIOC_TEMPERATURE_SENS) |\
+                                     PIN_MODE_ANALOG(GPIOC_VBAT_SENS) |\
+                                     PIN_MODE_ANALOG(GPIOC_CURRENT_2_SENS) |\
+                                     PIN_MODE_ANALOG(GPIOC_CURRENT_1_SENS) |\
                                      PIN_MODE_INPUT(4) |\
-                                     PIN_MODE_INPUT(GPIOC_UART_RX) |\
+                                     PIN_MODE_ALTERNATE(GPIOC_UART_RX) |\
                                      PIN_MODE_INPUT(GPIOC_RPM_PULSE_FEEDBACK) |\
-                                     PIN_MODE_INPUT(GPIOC_RGB_LED_RED) |\
-                                     PIN_MODE_INPUT(GPIOC_RGB_LED_GREEN) |\
-                                     PIN_MODE_INPUT(GPIOC_RGB_LED_BLUE) |\
+                                     PIN_MODE_ALTERNATE(GPIOC_RGB_LED_RED) |\
+                                     PIN_MODE_ALTERNATE(GPIOC_RGB_LED_GREEN) |\
+                                     PIN_MODE_ALTERNATE(GPIOC_RGB_LED_BLUE) |\
                                      PIN_MODE_INPUT(10) |\
                                      PIN_MODE_INPUT(11) |\
-                                     PIN_MODE_INPUT(GPIOC_TEST_4) |\
+                                     PIN_MODE_OUTPUT(GPIOC_TEST_4) |\
                                      PIN_MODE_INPUT(GPIOC_POWER_GOOD) |\
                                      PIN_MODE_INPUT(GPIOC_OVER_TEMP_WARNING_INVERSE) |\
                                      PIN_MODE_INPUT(GPIOC_DRIVER_FAULT_INVERSE))
@@ -395,9 +393,9 @@
                                      PIN_OTYPE_PUSHPULL(4) |\
                                      PIN_OTYPE_PUSHPULL(GPIOC_UART_RX) |\
                                      PIN_OTYPE_PUSHPULL(GPIOC_RPM_PULSE_FEEDBACK) |\
-                                     PIN_OTYPE_PUSHPULL(GPIOC_RGB_LED_RED) |\
-                                     PIN_OTYPE_PUSHPULL(GPIOC_RGB_LED_GREEN) |\
-                                     PIN_OTYPE_PUSHPULL(GPIOC_RGB_LED_BLUE) |\
+                                     PIN_OTYPE_OPENDRAIN(GPIOC_RGB_LED_RED) |\
+                                     PIN_OTYPE_OPENDRAIN(GPIOC_RGB_LED_GREEN) |\
+                                     PIN_OTYPE_OPENDRAIN(GPIOC_RGB_LED_BLUE) |\
                                      PIN_OTYPE_PUSHPULL(10) |\
                                      PIN_OTYPE_PUSHPULL(11) |\
                                      PIN_OTYPE_PUSHPULL(GPIOC_TEST_4) |\
@@ -422,22 +420,22 @@
                                      PIN_OSPEED_2M(GPIOC_OVER_TEMP_WARNING_INVERSE) |\
                                      PIN_OSPEED_2M(GPIOC_DRIVER_FAULT_INVERSE))
 
-#define VAL_GPIOC_PUPDR             (PIN_PUPDR_PULLDOWN(GPIOC_TEMPERATURE_SENS) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOC_VBAT_SENS) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOC_CURRENT_2_SENS) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOC_CURRENT_1_SENS) |\
+#define VAL_GPIOC_PUPDR             (PIN_PUPDR_FLOATING(GPIOC_TEMPERATURE_SENS) |\
+                                     PIN_PUPDR_FLOATING(GPIOC_VBAT_SENS) |\
+                                     PIN_PUPDR_FLOATING(GPIOC_CURRENT_2_SENS) |\
+                                     PIN_PUPDR_FLOATING(GPIOC_CURRENT_1_SENS) |\
                                      PIN_PUPDR_PULLDOWN(4) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOC_UART_RX) |\
+                                     PIN_PUPDR_PULLUP(GPIOC_UART_RX) |\
                                      PIN_PUPDR_PULLDOWN(GPIOC_RPM_PULSE_FEEDBACK) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOC_RGB_LED_RED) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOC_RGB_LED_GREEN) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOC_RGB_LED_BLUE) |\
+                                     PIN_PUPDR_FLOATING(GPIOC_RGB_LED_RED) |\
+                                     PIN_PUPDR_FLOATING(GPIOC_RGB_LED_GREEN) |\
+                                     PIN_PUPDR_FLOATING(GPIOC_RGB_LED_BLUE) |\
                                      PIN_PUPDR_PULLDOWN(10) |\
                                      PIN_PUPDR_PULLDOWN(11) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOC_TEST_4) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOC_POWER_GOOD) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOC_OVER_TEMP_WARNING_INVERSE) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOC_DRIVER_FAULT_INVERSE))
+                                     PIN_PUPDR_FLOATING(GPIOC_TEST_4) |\
+                                     PIN_PUPDR_PULLUP(GPIOC_POWER_GOOD) |\
+                                     PIN_PUPDR_PULLUP(GPIOC_OVER_TEMP_WARNING_INVERSE) |\
+                                     PIN_PUPDR_PULLUP(GPIOC_DRIVER_FAULT_INVERSE))
 
 #define VAL_GPIOC_ODR               (PIN_ODR_LOW(GPIOC_TEMPERATURE_SENS) |\
                                      PIN_ODR_LOW(GPIOC_VBAT_SENS) |\
@@ -446,9 +444,9 @@
                                      PIN_ODR_LOW(4) |\
                                      PIN_ODR_LOW(GPIOC_UART_RX) |\
                                      PIN_ODR_LOW(GPIOC_RPM_PULSE_FEEDBACK) |\
-                                     PIN_ODR_LOW(GPIOC_RGB_LED_RED) |\
-                                     PIN_ODR_LOW(GPIOC_RGB_LED_GREEN) |\
-                                     PIN_ODR_LOW(GPIOC_RGB_LED_BLUE) |\
+                                     PIN_ODR_HIGH(GPIOC_RGB_LED_RED) |\
+                                     PIN_ODR_HIGH(GPIOC_RGB_LED_GREEN) |\
+                                     PIN_ODR_HIGH(GPIOC_RGB_LED_BLUE) |\
                                      PIN_ODR_LOW(10) |\
                                      PIN_ODR_LOW(11) |\
                                      PIN_ODR_LOW(GPIOC_TEST_4) |\
@@ -461,11 +459,11 @@
                                      PIN_AFIO_AF(GPIOC_CURRENT_2_SENS,  0) |\
                                      PIN_AFIO_AF(GPIOC_CURRENT_1_SENS,  0) |\
                                      PIN_AFIO_AF(4,  0) |\
-                                     PIN_AFIO_AF(GPIOC_UART_RX,  0) |\
+                                     PIN_AFIO_AF(GPIOC_UART_RX,  7) |\
                                      PIN_AFIO_AF(GPIOC_RPM_PULSE_FEEDBACK,  0) |\
-                                     PIN_AFIO_AF(GPIOC_RGB_LED_RED,  0) )
-#define VAL_GPIOC_AFRH              (PIN_AFIO_AF(GPIOC_RGB_LED_GREEN,  0) |\
-                                     PIN_AFIO_AF(GPIOC_RGB_LED_BLUE,  0) |\
+                                     PIN_AFIO_AF(GPIOC_RGB_LED_RED,  2) )
+#define VAL_GPIOC_AFRH              (PIN_AFIO_AF(GPIOC_RGB_LED_GREEN,  2) |\
+                                     PIN_AFIO_AF(GPIOC_RGB_LED_BLUE,  2) |\
                                      PIN_AFIO_AF(10, 0) |\
                                      PIN_AFIO_AF(11, 0) |\
                                      PIN_AFIO_AF(GPIOC_TEST_4, 0) |\
@@ -478,7 +476,7 @@
  */
 #define VAL_GPIOD_MODER             (PIN_MODE_INPUT(0) |\
                                      PIN_MODE_INPUT(1) |\
-                                     PIN_MODE_INPUT(PORTD_TEST_1) |\
+                                     PIN_MODE_OUTPUT(PORTD_TEST_1) |\
                                      PIN_MODE_INPUT(3) |\
                                      PIN_MODE_INPUT(4) |\
                                      PIN_MODE_INPUT(5) |\
@@ -512,7 +510,7 @@
 
 #define VAL_GPIOD_OSPEEDR           (PIN_OSPEED_2M(0) |\
                                      PIN_OSPEED_2M(1) |\
-                                     PIN_OSPEED_2M(PORTD_TEST_1) |\
+                                     PIN_OSPEED_25M(PORTD_TEST_1) |\
                                      PIN_OSPEED_2M(3) |\
                                      PIN_OSPEED_2M(4) |\
                                      PIN_OSPEED_2M(5) |\
@@ -529,7 +527,7 @@
 
 #define VAL_GPIOD_PUPDR             (PIN_PUPDR_PULLDOWN(0) |\
                                      PIN_PUPDR_PULLDOWN(1) |\
-                                     PIN_PUPDR_PULLDOWN(PORTD_TEST_1) |\
+                                     PIN_PUPDR_FLOATING(PORTD_TEST_1) |\
                                      PIN_PUPDR_PULLDOWN(3) |\
                                      PIN_PUPDR_PULLDOWN(4) |\
                                      PIN_PUPDR_PULLDOWN(5) |\
@@ -947,8 +945,8 @@
                                      PIN_OSPEED_2M(14) |\
                                      PIN_OSPEED_2M(15))
 
-#define VAL_GPIOH_PUPDR             (PIN_PUPDR_PULLDOWN(GPIOH_OSC_IN) |\
-                                     PIN_PUPDR_PULLDOWN(GPIOH_OSC_OUT) |\
+#define VAL_GPIOH_PUPDR             (PIN_PUPDR_FLOATING(GPIOH_OSC_IN) |\
+                                     PIN_PUPDR_FLOATING(GPIOH_OSC_OUT) |\
                                      PIN_PUPDR_PULLDOWN(2) |\
                                      PIN_PUPDR_PULLDOWN(3) |\
                                      PIN_PUPDR_PULLDOWN(4) |\
