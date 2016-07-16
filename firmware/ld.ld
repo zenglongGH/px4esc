@@ -82,6 +82,29 @@ SECTIONS
         PROVIDE(__fini_array_end = .);
     } > flash
 
+    /*
+     * This padding section must be inserted before every section with greater alignment.
+     */
+    .padding1 :
+    {
+        /*
+         * Filling is important: if it is not specified, gaps between aligned sections will be filled with zero when
+         * exporting binaries, and will be skipped (i.e. set to 0xFF) when flashing .elf directly during debugging.
+         * The discrepancy causes the firmware CRC to mismatch, preventing the bootloader from running it.
+         * Assigning a well-defined fill byte eliminates the discrepancy (binary files will also contain 0xFF),
+         * allowing to flash the firmware directly with an SWD debugger during development.
+         * See http://www.math.utah.edu/docs/info/ld_3.html
+         */
+        FILL(0xFF);     /* Specifies the fill pattern, can be arbitrary */
+        . = ALIGN(16);  /* Alignment itself */
+        /* Now, we need some dummy data here, otherwise the alignment above will be ignored. */
+        /* We need exactly the same number of bytes in order to retain the alignment. */
+        BYTE(0xFF); BYTE(0xFF); BYTE(0xFF); BYTE(0xFF);
+        BYTE(0xFF); BYTE(0xFF); BYTE(0xFF); BYTE(0xFF);
+        BYTE(0xFF); BYTE(0xFF); BYTE(0xFF); BYTE(0xFF);
+        BYTE(0xFF); BYTE(0xFF); BYTE(0xFF); BYTE(0xFF);
+    } > flash
+
     .text : ALIGN(16) SUBALIGN(16)
     {
         *(.text)
