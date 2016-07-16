@@ -58,9 +58,10 @@ UDEFS += -DGIT_HASH=0x$(GIT_HASH)
 BUILD_CONFIG = 1
 BUILD_CHIBIOS_SHELL = 1
 
-BOOTLOADER_SIZE = 16384
+# 32K bootloader + 16K configuration storage
+APPLICATION_OFFSET = 49152
 
-DDEFS += -DCORTEX_VTOR_INIT=$(BOOTLOADER_SIZE)            \
+DDEFS += -DCORTEX_VTOR_INIT=$(APPLICATION_OFFSET)       \
          -DCRT1_AREAS_NUMBER=0
 
 UDEFS +=
@@ -85,7 +86,7 @@ POST_MAKE_ALL_RULE_HOOK: build/$(PROJECT).bin build/$(PROJECT).elf
 	rm -rf build/*.uavcan.bin build/*.compound.bin
 
 	# Generating compound image with embedded bootloader
-	cd build && dd if=/dev/zero bs=$(BOOTLOADER_SIZE) count=1 | tr "\000" "\377" >padded_bootloader.tmp.bin
+	cd build && dd if=/dev/zero bs=$(APPLICATION_OFFSET) count=1 | tr "\000" "\377" >padded_bootloader.tmp.bin
 	cd build && dd if=$(BOOTLOADER_IMAGE) of=padded_bootloader.tmp.bin conv=notrunc
 	cd build && cat padded_bootloader.tmp.bin $(PROJECT).bin >$(COMPOUND_IMAGE_FILE)
 

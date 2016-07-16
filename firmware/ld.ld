@@ -40,7 +40,8 @@ __process_stack_size__  = 0x0400;
 
 MEMORY
 {
-    flash : org = 0x08004000, len = 368k        /* First 16K reserved for the bootloader */
+    flash : org = 0x0800c000, len = 336k        /* First 48K reserved for the bootloader and nonvolatile storage */
+                                                /* The last sector of flash is temporarily reserved also */
     ram   : org = 0x20000000, len = 128k        /* 112K + 16K */
 }
 
@@ -51,7 +52,7 @@ __ram_end__            = __ram_start__ + __ram_size__;
 
 ENTRY(Reset_Handler)
 
-PROVIDE(DeviceSignatureStorage = ORIGIN(flash) - 256);
+PROVIDE(DeviceSignatureStorage = (0x08008000 - 256));  /* Right at the end of the space reserved for the bootloader */
 
 SECTIONS
 {
