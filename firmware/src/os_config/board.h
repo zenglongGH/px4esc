@@ -45,19 +45,20 @@
 /*
  * Port A
  */
-#define GPIOA_ADCIN0                    0
+#define GPIOA_SENS_A                    0
+#define GPIOA_SENS_B                    1
+#define GPIOA_SENS_C                    2
 
-// PA4, SPI1_NSS, TIM3_CH2, TIM12_CH1, TSC_G2_IO1, ADC_IN4, DAC1_OUT1
-#define GPIOA_PIN_4                     4
-// PA5, SPI1_SCK, TIM2_CH1_ETR, TIM14_CH1, TIM12_CH2, TSC_G2_IO2, ADC_IN5, DAC1_OUT2
-#define GPIOA_PIN_5                     5
-// PA6, SPI1_MISO, TIM3_CH1, TIM13_CH1, TIM16_CH1, TSC_G2_IO3, ADC_IN6, DAC2_OUT1
-#define GPIOA_PIN_6                     6
+#define GPIOA_RCPWM                     3
 
-#define GPIOA_CAN_POWER_DIS             8
+#define GPIOA_OC_ADJ                    4
+#define GPIOA_EN_GATE                   5
+#define GPIOA_DC_CAL                    6
 
-#define GPIOA_UART1_TX                  9
-#define GPIOA_UART1_RX                  10
+#define GPIOA_MOTOR_PWM_1N              7
+#define GPIOA_MOTOR_PWM_1P              8
+#define GPIOA_MOTOR_PWM_2P              9
+#define GPIOA_MOTOR_PWM_3P              10
 
 #define GPIOA_USB_DM                    11
 #define GPIOA_USB_DP                    12
@@ -70,28 +71,56 @@
 /*
  * Port B
  */
-#define GPIOB_LED_CAN_POWER_DIS         1
-#define GPIOB_CAN_TERMINATOR_EN         2
+#define GPIOB_MOTOR_PWM_2N              0
+#define GPIOB_MOTOR_PWM_3N              1
 
-// PB6, I2C1_SCL, TIM16_CH1N, TIM3_CH3, TIM4_CH1, TIM19_CH1, TIM15_CH1, TSC_G5_IO3
-#define GPIOB_PIN_6                     6
-// PB7, I2C1_SDA, TIM17_CH1N, TIM3_CH4, TIM4_CH2, TIM19_CH2, TIM15_CH2, TSC_G5_IO4
-#define GPIOB_PIN_7                     7
+#define GPIOB_GAIN                      2
 
-#define GPIOB_CAN_RX                    8
-#define GPIOB_CAN_TX                    9
+#define GPIOB_TEST_2                    3
+#define GPIOB_TEST_3                    4
+
+#define GPIOB_CAN2_RX                   5
+#define GPIOB_CAN2_TX                   6
+
+#define GPIOB_REQUIRE_GET_NODE_INFO     7
+
+#define GPIOB_CAN1_RX                   8
+#define GPIOB_CAN1_TX                   9
+
+#define GPIOB_UART_TX                   10
 
 /*
- * Port E
+ * Port C
  */
-#define GPIOE_LED_STATUS                8
-#define GPIOE_LED_TRAFFIC               9
+#define GPIOC_TEMPERATURE_SENS          0
+#define GPIOC_VBAT_SENS                 1
+#define GPIOC_CURRENT_2_SENS            2
+#define GPIOC_CURRENT_1_SENS            3
+
+#define GPIOC_UART_RX                   5
+
+#define GPIOC_RPM_PULSE_FEEDBACK        6
+
+#define GPIOC_RGB_LED_RED               7
+#define GPIOC_RGB_LED_GREEN             8
+#define GPIOC_RGB_LED_BLUE              9
+
+#define GPIOC_TEST_4                    12
+
+#define GPIOC_POWER_GOOD                13
+#define GPIOC_OVER_TEMP_WARNING_INVERSE 14
+#define GPIOC_DRIVER_FAULT_INVERSE      15
 
 /*
- * Port F
+ * Port D
  */
-#define GPIOF_OSC_IN                    0
-#define GPIOF_OSC_OUT                   1
+#define PORTD_TEST_1                    2
+
+/*
+ * Port H
+ */
+#define GPIOH_OSC_IN                    0
+#define GPIOH_OSC_OUT                   1
 
 /*
  * I/O ports initial setup, this configuration is established soon after reset in the initialization code.
