@@ -62,4 +62,9 @@ struct HardwareVersion
 
 HardwareVersion detectHardwareVersion();
 
+/**
+ * Sets the LED brightness and color. Brightness is specified per channel in the range [0, 1].
+ */
+void setLEDRGB(float red, float green, float blue);
+
 }

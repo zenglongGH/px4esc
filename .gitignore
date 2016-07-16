@@ -8,7 +8,6 @@
 *.la
 *.a
 *.elf
-*.bin
 *.hex
 lib*.so
 lib*.so.*
