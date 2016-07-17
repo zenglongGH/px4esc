@@ -86,10 +86,18 @@ int main()
 
     chibios_rt::BaseThread::setPriority(NORMALPRIO);
 
+    std::uint8_t counter = 0;
+
     while (true)
     {
         watchdog.reset();
 
-        os::lowsyslog("Hello world\n");
+        // Flying colors for testing
+        board::setLEDRGB(counter, std::uint8_t(counter + 85 * 1), std::uint8_t(counter + 85 * 2));
+
+        os::lowsyslog("%u \r", counter);
+
+        ::usleep(10000);
+        counter++;
     }
 }

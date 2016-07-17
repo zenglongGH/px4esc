@@ -71,6 +71,38 @@ const extern std::uint8_t DeviceSignatureStorage[];
 
 namespace board
 {
+namespace
+{
+
+static void initLEDPWM()
+{
+    {
+        os::CriticalSectionLocker cs;
+        // Power-on and reset
+        RCC->APB1ENR |= RCC_APB1ENR_TIM3EN;
+        RCC->APB1RSTR |=  RCC_APB1RSTR_TIM3RST;
+        RCC->APB1RSTR &= ~RCC_APB1RSTR_TIM3RST;
+    }
+
+    TIM3->ARR = 0xFFFF;
+    TIM3->CR1 = 0;
+    TIM3->CR2 = 0;
+
+    // CC2, CC3, CC4 are R, G, B. Inverted mode.
+    TIM3->CCMR1 = TIM_CCMR1_OC2M_2 | TIM_CCMR1_OC2M_1;
+    TIM3->CCMR2 = TIM_CCMR2_OC3M_2 | TIM_CCMR2_OC3M_1 |
+                  TIM_CCMR2_OC4M_2 | TIM_CCMR2_OC4M_1;
+
+    // All enabled, all inverted.
+    TIM3->CCER = TIM_CCER_CC4E | TIM_CCER_CC3E | TIM_CCER_CC2E |
+                 TIM_CCER_CC4P | TIM_CCER_CC3P | TIM_CCER_CC2P;
+
+    // Start
+    TIM3->EGR = TIM_EGR_UG | TIM_EGR_COMG;
+    TIM3->CR1 |= TIM_CR1_CEN;
+}
+
+}
 
 os::watchdog::Timer init(unsigned watchdog_timeout_msec)
 {
@@ -91,6 +123,11 @@ os::watchdog::Timer init(unsigned watchdog_timeout_msec)
     os::watchdog::init();
     os::watchdog::Timer wdt;
     wdt.startMSec(watchdog_timeout_msec);
+
+    /*
+     * Indication
+     */
+    initLEDPWM();
 
     /*
      * Configuration manager
@@ -152,6 +189,15 @@ HardwareVersion detectHardwareVersion()
     v.minor = 0;                // Some detection will be added in future versions
 
     return v;
+}
+
+void setLEDRGB(uint8_t red, uint8_t green, uint8_t blue)
+{
+    constexpr unsigned Multiplier = 257;
+
+    TIM3->CCR2 = red   * Multiplier;
+    TIM3->CCR3 = green * Multiplier;
+    TIM3->CCR4 = blue  * Multiplier;
 }
 
 } // namespace board
