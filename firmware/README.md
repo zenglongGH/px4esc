@@ -1,7 +1,7 @@
 PX4ESC Firmware
 ===============
 
-# Bootloader
+## Bootloader
 
 Currently we're using the PX4 UAVCAN bootloader.
 Its sources can be found here: <https://github.com/Zubax/PX4Firmware>, branch `px4esc_bootloader`.
