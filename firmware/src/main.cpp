@@ -109,12 +109,12 @@ int main()
         os::lowsyslog("%u \r", counter);
 
         // Matrix mult test
-        Matrix<16, 10> A = Matrix<16, 10>::Random();
-        const Matrix<10, 16> B = A.transpose();
-        const Matrix<10, 10> C = B * A;
-        for (int i = 0; i < A.ColsAtCompileTime; i++)
+        Matrix<8, 8> A = Matrix<8, 8>::Random();
+        const Matrix<8, 8> B = A.transpose();
+        const Matrix<8, 8> C = B * A;
+        for (int i = 0; i < C.ColsAtCompileTime; i++)
         {
-            for (int j = 0; j < A.RowsAtCompileTime; j++)
+            for (int j = 0; j < C.RowsAtCompileTime; j++)
             {
                 os::lowsyslog("%.6f\t", C(i, j));
             }
