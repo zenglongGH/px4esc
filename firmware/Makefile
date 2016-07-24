@@ -46,9 +46,7 @@ UDEFS += -DCONFIG_PARAM_MAX_NAME_LENGTH=16
 # Git commit hash
 #
 
-# TODO: use real git hash once in a repo
-#GIT_HASH := $(shell git rev-parse --short HEAD)
-GIT_HASH := 0
+GIT_HASH := $(shell git rev-parse --short HEAD)
 UDEFS += -DGIT_HASH=0x$(GIT_HASH)
 
 #
