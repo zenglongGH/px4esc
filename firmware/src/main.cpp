@@ -38,12 +38,18 @@
 #include <cstdio>
 #include <cstdlib>
 #include <zubax_chibios/os.hpp>
+#include <Eigen/Eigen>
 
 #include "board/board.hpp"
 
 #if __GNUC__ < 5
 # error "GCC version 5.x or older is required"
 #endif
+
+// Testing
+using Scalar = float;
+template <int Rows, int Cols> using Matrix = Eigen::Matrix<Scalar, Rows, Cols>;
+template <int Size> using Vector = Matrix<Size, 1>;
 
 
 namespace app
@@ -101,6 +107,20 @@ int main()
         board::setLEDRGB(counter, std::uint8_t(counter + 85 * 1), std::uint8_t(counter + 85 * 2));
 
         os::lowsyslog("%u \r", counter);
+
+        // Matrix mult test
+        Matrix<16, 10> A = Matrix<16, 10>::Random();
+        const Matrix<10, 16> B = A.transpose();
+        const Matrix<10, 10> C = B * A;
+        for (int i = 0; i < A.ColsAtCompileTime; i++)
+        {
+            for (int j = 0; j < A.RowsAtCompileTime; j++)
+            {
+                os::lowsyslog("%.6f\t", C(i, j));
+            }
+            os::lowsyslog("\n");
+        }
+        os::lowsyslog("\n");
 
         ::usleep(10000);
         counter++;

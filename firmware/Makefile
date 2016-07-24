@@ -42,6 +42,10 @@ UDEFS = -DFW_VERSION_MAJOR=$(FW_VERSION_MAJOR)           \
 # MAVLink v1 compliance
 UDEFS += -DCONFIG_PARAM_MAX_NAME_LENGTH=16
 
+# Eigen library
+USE_OPT += -Wno-deprecated-declarations
+UINCDIR += eigen3
+
 #
 # Git commit hash
 #
