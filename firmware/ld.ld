@@ -35,8 +35,8 @@
   * Based on a ChibiOS demo app.
   */
 
-__main_stack_size__     = 0x0400;
-__process_stack_size__  = 0x0400;
+__main_stack_size__     = 0x1000;
+__process_stack_size__  = 0x1000;
 
 MEMORY
 {
@@ -61,6 +61,7 @@ SECTIONS
 
     startup : ALIGN(16) SUBALIGN(16)
     {
+        FILL(0xFF);
         KEEP(*(.vectors))
         . = ALIGN(8);
         KEEP(*(.app_descriptor));
@@ -69,6 +70,7 @@ SECTIONS
 
     constructors : ALIGN(4) SUBALIGN(4)
     {
+        FILL(0xFF);
         PROVIDE(__init_array_start = .);
         KEEP(*(SORT(.init_array.*)))
         KEEP(*(.init_array))
@@ -77,6 +79,7 @@ SECTIONS
 
     destructors : ALIGN(4) SUBALIGN(4)
     {
+        FILL(0xFF);
         PROVIDE(__fini_array_start = .);
         KEEP(*(.fini_array))
         KEEP(*(SORT(.fini_array.*)))
@@ -108,6 +111,7 @@ SECTIONS
 
     .text : ALIGN(16) SUBALIGN(16)
     {
+        FILL(0xFF);
         *(.text)
         *(.text.*)
         *(.rodata)
@@ -139,8 +143,18 @@ SECTIONS
         *(.eh_frame)
     } > flash
 
+    .padding2 :
+    {
+        /* Read comments near padding1 for explanation */
+        FILL(0xFF);
+        . = ALIGN(8);
+        BYTE(0xFF); BYTE(0xFF); BYTE(0xFF); BYTE(0xFF);
+        BYTE(0xFF); BYTE(0xFF); BYTE(0xFF); BYTE(0xFF);
+    } > flash
+    
     .textalign : ONLY_IF_RO
     {
+        FILL(0xFF);
         . = ALIGN(8);
     } > flash
 
@@ -169,6 +183,7 @@ SECTIONS
 
     .data : ALIGN(4)
     {
+        FILL(0xFF);
         . = ALIGN(4);
         PROVIDE(_data_start = .);
         *(.data)
