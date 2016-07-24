@@ -41,6 +41,10 @@
 
 #include "board/board.hpp"
 
+#if __GNUC__ < 5
+# error "GCC version 5.x or older is required"
+#endif
+
 
 namespace app
 {
@@ -64,7 +68,7 @@ static const volatile struct __attribute__((packed))
 constexpr unsigned WatchdogTimeoutMSec = 1500;
 
 
-auto init()
+os::watchdog::Timer init()
 {
     /*
      * Board initialization
@@ -76,6 +80,7 @@ auto init()
 
 }
 }
+
 
 int main()
 {
