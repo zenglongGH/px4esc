@@ -61,7 +61,7 @@ SECTIONS
 
     startup : ALIGN(16) SUBALIGN(16)
     {
-        FILL(0xFF);
+        FILL(0xDEADC0DE);
         KEEP(*(.vectors))
         . = ALIGN(8);
         KEEP(*(.app_descriptor));
@@ -70,7 +70,7 @@ SECTIONS
 
     constructors : ALIGN(4) SUBALIGN(4)
     {
-        FILL(0xFF);
+        FILL(0xDEADC0DE);
         PROVIDE(__init_array_start = .);
         KEEP(*(SORT(.init_array.*)))
         KEEP(*(.init_array))
@@ -79,7 +79,7 @@ SECTIONS
 
     destructors : ALIGN(4) SUBALIGN(4)
     {
-        FILL(0xFF);
+        FILL(0xDEADC0DE);
         PROVIDE(__fini_array_start = .);
         KEEP(*(.fini_array))
         KEEP(*(SORT(.fini_array.*)))
@@ -95,23 +95,20 @@ SECTIONS
          * Filling is important: if it is not specified, gaps between aligned sections will be filled with zero when
          * exporting binaries, and will be skipped (i.e. set to 0xFF) when flashing .elf directly during debugging.
          * The discrepancy causes the firmware CRC to mismatch, preventing the bootloader from running it.
-         * Assigning a well-defined fill byte eliminates the discrepancy (binary files will also contain 0xFF),
-         * allowing to flash the firmware directly with an SWD debugger during development.
+         * Assigning a well-defined fill byte eliminates the discrepancy (binary files will also contain 0xFF or
+         * whatever), allowing to flash the firmware directly with an SWD debugger during development.
          * See http://www.math.utah.edu/docs/info/ld_3.html
+         * Also http://blog.hrbacek.info/2013/12/28/filling-unused-memory-area-using-gnu-linker-script
          */
-        FILL(0xFF);     /* Specifies the fill pattern, can be arbitrary */
-        . = ALIGN(16);  /* Alignment itself */
+        FILL(0xDEADC0DE);
         /* Now, we need some dummy data here, otherwise the alignment above will be ignored. */
-        /* We need exactly the same number of bytes in order to retain the alignment. */
-        BYTE(0xFF); BYTE(0xFF); BYTE(0xFF); BYTE(0xFF);
-        BYTE(0xFF); BYTE(0xFF); BYTE(0xFF); BYTE(0xFF);
-        BYTE(0xFF); BYTE(0xFF); BYTE(0xFF); BYTE(0xFF);
-        BYTE(0xFF); BYTE(0xFF); BYTE(0xFF); BYTE(0xFF);
+        BYTE(0xFF);
+        . = ALIGN(64);  /* Text sometimes gets aligned at >32, not sure why */
     } > flash
 
     .text : ALIGN(16) SUBALIGN(16)
     {
-        FILL(0xFF);
+        FILL(0xDEADC0DE);
         *(.text)
         *(.text.*)
         *(.rodata)
@@ -143,19 +140,11 @@ SECTIONS
         *(.eh_frame)
     } > flash
 
-    .padding2 :
-    {
-        /* Read comments near padding1 for explanation */
-        FILL(0xFF);
-        . = ALIGN(8);
-        BYTE(0xFF); BYTE(0xFF); BYTE(0xFF); BYTE(0xFF);
-        BYTE(0xFF); BYTE(0xFF); BYTE(0xFF); BYTE(0xFF);
-    } > flash
-    
     .textalign : ONLY_IF_RO
     {
-        FILL(0xFF);
-        . = ALIGN(8);
+        FILL(0xDEADC0DE);
+        BYTE(0xFF);
+        . = ALIGN(64);
     } > flash
 
     . = ALIGN(4);
@@ -183,7 +172,7 @@ SECTIONS
 
     .data : ALIGN(4)
     {
-        FILL(0xFF);
+        FILL(0xDEADC0DE);
         . = ALIGN(4);
         PROVIDE(_data_start = .);
         *(.data)
