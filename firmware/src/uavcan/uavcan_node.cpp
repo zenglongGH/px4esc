@@ -411,25 +411,9 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
             board::die(res);
         }
 
-//        res = init_esc_controller(getNode());
-//        if (res < 0)
-//        {
-//            board::die(res);
-//        }
-//
-//        res = init_indication_controller(getNode());
-//        if (res < 0)
-//        {
-//            board::die(res);
-//        }
-//
-//
-//        enumeration_handler_.construct<uavcan::INode&>(getNode());
-//        res = enumeration_handler_->start();
-//        if (res < 0)
-//        {
-//            board::die(res);
-//        }
+        // TODO: ESC API
+        // TODO: Indication API
+        // TODO: Enumeration API
 
         os::lowsyslog("UAVCAN: Node started, ID %i\n", int(getNode().getNodeID().get()));
     }

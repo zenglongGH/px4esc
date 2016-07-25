@@ -160,8 +160,8 @@ os::watchdog::Timer init()
                       {fw_version.major, fw_version.minor},
                       fw_version.image_crc64we,
                       fw_version.vcs_commit,
-                      onFirmwareUpdateRequestedFromUAVCAN,
-                      onRebootRequested);
+                      &onFirmwareUpdateRequestedFromUAVCAN,
+                      &onRebootRequested);
 
     return watchdog;
 }
