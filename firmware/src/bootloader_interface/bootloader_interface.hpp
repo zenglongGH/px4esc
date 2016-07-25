@@ -65,6 +65,7 @@ struct AppShared
 };
 
 static_assert(sizeof(AppShared) <= 240, "AppShared may be larger than the amount of allocated memory");
+static_assert(sizeof(bool) == 1, "Please redefine bool as uint8_t in the shared struct (should never happen on ARM)");
 
 /**
  * Descriptor of the firmware that is currently being executed.
