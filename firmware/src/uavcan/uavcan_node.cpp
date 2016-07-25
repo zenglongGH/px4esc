@@ -69,7 +69,7 @@ uavcan_stm32::CanInitHelper<RxQueueDepth> g_can;        ///< CAN driver instance
 uavcan::protocol::SoftwareVersion g_firmware_version;
 std::uint32_t g_can_bit_rate;
 uavcan::NodeID g_node_id;
-std::uint8_t g_node_status_mode = uavcan::protocol::NodeStatus::MODE_OPERATIONAL;
+std::uint8_t g_node_status_mode = uavcan::protocol::NodeStatus::MODE_INITIALIZATION;
 std::uint8_t g_node_status_health = uavcan::protocol::NodeStatus::HEALTH_OK;
 
 /**
@@ -500,6 +500,12 @@ void setNodeStatus(NodeStatus ns)
         break;
     }
     }
+}
+
+void notifyNodeInitializationComplete()
+{
+    // Atomic write, no need for locking
+    g_node_status_mode = uavcan::protocol::NodeStatus::MODE_OPERATIONAL;
 }
 
 uavcan::NodeID getNodeID()

@@ -178,6 +178,8 @@ int main()
 
     std::uint8_t counter = 0;
 
+    uavcan_node::notifyNodeInitializationComplete();
+
     while (!os::isRebootRequested())
     {
         watchdog.reset();
