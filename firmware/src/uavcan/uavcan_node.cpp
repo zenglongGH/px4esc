@@ -98,8 +98,10 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
 {
     os::watchdog::Timer wdt_;
 
-    void init_can()
+    void initCAN()
     {
+        os::lowsyslog("UAVCAN: Inherited CAN bitrate: %u\n", unsigned(g_can_bit_rate));
+
         int res = 0;
         do
         {
@@ -113,7 +115,6 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
             if (res >= 0)
             {
                 g_can_bit_rate = bitrate;
-                os::lowsyslog("UAVCAN: CAN inited at %u bps\n", unsigned(g_can_bit_rate));
             }
             else if (autodetect && (res == -uavcan_stm32::ErrBitRateNotDetected))
             {
@@ -128,9 +129,10 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
         while (res < 0);
 
         assert(g_can_bit_rate > 0);
+        os::lowsyslog("UAVCAN: CAN inited at %u bps\n", unsigned(g_can_bit_rate));
     }
 
-    void init_node()
+    void initNode()
     {
         /*
          * Filling node info
@@ -177,6 +179,8 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
         /*
          * Configuring node ID
          */
+        os::lowsyslog("UAVCAN: Inherited node ID: %u\n", g_node_id.get());
+
         if (g_param_node_id.get() > 0 || g_node_id.isUnicast())         // Node ID is already known
         {
             // Config takes precedence over hint
@@ -253,11 +257,11 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
         wdt_.startMSec(10000);
         setName("uavcan");
 
-        init_can();
+        initCAN();
 
         wdt_.reset();
 
-        init_node();
+        initNode();
 
         while (!os::isRebootRequested())
         {
