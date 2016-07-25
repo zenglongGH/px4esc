@@ -165,7 +165,7 @@ UniqueID readUniqueID()
 {
     UniqueID bytes;
     std::fill(bytes.begin(), bytes.end(), 0);
-    std::memcpy(bytes.data(), reinterpret_cast<const void*>(0x1FFFF7AC), 12);
+    std::memcpy(bytes.data(), reinterpret_cast<const void*>(0x1FFF7A10), 12);
     return bytes;
 }
 
