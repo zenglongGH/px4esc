@@ -56,6 +56,7 @@ namespace
 static constexpr unsigned MemoryPoolSize = 8192;
 static constexpr unsigned RxQueueDepth = 32;
 static constexpr unsigned NodeThreadPriority = (HIGHPRIO + NORMALPRIO) / 2;
+static constexpr unsigned FixedBitrateInitTimeoutSec = 10;
 
 /**
  * Node declarations.
@@ -100,9 +101,10 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
 
     void initCAN()
     {
-        os::lowsyslog("UAVCAN: Inherited CAN bitrate: %u\n", unsigned(g_can_bit_rate));
-
         int res = 0;
+
+        unsigned fixed_failures_cnt = 0;
+
         do
         {
             wdt_.reset();
@@ -124,6 +126,17 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
             {
                 os::lowsyslog("UAVCAN: Could not init CAN; status: %d, autodetect: %d, bitrate: %u\n",
                               res, int(autodetect), unsigned(bitrate));
+
+                if (!autodetect)
+                {
+                    fixed_failures_cnt++;
+
+                    if (fixed_failures_cnt >= FixedBitrateInitTimeoutSec)
+                    {
+                        os::lowsyslog("UAVCAN: Too many CAN init errors, falling back to autodetect\n");
+                        g_can_bit_rate = 0;
+                    }
+                }
             }
         }
         while (res < 0);
@@ -179,8 +192,6 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
         /*
          * Configuring node ID
          */
-        os::lowsyslog("UAVCAN: Inherited node ID: %u\n", g_node_id.get());
-
         if (g_param_node_id.get() > 0 || g_node_id.isUnicast())         // Node ID is already known
         {
             // Config takes precedence over hint
