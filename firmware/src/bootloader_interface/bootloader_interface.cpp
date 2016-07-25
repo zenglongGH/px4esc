@@ -32,9 +32,7 @@
 ****************************************************************************/
 
 #include "bootloader_interface.hpp"
-#include <uavcan_stm32/bxcan.hpp>
-#include <uavcan/uavcan.hpp>
-
+#include <zubax_chibios/bootloader/app_shared.hpp>
 
 namespace bootloader_interface
 {
@@ -54,59 +52,6 @@ static const volatile struct __attribute__((packed))
 } _app_descriptor __attribute__((section(".app_descriptor")));
 
 
-static constexpr auto BootloaderSignature = 0xB0A0424CU;
-static constexpr auto AppSignature        = 0xB0A04150U;
-
-
-struct SharedData
-{
-    std::uint32_t can_bus_bit_rate_bps = 0;
-    std::uint8_t uavcan_node_id = 0;
-} static shared_data;
-
-
-class CRCComputer : public uavcan::DataTypeSignatureCRC
-{
-public:
-    void add(std::uint32_t value)
-    {
-        uavcan::DataTypeSignatureCRC::add(reinterpret_cast<const std::uint8_t*>(&value), 4);
-    }
-};
-
-
-void init()
-{
-    const auto signature = uavcan_stm32::bxcan::Can[0]->FilterRegister[3].FR1;
-    uavcan_stm32::bxcan::Can[0]->FilterRegister[3].FR1 = 0;                     // Invalidate to prevent deja vu
-
-    const auto bus_speed = uavcan_stm32::bxcan::Can[0]->FilterRegister[3].FR2;
-    const auto node_id   = uavcan_stm32::bxcan::Can[0]->FilterRegister[4].FR1;
-
-    union
-    {
-        std::uint64_t u64;
-        std::uint32_t u32[2];
-    } crc;
-    crc.u32[0] = uavcan_stm32::bxcan::Can[0]->FilterRegister[2].FR2;
-    crc.u32[1] = uavcan_stm32::bxcan::Can[0]->FilterRegister[2].FR1;
-
-    CRCComputer computer;
-    computer.add(signature);
-    computer.add(bus_speed);
-    computer.add(node_id);
-
-    const auto signature_match = signature == BootloaderSignature;
-    const auto crc_match = crc.u64 == computer.get();
-    const auto valid_params = (bus_speed > 0) && (node_id <= uavcan::NodeID::Max);
-
-    if (signature_match && crc_match && valid_params)
-    {
-        shared_data.can_bus_bit_rate_bps = bus_speed;
-        shared_data.uavcan_node_id = static_cast<std::uint8_t>(node_id);
-    }
-}
-
 FirmwareVersion getFirmwareVersion()
 {
     FirmwareVersion x;
@@ -117,35 +62,20 @@ FirmwareVersion getFirmwareVersion()
     return x;
 }
 
-std::uint32_t getInheritedCANBusBitRate()
+static inline auto makeMarshaller()
 {
-    return shared_data.can_bus_bit_rate_bps;
+    // Note that the first 256 bytes of SRAM are used for bootloader-app communication! See the linker script.
+    return bootloader::app_shared::makeAppSharedMarshaller<AppShared>(reinterpret_cast<void*>(SRAM_BASE));
 }
 
-std::uint8_t getInheritedUAVCANNodeID()
+std::pair<AppShared, bool> readAndInvalidateSharedStruct()
 {
-    return shared_data.uavcan_node_id;
+    return makeMarshaller().read(bootloader::app_shared::AutoErase::EraseAfterRead);
 }
 
-void passParametersToBootloader(std::uint32_t can_bus_bit_rate, std::uint8_t uavcan_node_id)
+void writeSharedStruct(const AppShared& shared)
 {
-    uavcan_stm32::bxcan::Can[0]->FilterRegister[3].FR1 = AppSignature;
-    uavcan_stm32::bxcan::Can[0]->FilterRegister[3].FR2 = can_bus_bit_rate;
-    uavcan_stm32::bxcan::Can[0]->FilterRegister[4].FR1 = uavcan_node_id;
-
-    CRCComputer computer;
-    computer.add(uavcan_stm32::bxcan::Can[0]->FilterRegister[3].FR1);
-    computer.add(uavcan_stm32::bxcan::Can[0]->FilterRegister[3].FR2);
-    computer.add(uavcan_stm32::bxcan::Can[0]->FilterRegister[4].FR1);
-
-    union
-    {
-        std::uint64_t u64;
-        std::uint32_t u32[2];
-    } crc;
-    crc.u64 = computer.get();
-    uavcan_stm32::bxcan::Can[0]->FilterRegister[2].FR2 = crc.u32[0];
-    uavcan_stm32::bxcan::Can[0]->FilterRegister[2].FR1 = crc.u32[1];
+    makeMarshaller().write(shared);
 }
 
 }

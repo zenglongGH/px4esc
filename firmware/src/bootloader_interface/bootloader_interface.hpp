@@ -34,10 +34,38 @@
 #pragma once
 
 #include <cstdint>
+#include <utility>
 
 
 namespace bootloader_interface
 {
+/**
+ * This struct is used to exchange data between the bootloader and the application.
+ * Its format allows for future extensions.
+ */
+struct AppShared
+{
+    std::uint32_t reserved_a = 0;                               ///< Reserved for future use
+    std::uint32_t reserved_b = 0;                               ///< Reserved for future use
+
+    /*
+     * UAVCAN part
+     */
+    std::uint32_t can_bus_speed = 0;                            ///< App <-> Bootloader
+    std::uint8_t uavcan_node_id = 0;                            ///< App <-> Bootloader
+    std::uint8_t uavcan_fw_server_node_id = 0;                  ///< App --> Bootloader
+
+    static constexpr std::uint8_t UAVCANFileNameMaxLength = 201;
+    char uavcan_file_name[UAVCANFileNameMaxLength] = {};        ///< App --> Bootloader
+
+    /*
+     * General part
+     */
+    bool stay_in_bootloader = false;                            ///< App --> Bootloader
+};
+
+static_assert(sizeof(AppShared) <= 240, "AppShared may be larger than the amount of allocated memory");
+
 /**
  * Descriptor of the firmware that is currently being executed.
  * This descriptor is used (at least) by the UAVCAN node and CLI interface.
@@ -51,32 +79,24 @@ struct FirmwareVersion
 };
 
 /**
- * Reads the bootloader's shared data structure.
- * This function must be invoked before the CAN hardware is initialized.
- */
-void init();
-
-/**
  * Returns version info of the currently running firmware image.
  * This function relies on the firmware image post-processing; refer to the build system docs for details.
  */
 FirmwareVersion getFirmwareVersion();
 
 /**
- * If known, returns the bit rate value inherited from the bootloader.
- * If unknown, return zero.
+ * Reads the bootloader-app shared structure from the shared memory location and returns it by value.
+ * The operation will fail if the structure is not written correctly (e.g. if the bootloader didn't provide any
+ * information or if it was using wrong structure layout due to version mismatch, or whatever).
+ * The success of the operation is indicated in the second member of the returned pair.
+ * Note that the structure will be invalidated after read to prevent deja-vu.
  */
-std::uint32_t getInheritedCANBusBitRate();
+std::pair<AppShared, bool> readAndInvalidateSharedStruct();
 
 /**
- * If known, returns the node ID value inherited from the bootloader.
- * If unknown, returns zero.
+ * Writes the bootloader-app shared data structure.
+ * This function cannot fail.
  */
-std::uint8_t getInheritedUAVCANNodeID();
-
-/**
- * Initializes the shared data structure with given values.
- */
-void passParametersToBootloader(std::uint32_t can_bus_bit_rate, std::uint8_t uavcan_node_id);
+void writeSharedStruct(const AppShared& shared);
 
 }

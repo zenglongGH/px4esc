@@ -69,14 +69,27 @@ os::watchdog::Timer init()
      */
     auto watchdog = board::init(WatchdogTimeoutMSec);
 
-    bootloader_interface::init();
     const auto fw_version = bootloader_interface::getFirmwareVersion();
+
+    const auto app_shared_read_result = bootloader_interface::readAndInvalidateSharedStruct();
+    const auto& app_shared = app_shared_read_result.first;
+    const auto app_shared_available = app_shared_read_result.second;
+
+    if (app_shared_available)
+    {
+        os::lowsyslog("Init: Bootloader struct values: CAN bitrate: %u, UAVCAN Node ID: %u\n",
+                      unsigned(app_shared.can_bus_speed), app_shared.uavcan_node_id);
+    }
+    else
+    {
+        os::lowsyslog("Init: Bootloader struct is NOT present\n");
+    }
 
     /*
      * UAVCAN node initialization
      */
-    uavcan_node::init(bootloader_interface::getInheritedCANBusBitRate(),
-                      bootloader_interface::getInheritedUAVCANNodeID(),
+    uavcan_node::init(app_shared_available ? app_shared.can_bus_speed : 0,
+                      app_shared_available ? app_shared.uavcan_node_id : 0,
                       {fw_version.major, fw_version.minor},
                       fw_version.image_crc64we,
                       fw_version.vcs_commit);

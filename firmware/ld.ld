@@ -42,7 +42,7 @@ MEMORY
 {
     flash : org = 0x0800c000, len = 336k        /* First 48K reserved for the bootloader and nonvolatile storage */
                                                 /* The last sector of flash is temporarily reserved also */
-    ram   : org = 0x20000000, len = 128k        /* 112K + 16K */
+    ram   : org = 0x20000100, len = 130816      /* First 256 bytes are reserved for bootloader-app communication. */
 }
 
 
