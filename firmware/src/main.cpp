@@ -42,7 +42,7 @@
 
 #include "board/board.hpp"
 #include "bootloader_interface/bootloader_interface.hpp"
-#include "uavcan/uavcan_node.hpp"
+#include "uavcan_node/uavcan_node.hpp"
 
 #if __GNUC__ < 5
 # error "GCC version 5.x or newer is required"
