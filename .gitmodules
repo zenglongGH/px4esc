@@ -4,3 +4,6 @@
 [submodule "firmware/eigen"]
 	path = firmware/eigen
 	url = https://github.com/Zubax/eigen
+[submodule "firmware/libuavcan"]
+	path = firmware/libuavcan
+	url = https://github.com/UAVCAN/libuavcan

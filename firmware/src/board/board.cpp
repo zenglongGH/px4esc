@@ -135,7 +135,7 @@ os::watchdog::Timer init(unsigned watchdog_timeout_msec)
     const int config_init_res = os::config::init();
     if (config_init_res < 0)
     {
-        die();
+        die(config_init_res);
     }
 
     /*
@@ -148,8 +148,9 @@ os::watchdog::Timer init(unsigned watchdog_timeout_msec)
 }
 
 __attribute__((noreturn))
-void die()
+void die(int reason)
 {
+    chSysHalt(os::intToString(reason));
     while (1)
     {
     }

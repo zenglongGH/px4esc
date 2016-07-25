@@ -34,37 +34,61 @@
 #pragma once
 
 #include <cstdint>
-#include <array>
-#include <zubax_chibios/os.hpp>
+#include <utility>
 
-namespace board
+
+namespace uavcan_node
 {
-
-os::watchdog::Timer init(unsigned watchdog_timeout_msec);
-
-__attribute__((noreturn))
-void die(int reason);
-
-void restart();
-
-typedef std::array<std::uint8_t, 16> UniqueID;
-UniqueID readUniqueID();
-
-typedef std::array<std::uint8_t, 128> DeviceSignature;
-bool tryReadDeviceSignature(DeviceSignature& out_sign);
-bool tryWriteDeviceSignature(const DeviceSignature& sign);
-
-struct HardwareVersion
+/**
+ * Refer to setNodeStatus().
+ */
+enum class NodeStatus
 {
-    std::uint8_t major;
-    std::uint8_t minor;
+    OK,
+    Warning,
+    Critical
 };
 
-HardwareVersion detectHardwareVersion();
+/**
+ * Starts the local UAVCAN node in a dedicated thread.
+ * This function cannot fail.
+ *
+ * @param bit_rate_hint                 CAN bus bitrate to use; zero if no hint is available.
+ *                                      Typically this value should be provided by the bootloader.
+ *
+ * @param node_id_hint                  Node ID to use; use broadcast or invalid node ID if no hint is available.
+ *                                      Typically this value should be provided by the bootloader.
+ *
+ * @param firmware_version_major_minor  Pair of major and minor firmware version numbers.
+ *
+ * @param firmware_image_crc64we        CRC-64-WE of the firmware image.
+ *
+ * @param firmware_vcs_commit           Commit hash of the firmware sources.
+ */
+void init(std::uint32_t bit_rate_hint,
+          std::uint8_t node_id_hint,
+          std::pair<std::uint8_t, std::uint8_t> firmware_version_major_minor,
+          std::uint64_t firmware_image_crc64we,
+          std::uint32_t firmware_vcs_commit);
 
 /**
- * Sets the LED brightness and color. Brightness is specified per channel in the range [0, 255].
+ * Sets the status of the local node. The NodeStatus value is translated into the UAVCAN-defined node status code.
  */
-void setLEDRGB(uint8_t red, uint8_t green, uint8_t blue);
+void setNodeStatus(NodeStatus ns);
+
+/**
+ * Signal the local node that the application has completed initialization and is ready to perform its functions.
+ */
+void notifyNodeInitializationComplete();
+
+/**
+ * Returns current node ID, if set, zero otherwise.
+ */
+std::uint8_t getNodeID();
+
+/**
+ * Returns current CAN bus bitrate, if set, zero otherwise.
+ */
+std::uint32_t getCANBusBitRate();
 
 }

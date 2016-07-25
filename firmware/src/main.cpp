@@ -41,9 +41,11 @@
 #include <Eigen/Eigen>
 
 #include "board/board.hpp"
+#include "bootloader_interface/bootloader_interface.hpp"
+#include "uavcan/uavcan_node.hpp"
 
 #if __GNUC__ < 5
-# error "GCC version 5.x or older is required"
+# error "GCC version 5.x or newer is required"
 #endif
 
 // Testing
@@ -56,20 +58,6 @@ namespace app
 {
 namespace
 {
-/**
- * This is the Brickproof Bootloader's app descriptor.
- * Details: https://github.com/PX4/Firmware/tree/nuttx_next/src/drivers/bootloaders/src/uavcan
- */
-static const volatile struct __attribute__((packed))
-{
-    std::uint8_t signature[8]   = {'A','P','D','e','s','c','0','0'};
-    std::uint64_t image_crc     = 0;
-    std::uint32_t image_size    = 0;
-    std::uint32_t vcs_commit    = GIT_HASH;
-    std::uint8_t major_version  = FW_VERSION_MAJOR;
-    std::uint8_t minor_version  = FW_VERSION_MINOR;
-    std::uint8_t reserved[6]    = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-} _app_descriptor __attribute__((section(".app_descriptor")));
 
 constexpr unsigned WatchdogTimeoutMSec = 1500;
 
@@ -80,6 +68,18 @@ os::watchdog::Timer init()
      * Board initialization
      */
     auto watchdog = board::init(WatchdogTimeoutMSec);
+
+    bootloader_interface::init();
+    const auto fw_version = bootloader_interface::getFirmwareVersion();
+
+    /*
+     * UAVCAN node initialization
+     */
+    uavcan_node::init(bootloader_interface::getInheritedCANBusBitRate(),
+                      bootloader_interface::getInheritedUAVCANNodeID(),
+                      {fw_version.major, fw_version.minor},
+                      fw_version.image_crc64we,
+                      fw_version.vcs_commit);
 
     return watchdog;
 }
@@ -105,22 +105,6 @@ int main()
 
         // Flying colors for testing
         board::setLEDRGB(counter, std::uint8_t(counter + 85 * 1), std::uint8_t(counter + 85 * 2));
-
-        os::lowsyslog("%u \r", counter);
-
-        // Matrix mult test
-        Matrix<8, 8> A = Matrix<8, 8>::Random();
-        const Matrix<8, 8> B = A.transpose();
-        const Matrix<8, 8> C = B * A;
-        for (int i = 0; i < C.ColsAtCompileTime; i++)
-        {
-            for (int j = 0; j < C.RowsAtCompileTime; j++)
-            {
-                os::lowsyslog("%.6f\t", C(i, j));
-            }
-            os::lowsyslog("\n");
-        }
-        os::lowsyslog("\n");
 
         ::usleep(10000);
         counter++;

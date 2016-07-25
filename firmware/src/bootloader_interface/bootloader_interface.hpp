@@ -34,37 +34,49 @@
 #pragma once
 
 #include <cstdint>
-#include <array>
-#include <zubax_chibios/os.hpp>
 
-namespace board
+
+namespace bootloader_interface
 {
-
-os::watchdog::Timer init(unsigned watchdog_timeout_msec);
-
-__attribute__((noreturn))
-void die(int reason);
-
-void restart();
-
-typedef std::array<std::uint8_t, 16> UniqueID;
-UniqueID readUniqueID();
-
-typedef std::array<std::uint8_t, 128> DeviceSignature;
-bool tryReadDeviceSignature(DeviceSignature& out_sign);
-bool tryWriteDeviceSignature(const DeviceSignature& sign);
-
-struct HardwareVersion
+/**
+ * Descriptor of the firmware that is currently being executed.
+ * This descriptor is used (at least) by the UAVCAN node and CLI interface.
+ */
+struct FirmwareVersion
 {
-    std::uint8_t major;
-    std::uint8_t minor;
+    std::uint64_t image_crc64we = 0;    ///< CRC-64-WE, same as in libuavcan
+    std::uint32_t vcs_commit = 0;       ///< 32-bit commit hash of the firmware source
+    std::uint8_t major = 0;             ///< Major version number
+    std::uint8_t minor = 0;             ///< Minor version number
 };
 
-HardwareVersion detectHardwareVersion();
+/**
+ * Reads the bootloader's shared data structure.
+ * This function must be invoked before the CAN hardware is initialized.
+ */
+void init();
 
 /**
- * Sets the LED brightness and color. Brightness is specified per channel in the range [0, 255].
+ * Returns version info of the currently running firmware image.
+ * This function relies on the firmware image post-processing; refer to the build system docs for details.
  */
-void setLEDRGB(uint8_t red, uint8_t green, uint8_t blue);
+FirmwareVersion getFirmwareVersion();
+
+/**
+ * If known, returns the bit rate value inherited from the bootloader.
+ * If unknown, return zero.
+ */
+std::uint32_t getInheritedCANBusBitRate();
+
+/**
+ * If known, returns the node ID value inherited from the bootloader.
+ * If unknown, returns zero.
+ */
+std::uint8_t getInheritedUAVCANNodeID();
+
+/**
+ * Initializes the shared data structure with given values.
+ */
+void passParametersToBootloader(std::uint32_t can_bus_bit_rate, std::uint8_t uavcan_node_id);
 
 }
