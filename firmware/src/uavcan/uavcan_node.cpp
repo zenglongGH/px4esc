@@ -40,6 +40,7 @@
 #include <uavcan_stm32/uavcan_stm32.hpp>
 #include <uavcan/protocol/param_server.hpp>
 #include <uavcan/protocol/dynamic_node_id_client.hpp>
+#include <uavcan/protocol/restart_request_server.hpp>
 
 #include <board/board.hpp>
 
@@ -77,6 +78,12 @@ std::uint8_t g_node_status_health = uavcan::protocol::NodeStatus::HEALTH_OK;
 os::config::Param<std::uint8_t> g_param_node_id("uavcan.node_id",       0,      0,      125);
 
 /**
+ * Callbacks.
+ */
+FirmwareUpdateRequestCallback g_on_firmware_update_requested;
+RebootRequestCallback g_on_reboot_requested;
+
+/**
  * Implementation details.
  * Functions that return references to statics are designed this way as means to implement late initialization.
  */
@@ -86,11 +93,172 @@ Node& getNode()
     return node;
 }
 
-//uavcan::ParamServer& getParamServer()
-//{
-//    static uavcan::ParamServer server(getNode());
-//    return server;
-//}
+uavcan::ParamServer& getParamServer()
+{
+    static uavcan::ParamServer server(getNode());
+    return server;
+}
+
+/**
+ * Param access server
+ * TODO: Rewrite to use pure C++ API to Zubax ChibiOS.
+ */
+class ParamManager : public uavcan::IParamManager
+{
+    void convert(float native_value, ConfigDataType native_type, Value& out_value) const
+    {
+        if (native_type == CONFIG_TYPE_BOOL)
+        {
+            out_value.to<Value::Tag::boolean_value>() = !uavcan::isCloseToZero(native_value);
+        }
+        else if (native_type == CONFIG_TYPE_INT)
+        {
+            out_value.to<Value::Tag::integer_value>() = static_cast<std::int64_t>(native_value);
+        }
+        else if (native_type == CONFIG_TYPE_FLOAT)
+        {
+            out_value.to<Value::Tag::real_value>() = native_value;
+        }
+        else
+        {
+            ; // Invalid type - leave empty
+        }
+    }
+
+    void convert(float native_value, ConfigDataType native_type, NumericValue& out_value) const
+    {
+        if (native_type == CONFIG_TYPE_INT)
+        {
+            out_value.to<NumericValue::Tag::integer_value>() = static_cast<std::int64_t>(native_value);
+        }
+        else if (native_type == CONFIG_TYPE_FLOAT)
+        {
+            out_value.to<NumericValue::Tag::real_value>() = native_value;
+        }
+        else
+        {
+            ; // Not applicable - leave empty
+        }
+    }
+
+    void getParamNameByIndex(Index index, Name& out_name) const override
+    {
+        const char* name = configNameByIndex(index);
+        if (name != nullptr)
+        {
+            out_name = name;
+        }
+    }
+
+    void assignParamValue(const Name& name, const Value& value) override
+    {
+        float native_value = 0.F;
+
+        if (value.is(Value::Tag::boolean_value))
+        {
+            native_value = (*value.as<Value::Tag::boolean_value>()) ? 1.F : 0.F;
+        }
+        else if (value.is(Value::Tag::integer_value))
+        {
+            native_value = static_cast<float>(*value.as<Value::Tag::integer_value>());
+        }
+        else if (value.is(Value::Tag::real_value))
+        {
+            native_value = *value.as<Value::Tag::real_value>();
+        }
+        else
+        {
+            return;
+        }
+
+        (void)configSet(name.c_str(), native_value);
+    }
+
+    void readParamValue(const Name& name, Value& out_value) const override
+    {
+        ConfigParam descr;
+        const int res = configGetDescr(name.c_str(), &descr);
+        if (res >= 0)
+        {
+            convert(configGet(name.c_str()), descr.type, out_value);
+        }
+    }
+
+    void readParamDefaultMaxMin(const Name& name, Value& out_default,
+                                NumericValue& out_max, NumericValue& out_min) const override
+    {
+        ConfigParam descr;
+        const int res = configGetDescr(name.c_str(), &descr);
+        if (res >= 0)
+        {
+            convert(descr.default_, descr.type, out_default);
+            convert(descr.max, descr.type, out_max);
+            convert(descr.min, descr.type, out_min);
+        }
+    }
+
+    int saveAllParams() override
+    {
+        return configSave();
+    }
+
+    int eraseAllParams() override
+    {
+        return configErase();
+    }
+} g_param_manager;
+
+/**
+ * Restart handler
+ */
+class RestartRequestHandler : public uavcan::IRestartRequestHandler
+{
+    bool handleRestartRequest(uavcan::NodeID request_source) override
+    {
+        uavcan::MakeString<40>::Type str("Request from node ");
+        str.appendFormatted("%d", request_source.get());
+
+        if (g_on_reboot_requested)
+        {
+            return g_on_reboot_requested(str.c_str());
+        }
+        else
+        {
+            os::lowsyslog("UAVCAN: REBOOT REQUEST HANDLER NOT SET\n");
+            return false;
+        }
+    }
+} g_restart_request_handler;
+
+/**
+ * Firmware update server
+ */
+auto& getBeginFirmwareUpdateServer()
+{
+    static uavcan::ServiceServer<uavcan::protocol::file::BeginFirmwareUpdate,
+        void (*)(const uavcan::ReceivedDataStructure<uavcan::protocol::file::BeginFirmwareUpdate::Request>&,
+                 uavcan::protocol::file::BeginFirmwareUpdate::Response&)> srv(getNode());
+    return srv;
+}
+
+void handleBeginFirmwareUpdateRequest(
+    const uavcan::ReceivedDataStructure<uavcan::protocol::file::BeginFirmwareUpdate::Request>& request,
+    uavcan::protocol::file::BeginFirmwareUpdate::Response& response)
+{
+    assert(g_can_bit_rate > 0);
+    assert(g_node_id.isUnicast());
+
+    if (g_on_firmware_update_requested)
+    {
+        response.error = g_on_firmware_update_requested(request);
+    }
+    else
+    {
+        os::lowsyslog("UAVCAN: FIRMWARE UPDATE HANDLER NOT SET\n");
+        response.error = response.ERROR_UNKNOWN;
+        response.optional_error_message = "Not supported by application";
+    }
+}
 
 /**
  * Node thread.
@@ -224,17 +392,25 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
             getNode().setNodeID(dnid_client.getAllocatedNodeID());
         }
 
+        g_node_id = getNode().getNodeID();
+
         /*
          * Initializing the business logic
          */
-//        getNode().setRestartRequestHandler(&restart_request_handler);
-//
-//        int res = get_param_server().start(&param_manager);
-//        if (res < 0)
-//        {
-//            board::die(res);
-//        }
-//
+        getNode().setRestartRequestHandler(&g_restart_request_handler);
+
+        int res = getParamServer().start(&g_param_manager);
+        if (res < 0)
+        {
+            board::die(res);
+        }
+
+        res = getBeginFirmwareUpdateServer().start(&handleBeginFirmwareUpdateRequest);
+        if (res < 0)
+        {
+            board::die(res);
+        }
+
 //        res = init_esc_controller(getNode());
 //        if (res < 0)
 //        {
@@ -247,11 +423,6 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
 //            board::die(res);
 //        }
 //
-//        res = get_begin_firmware_update_server().start(&handle_begin_firmware_update_request);
-//        if (res < 0)
-//        {
-//            board::die(res);
-//        }
 //
 //        enumeration_handler_.construct<uavcan::INode&>(getNode());
 //        res = enumeration_handler_->start();
@@ -273,6 +444,9 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
         wdt_.reset();
 
         initNode();
+
+        assert(g_can_bit_rate > 0);
+        assert(g_node_id.isUnicast());
 
         while (!os::isRebootRequested())
         {
@@ -302,7 +476,9 @@ void init(std::uint32_t bit_rate_hint,
           std::uint8_t node_id_hint,
           std::pair<std::uint8_t, std::uint8_t> firmware_version_major_minor,
           std::uint64_t firmware_image_crc64we,
-          std::uint32_t firmware_vcs_commit)
+          std::uint32_t firmware_vcs_commit,
+          const FirmwareUpdateRequestCallback& on_firmware_update_requested,
+          const RebootRequestCallback& on_reboot_requested)
 {
     g_can_bit_rate = bit_rate_hint;
     g_node_id = node_id_hint;
@@ -313,6 +489,9 @@ void init(std::uint32_t bit_rate_hint,
     g_firmware_version.vcs_commit = firmware_vcs_commit;
     g_firmware_version.optional_field_flags =
         g_firmware_version.OPTIONAL_FIELD_FLAG_IMAGE_CRC | g_firmware_version.OPTIONAL_FIELD_FLAG_VCS_COMMIT;
+
+    g_on_firmware_update_requested = on_firmware_update_requested;
+    g_on_reboot_requested = on_reboot_requested;
 
     (void) g_node_thread.start(NodeThreadPriority);
 }
@@ -339,9 +518,9 @@ void setNodeStatus(NodeStatus ns)
     }
 }
 
-std::uint8_t getNodeID()
+uavcan::NodeID getNodeID()
 {
-    return g_node_id.isUnicast() ? g_node_id.get() : 0;
+    return g_node_id;
 }
 
 std::uint32_t getCANBusBitRate()

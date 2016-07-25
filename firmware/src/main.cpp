@@ -61,7 +61,74 @@ namespace
 
 constexpr unsigned WatchdogTimeoutMSec = 1500;
 
+/**
+ * This callback is invoked when any component wants the application to restart. This is thread safe.
+ */
+bool onRebootRequested(const char* reason)
+{
+    os::lowsyslog("Main: Reboot requested; reason: %s\n", reason);
+    os::requestReboot();
+    return true;                // Should reject while the motor is running?
+}
 
+/**
+ * This callback is invoked from the local UAVCAN node (from its own thread!) when the said node
+ * receives a firmware update request. The objective here is to set up the bootloader and signal
+ * rebooting; once the system is rebooted, the bootloader will know what to do.
+ */
+auto onFirmwareUpdateRequestedFromUAVCAN(
+    const uavcan::ReceivedDataStructure<uavcan::protocol::file::BeginFirmwareUpdate::Request>& request)
+{
+    /*
+     * Checking preconditions
+     * Should reject while the motor is running?
+     */
+    static bool already_in_progress = false;
+
+    os::lowsyslog("Main: UAVCAN firmware update request from %d, source %d, path '%s'\n",
+                  request.getSrcNodeID().get(), request.source_node_id, request.image_file_remote_path.path.c_str());
+
+    if (already_in_progress)
+    {
+        os::lowsyslog("Main: UAVCAN firmware update is already in progress, rejecting\n");
+        return uavcan::protocol::file::BeginFirmwareUpdate::Response::ERROR_IN_PROGRESS;
+    }
+
+    /*
+     * Initializing the app shared structure with proper arguments
+     */
+    bootloader_interface::AppShared shared;
+    shared.can_bus_speed = uavcan_node::getCANBusBitRate();
+    shared.uavcan_node_id = uavcan_node::getNodeID().get();
+    shared.uavcan_fw_server_node_id = request.source_node_id;
+    shared.stay_in_bootloader = true;
+
+    std::strncpy(static_cast<char*>(&shared.uavcan_file_name[0]),       // This is really messy
+                 request.image_file_remote_path.path.c_str(),
+                 shared.UAVCANFileNameMaxLength);
+    shared.uavcan_file_name[shared.UAVCANFileNameMaxLength - 1] = '\0';
+
+    static_assert(request.image_file_remote_path.path.MaxSize < shared.UAVCANFileNameMaxLength, "Err...");
+
+    os::lowsyslog("Main: Bootloader args: CAN bus bitrate: %u, local node ID: %d\n",
+                  unsigned(shared.can_bus_speed), shared.uavcan_node_id);
+
+    /*
+     * Commiting everything
+     */
+    bootloader_interface::writeSharedStruct(shared);
+
+    os::requestReboot();
+
+    already_in_progress = true;
+
+    os::lowsyslog("Main: UAVCAN firmware update initiated\n");
+    return uavcan::protocol::file::BeginFirmwareUpdate::Response::ERROR_OK;
+}
+
+/**
+ * This is invoked once immediately after boot.
+ */
 os::watchdog::Timer init()
 {
     /*
@@ -77,12 +144,12 @@ os::watchdog::Timer init()
 
     if (app_shared_available)
     {
-        os::lowsyslog("Init: Bootloader struct values: CAN bitrate: %u, UAVCAN Node ID: %u\n",
+        os::lowsyslog("Main: Bootloader struct values: CAN bitrate: %u, UAVCAN Node ID: %u\n",
                       unsigned(app_shared.can_bus_speed), app_shared.uavcan_node_id);
     }
     else
     {
-        os::lowsyslog("Init: Bootloader struct is NOT present\n");
+        os::lowsyslog("Main: Bootloader struct is NOT present\n");
     }
 
     /*
@@ -92,7 +159,9 @@ os::watchdog::Timer init()
                       app_shared_available ? app_shared.uavcan_node_id : 0,
                       {fw_version.major, fw_version.minor},
                       fw_version.image_crc64we,
-                      fw_version.vcs_commit);
+                      fw_version.vcs_commit,
+                      onFirmwareUpdateRequestedFromUAVCAN,
+                      onRebootRequested);
 
     return watchdog;
 }
@@ -103,16 +172,13 @@ os::watchdog::Timer init()
 
 int main()
 {
-    /*
-     * Initializing
-     */
     auto watchdog = app::init();
 
-    chibios_rt::BaseThread::setPriority(NORMALPRIO);
+    chibios_rt::BaseThread::setPriority(LOWPRIO);
 
     std::uint8_t counter = 0;
 
-    while (true)
+    while (!os::isRebootRequested())
     {
         watchdog.reset();
 
@@ -122,4 +188,17 @@ int main()
         ::usleep(10000);
         counter++;
     }
+
+    /*
+     * Rebooting
+     */
+    os::lowsyslog("Main: GOING DOWN FOR REBOOT\n");
+
+    watchdog.reset();
+
+    ::sleep(1);         // Let other threads terminate properly
+
+    board::restart();
+
+    return 0;
 }

@@ -208,6 +208,8 @@ namespace os
 
 void applicationHaltHook()
 {
+    board::setLEDRGB(255, 0, 0);
+
     // TODO: Emergency stop
 }
 
