@@ -86,11 +86,12 @@ APPLICATION_OFFSET = 49152
 DDEFS += -DCORTEX_VTOR_INIT=$(APPLICATION_OFFSET)       \
          -DCRT1_AREAS_NUMBER=0
 
-UDEFS +=
-
 USE_LTO := no
 
 SERIAL_CLI_PORT_NUMBER = 3
+
+USE_OPT += -Wdouble-promotion -Wswitch-enum -Wfloat-equal
+USE_CPPOPT += -Wconversion -Wno-error=conversion
 
 RELEASE_OPT = -O2 -fomit-frame-pointer
 DEBUG_OPT = -O2 -g3 -DDISABLE_WATCHDOG=1
