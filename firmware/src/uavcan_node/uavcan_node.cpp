@@ -72,6 +72,9 @@ uavcan::NodeID g_node_id;
 std::uint8_t g_node_status_mode = uavcan::protocol::NodeStatus::MODE_INITIALIZATION;
 std::uint8_t g_node_status_health = uavcan::protocol::NodeStatus::HEALTH_OK;
 
+// TODO: This flag thing is horrible and needs to be redesigned, but I'm not sure how
+volatile bool g_do_print_status = false;
+
 /**
  * Runtime configuration parameters.
  */
@@ -267,6 +270,48 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
 {
     os::watchdog::Timer wdt_;
 
+    void printStatus()
+    {
+        std::printf("CAN bitrate: %lu\n", g_can_bit_rate);
+        std::printf("Node ID:     %u\n", g_node_id.get());
+        std::printf("Node mode:   %u\n", g_node_status_mode);
+        std::printf("Node health: %u\n", g_node_status_health);
+
+        const auto perf = getNode().getDispatcher().getTransferPerfCounter();
+
+        const auto pool_capacity = getNode().getAllocator().getBlockCapacity();
+        const auto pool_peak_usage = getNode().getAllocator().getPeakNumUsedBlocks();
+
+        uavcan::CanIfacePerfCounters iface_perf[uavcan::MaxCanIfaces];
+        std::uint8_t num_ifaces = 0;
+        for (num_ifaces = 0; num_ifaces < getNode().getDispatcher().getCanIOManager().getNumIfaces(); num_ifaces++)
+        {
+            iface_perf[num_ifaces] = getNode().getDispatcher().getCanIOManager().getIfacePerfCounters(num_ifaces);
+        }
+
+        std::printf("Memory pool capacity:   %u blocks\n", pool_capacity);
+        std::printf("Memory pool peak usage: %u blocks\n", pool_peak_usage);
+
+        std::printf("Transfers RX/TX: %llu / %llu\n", perf.getRxTransferCount(), perf.getTxTransferCount());
+        std::printf("Transfer errors: %llu\n", perf.getErrorCount());
+
+        for (unsigned i = 0; i < num_ifaces; i++)
+        {
+            std::printf("CAN iface %u:\n", i);
+            std::printf("    Frames RX/TX: %llu / %llu\n", iface_perf[i].frames_rx, iface_perf[i].frames_tx);
+            std::printf("    Errors:       %llu\n", iface_perf[i].errors);
+        }
+    }
+
+    void pollCommandFlags()     // TODO: This is ugly, needs to be refactored later!
+    {
+        if (g_do_print_status)
+        {
+            printStatus();
+            g_do_print_status = false;
+        }
+    }
+
     void initCAN()
     {
         int res = 0;
@@ -277,6 +322,7 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
         {
             wdt_.reset();
             ::sleep(1);
+            pollCommandFlags();
 
             auto bitrate = g_can_bit_rate;
             const bool autodetect = bitrate == 0;
@@ -347,6 +393,8 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
          */
         while (true)
         {
+            pollCommandFlags();
+
             const int uavcan_start_res = getNode().start();
             if (uavcan_start_res >= 0)
             {
@@ -381,6 +429,7 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
 
             while (!dnid_client.isAllocationComplete())
             {
+                pollCommandFlags();
                 getNode().spin(uavcan::MonotonicDuration::fromMSec(100));
                 wdt_.reset();
             }
@@ -444,6 +493,8 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
             {
                 os::lowsyslog("UAVCAN: Spin: %d\n", spin_res);
             }
+
+            pollCommandFlags();
         }
 
         os::lowsyslog("UAVCAN: Goodbye\n");
@@ -516,6 +567,21 @@ uavcan::NodeID getNodeID()
 std::uint32_t getCANBusBitRate()
 {
     return g_can_bit_rate;
+}
+
+void printStatusInfo()
+{
+    // Ugh this is wrong
+    g_do_print_status = true;
+
+    for (int i = 0; i < 20; i++)
+    {
+        ::usleep(100000);
+        if (!g_do_print_status)
+        {
+            break;
+        }
+    }
 }
 
 }

@@ -34,6 +34,7 @@
 #include "cli.hpp"
 #include <board/board.hpp>
 #include <bootloader_interface/bootloader_interface.hpp>
+#include <uavcan_node/uavcan_node.hpp>
 #include <zubax_chibios/os.hpp>
 #include <zubax_chibios/config/config.hpp>
 #include <zubax_chibios/util/shell.hpp>
@@ -114,6 +115,17 @@ class ConfigCommand : public os::shell::ICommandHandler
 } static cmd_cfg;
 
 
+class UAVCANCommand : public os::shell::ICommandHandler
+{
+    const char* getName() const override { return "uavcan"; }
+
+    void execute(os::shell::BaseChannelWrapper&, int, char**) override
+    {
+        uavcan_node::printStatusInfo();
+    }
+} static cmd_uavcan;
+
+
 class CLIThread : public chibios_rt::BaseStaticThread<2048>
 {
     os::shell::Shell<> shell_;
@@ -142,6 +154,7 @@ public:
         (void) shell_.addCommandHandler(&cmd_reboot);
         (void) shell_.addCommandHandler(&cmd_zubax_id);
         (void) shell_.addCommandHandler(&cmd_cfg);
+        (void) shell_.addCommandHandler(&cmd_uavcan);
     }
 
     virtual ~CLIThread() { }

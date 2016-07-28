@@ -114,4 +114,9 @@ uavcan::NodeID getNodeID();
  */
 std::uint32_t getCANBusBitRate();
 
+/**
+ * Prints node status information into stdout.
+ */
+void printStatusInfo();
+
 }
