@@ -90,7 +90,7 @@ USE_LTO := no
 
 SERIAL_CLI_PORT_NUMBER = 3
 
-USE_OPT += -Wdouble-promotion -Wswitch-enum -Wfloat-equal
+USE_OPT += -Wdouble-promotion -Wswitch-enum -Wfloat-equal -fno-strict-aliasing -fno-strict-overflow
 USE_CPPOPT += -Wconversion -Wno-error=conversion
 
 RELEASE_OPT = -O2 -fomit-frame-pointer
