@@ -35,6 +35,7 @@
 #include <board/board.hpp>
 #include <bootloader_interface/bootloader_interface.hpp>
 #include <zubax_chibios/os.hpp>
+#include <zubax_chibios/config/config.hpp>
 #include <zubax_chibios/util/shell.hpp>
 #include <zubax_chibios/util/base64.hpp>
 
@@ -79,7 +80,7 @@ class ZubaxIDCommand : public os::shell::ICommandHandler
             ios.print("fw_version   : '%u.%u'\n", fw_version.major, fw_version.minor);
             ios.print("fw_vcs_commit: 0x%08x\n", unsigned(fw_version.vcs_commit));
             ios.print("fw_build_date: %s\n", __DATE__);
-            // TODO: Image CRC
+            ios.print("fw_crc64we   : 0x%016llx\n", fw_version.image_crc64we);
         }
 
         {
@@ -100,6 +101,17 @@ class ZubaxIDCommand : public os::shell::ICommandHandler
         }
     }
 } static cmd_zubax_id;
+
+
+class ConfigCommand : public os::shell::ICommandHandler
+{
+    const char* getName() const override { return "cfg"; }
+
+    void execute(os::shell::BaseChannelWrapper&, int argc, char** argv) override
+    {
+        (void) os::config::executeCLICommand(argc - 1, &argv[1]);
+    }
+} static cmd_cfg;
 
 
 class CLIThread : public chibios_rt::BaseStaticThread<2048>
@@ -129,6 +141,7 @@ public:
     {
         (void) shell_.addCommandHandler(&cmd_reboot);
         (void) shell_.addCommandHandler(&cmd_zubax_id);
+        (void) shell_.addCommandHandler(&cmd_cfg);
     }
 
     virtual ~CLIThread() { }
@@ -140,7 +153,7 @@ public:
 void init(const RebootRequestCallback& reboot_callback)
 {
     g_reboot_request_callback = reboot_callback;
-    g_cli_thread.start(LOWPRIO + 1);
+    (void) g_cli_thread.start(LOWPRIO + 1);
 }
 
 }
