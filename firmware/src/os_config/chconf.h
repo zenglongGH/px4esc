@@ -41,6 +41,6 @@
 #define CH_CFG_USE_SEMAPHORES           TRUE
 #define CH_DBG_FILL_THREADS             TRUE
 
-#define PORT_INT_REQUIRED_STACK         1024
+#define PORT_INT_REQUIRED_STACK         4096
 
 #include <zubax_chibios/sys/chconf_tail.h>

@@ -43,6 +43,7 @@
 #include "board/board.hpp"
 #include "bootloader_interface/bootloader_interface.hpp"
 #include "uavcan_node/uavcan_node.hpp"
+#include "cli/cli.hpp"
 
 #if __GNUC__ < 5
 # error "GCC version 5.x or newer is required"
@@ -151,6 +152,11 @@ os::watchdog::Timer init()
     {
         os::lowsyslog("Main: Bootloader struct is NOT present\n");
     }
+
+    /*
+     * CLI initialization
+     */
+    cli::init(&onRebootRequested);
 
     /*
      * UAVCAN node initialization
