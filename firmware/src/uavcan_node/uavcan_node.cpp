@@ -281,7 +281,7 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
             auto bitrate = g_can_bit_rate;
             const bool autodetect = bitrate == 0;
 
-            res = g_can.init([]() { ::usleep(g_can.getRecommendedListeningDelay().toUSec()); }, bitrate);
+            res = g_can.init([]() { ::usleep(::useconds_t(g_can.getRecommendedListeningDelay().toUSec())); }, bitrate);
             if (res >= 0)
             {
                 g_can_bit_rate = bitrate;
