@@ -110,7 +110,7 @@ BOOTLOADER_IMAGE := $(abspath bootloader.bin)
 # This rule hook is defined in the ChibiOS build system
 POST_MAKE_ALL_RULE_HOOK: build/$(PROJECT).bin build/$(PROJECT).elf
 	# Removing previous build outputs that could use a different git hash
-	rm -rf build/*.uavcan.bin build/*.compound.bin
+	rm -rf build/*.application.bin build/*.compound.bin
 
 	# Generating compound image with embedded bootloader
 	cd build && dd if=/dev/zero bs=$(APPLICATION_OFFSET) count=1 | tr "\000" "\377" >padded_bootloader.tmp.bin
