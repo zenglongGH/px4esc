@@ -219,18 +219,6 @@ void setLEDRGB(uint8_t red, uint8_t green, uint8_t blue)
 
 } // namespace board
 
-namespace os
-{
-
-void applicationHaltHook()
-{
-    board::setLEDRGB(255, 0, 0);
-
-    // TODO: Emergency stop
-}
-
-}
-
 /*
  * Early init from ChibiOS
  */

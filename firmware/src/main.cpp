@@ -127,6 +127,18 @@ auto onFirmwareUpdateRequestedFromUAVCAN(
     return uavcan::protocol::file::BeginFirmwareUpdate::Response::ERROR_OK;
 }
 
+namespace os
+{
+
+void applicationHaltHook()
+{
+    board::setLEDRGB(255, 0, 0);
+
+    // TODO: Emergency stop
+}
+
+}
+
 /**
  * This is invoked once immediately after boot.
  */
