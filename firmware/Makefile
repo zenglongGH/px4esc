@@ -90,8 +90,12 @@ USE_LTO := no
 
 SERIAL_CLI_PORT_NUMBER = 3
 
+# TODO: More warnings need to be enabled here. In order to avoid conflicts with third-party code, including the
+# operating system itself, it needs to be compiled as separate static libraries with warnings disabled, and then
+# linked with the application. This approach will require some modifications of the build system.
+# See this thread: http://www.chibios.com/forum/viewtopic.php?t=1860
 USE_OPT += -Wdouble-promotion -Wswitch-enum -Wfloat-equal -fno-strict-aliasing -fno-strict-overflow
-USE_CPPOPT += -Wconversion -Wno-error=conversion
+USE_CPPOPT += -Wconversion -Wno-error=conversion -Wsign-promo
 
 RELEASE_OPT = -O2 -fomit-frame-pointer
 DEBUG_OPT = -O2 -g3 -DDISABLE_WATCHDOG=1
