@@ -37,6 +37,22 @@
 #include <hal.h>
 #include <unistd.h>
 
+// Making sure that the priority level 0 (highest) is not occupied by the OS.
+#ifndef CORTEX_PRIORITY_SVCALL
+# error "CORTEX_PRIORITY_SVCALL is not defined, probably this version of ChibiOS/RT is not supported"
+#endif
+#if CORTEX_PRIORITY_SVCALL < 1
+# error "This application must be able to preempt the OS IRQ; current configuration does not allow that"
+#endif
+
+// Making sure the OS is configured to never disable the higher priority IRQ.
+#ifndef CORTEX_SIMPLIFIED_PRIORITY
+# error "CORTEX_SIMPLIFIED_PRIORITY is not defined, probably this version of ChibiOS/RT is not supported"
+#endif
+#if CORTEX_SIMPLIFIED_PRIORITY
+# error "This application requires BASEPRI based critical section management; current configuration is invalid"
+#endif
+
 /// PAL setup
 const ::PALConfig pal_default_config =
 {
