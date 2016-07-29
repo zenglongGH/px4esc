@@ -27,6 +27,7 @@ __pycache__
 *.swp
 *~
 *.bak
+*.tmp
 
 # Configuration files
 .gdbinit
@@ -38,16 +39,6 @@ __pycache__
 .project
 .cproject
 .pydevproject
-.gdbinit
-.swp
-.dep
-.ewd
-.ewt
-.map
-.out
-.sim
-.tmp
 
 # Libuavcan generated headers
 dsdlc_generated
-/Default/
