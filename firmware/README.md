@@ -56,7 +56,8 @@ known as Zubax ChibiOS.
 The extensions include things like configuration parameter management, command line interface,
 implementation of algorithms such as Base64, etc.
 
-In the future the project may migrate to the NuttX RTOS, provided that there is adequate support of C++14.
+In the future the project may migrate to the NuttX RTOS, provided that it adequately supports C++14 and
+its kernel is preemptive.
 At the moment, the sole motivation for abandonment of ChibiOS/RT is its
 [somewhat restrictive licensing policies](http://www.chibios.org/dokuwiki/doku.php?id=chibios:licensing:start).
 However, it should be kept in mind that if IP security is of a concern, the restrictive nature of GPL3 can be
