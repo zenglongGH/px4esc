@@ -39,18 +39,53 @@ namespace motor
 {
 namespace driver
 {
-
+/**
+ * Initializes the driver IC GPIO interface and applies default configuration, which is as follows:
+ * - Current limiting disabled
+ * - DC_CAL disabled (it's broken anyway, so this function is not exposed via the module API)
+ * - EN_GATE disabled (driver disabled)
+ * - Current amplification set at x40
+ */
 void init();
 
+/**
+ * Writes the EN_GATE pin of the driver IC.
+ */
 void setGateDriverEnabled(bool enabled);
 
+/**
+ * @ref setCurrentAmplifierGain().
+ */
 enum class CurrentAmplifierGain
 {
     X10,
     X40
 };
 
+/**
+ * Writes the GAIN pin of the driver IC. See @ref CurrentAmplifierGain.
+ */
 void setCurrentAmplifierGain(CurrentAmplifierGain gain);
+
+/**
+ * @ref readFailureIndicators().
+ */
+struct FailureIndicators
+{
+    bool bad_power = false;     ///< PWRGD
+    bool overload = false;      ///< OCTW
+    bool fault = false;         ///< FAULT
+
+    bool allGood() const
+    {
+        return !(bad_power || overload || fault);
+    }
+};
+
+/**
+ * Read failure information from the driver IC's pins.
+ */
+FailureIndicators readFailureIndicators();
 
 }
 }

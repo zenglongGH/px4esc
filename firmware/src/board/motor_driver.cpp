@@ -54,6 +54,8 @@ void init()
     // Initializing other defaults that can be changed at run time
     setGateDriverEnabled(false);
     setCurrentAmplifierGain(CurrentAmplifierGain::X40);
+
+    // TODO: Set up an interrupt to trigger when PWRGD goes down. Call an external handler on it, or just halt the OS.
 }
 
 void setGateDriverEnabled(bool enabled)
@@ -64,6 +66,17 @@ void setGateDriverEnabled(bool enabled)
 void setCurrentAmplifierGain(CurrentAmplifierGain gain)
 {
     palWritePad(GPIOB, GPIOB_GAIN, bool(gain));
+}
+
+FailureIndicators readFailureIndicators()
+{
+    FailureIndicators fi;
+
+    fi.bad_power = !palReadPad(GPIOC, GPIOC_POWER_GOOD);
+    fi.overload  = !palReadPad(GPIOC, GPIOC_OVER_TEMP_WARNING_INVERSE);
+    fi.fault     = !palReadPad(GPIOC, GPIOC_DRIVER_FAULT_INVERSE);
+
+    return fi;
 }
 
 }

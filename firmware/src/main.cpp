@@ -156,7 +156,9 @@ os::watchdog::Timer init()
      * Motor initialization
      */
     // This is only for testing purposes, will be removed later
+    board::motor::driver::init();
     board::motor::pwm::init(60000.0F, 5e-07F);
+
     board::motor::driver::setGateDriverEnabled(true);
     board::motor::pwm::activate();
 
@@ -217,6 +219,8 @@ int main()
     /*
      * Rebooting
      */
+    board::motor::pwm::emergency();             // Just to be on the safe side
+
     os::lowsyslog("Main: GOING DOWN FOR REBOOT\n");
 
     watchdog.reset();
