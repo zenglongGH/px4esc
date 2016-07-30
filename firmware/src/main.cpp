@@ -38,7 +38,6 @@
 #include <cstdio>
 #include <cstdlib>
 #include <zubax_chibios/os.hpp>
-#include <Eigen/Eigen>
 
 #include "board/board.hpp"
 #include "bootloader_interface/bootloader_interface.hpp"
@@ -48,11 +47,6 @@
 #if __GNUC__ < 5
 # error "GCC version 5.x or newer is required"
 #endif
-
-// Testing
-using Scalar = float;
-template <int Rows, int Cols> using Matrix = Eigen::Matrix<Scalar, Rows, Cols>;
-template <int Size> using Vector = Matrix<Size, 1>;
 
 
 namespace app
@@ -127,18 +121,6 @@ auto onFirmwareUpdateRequestedFromUAVCAN(
     return uavcan::protocol::file::BeginFirmwareUpdate::Response::ERROR_OK;
 }
 
-namespace os
-{
-
-void applicationHaltHook()
-{
-    board::setLEDRGB(255, 0, 0);
-
-    // TODO: Emergency stop
-}
-
-}
-
 /**
  * This is invoked once immediately after boot.
  */
@@ -171,6 +153,13 @@ os::watchdog::Timer init()
     cli::init(&onRebootRequested);
 
     /*
+     * Motor initialization
+     */
+    // This is only for testing purposes, will be removed later
+    board::motor::pwm::init(60000.0F, 5e-07F);
+    board::motor::pwm::activate();
+
+    /*
      * UAVCAN node initialization
      */
     uavcan_node::init(app_shared_available ? app_shared.can_bus_speed : 0,
@@ -185,6 +174,17 @@ os::watchdog::Timer init()
 }
 
 }
+}
+
+namespace os
+{
+
+extern void applicationHaltHook()
+{
+    board::motor::pwm::emergency();
+    board::setLEDRGB(255, 0, 0);
+}
+
 }
 
 
@@ -204,6 +204,10 @@ int main()
 
         // Flying colors for testing
         board::setLEDRGB(counter, std::uint8_t(counter + 85 * 1), std::uint8_t(counter + 85 * 2));
+
+        board::motor::pwm::set({counter / 255.0F,
+                                std::uint8_t(counter + 85 * 1) / 255.0F,
+                                std::uint8_t(counter + 85 * 2) / 255.0F});
 
         ::usleep(10000);
         counter++;

@@ -34,40 +34,62 @@
 #pragma once
 
 #include <cstdint>
-#include <array>
-#include <zubax_chibios/os.hpp>
-
-#include "motor_pwm.hpp"
+#include <math.hpp>
 
 
 namespace board
 {
-
-os::watchdog::Timer init(unsigned watchdog_timeout_msec);
-
-__attribute__((noreturn))
-void die(int reason);
-
-void restart();
-
-typedef std::array<std::uint8_t, 16> UniqueID;
-UniqueID readUniqueID();
-
-typedef std::array<std::uint8_t, 128> DeviceSignature;
-bool tryReadDeviceSignature(DeviceSignature& out_sign);
-bool tryWriteDeviceSignature(const DeviceSignature& sign);
-
-struct HardwareVersion
+namespace motor
 {
-    std::uint8_t major;
-    std::uint8_t minor;
-};
-
-HardwareVersion detectHardwareVersion();
+namespace pwm
+{
+/**
+ * Limits imposed by the hardware.
+ */
+constexpr math::Range<> FrequencyRange(50000, 80000);
+constexpr math::Range<> DeadTimeRange(0.0F, 700e-9F);
 
 /**
- * Sets the LED brightness and color. Brightness is specified per channel in the range [0, 255].
+ * @param frequency     Preferred PWM frequency in Hertz
+ * @param dead_time     Preferred PWM dead time in seconds
  */
-void setLEDRGB(uint8_t red, uint8_t green, uint8_t blue);
+void init(float frequency, float dead_time);
 
+/**
+ * Meaningful results guaranteed only after initialization.
+ * @return Carrier frequency in Hertz.
+ */
+float getFrequency();
+
+/**
+ * Meaningful results guaranteed only after initialization.
+ * @return Dead time in seconds.
+ */
+float getDeadTime();
+
+/**
+ * Activates the outputs and initializes PWM channels to safe values.
+ */
+void activate();
+
+/**
+ * Deactivates the PWM outputs (shuts down the carrier).
+ */
+void deactivate();
+
+/**
+ * This function should only be called after @ref activate() and before @ref deactivate().
+ * @param abc           PWM values per channel in the range [0, 1].
+ */
+void set(math::Vector<3> abc);
+
+/**
+ * Immediately deactivates the PWM outputs (shuts down the carrier).
+ * Further use of the driver may not be possible.
+ * This function can be called from ANY context, e.g. from Hard Fault handler.
+ */
+void emergency();
+
+}
+}
 }
