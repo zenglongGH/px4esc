@@ -33,42 +33,25 @@
 
 #pragma once
 
-#include <cstdint>
-#include <array>
-#include <zubax_chibios/os.hpp>
-
-#include "motor_pwm.hpp"
-#include "motor_driver.hpp"
-
-
 namespace board
 {
-
-os::watchdog::Timer init(unsigned watchdog_timeout_msec);
-
-__attribute__((noreturn))
-void die(int reason);
-
-void restart();
-
-typedef std::array<std::uint8_t, 16> UniqueID;
-UniqueID readUniqueID();
-
-typedef std::array<std::uint8_t, 128> DeviceSignature;
-bool tryReadDeviceSignature(DeviceSignature& out_sign);
-bool tryWriteDeviceSignature(const DeviceSignature& sign);
-
-struct HardwareVersion
+namespace motor
 {
-    std::uint8_t major;
-    std::uint8_t minor;
+namespace driver
+{
+
+void init();
+
+void setGateDriverEnabled(bool enabled);
+
+enum class CurrentAmplifierGain
+{
+    X10,
+    X40
 };
 
-HardwareVersion detectHardwareVersion();
+void setCurrentAmplifierGain(CurrentAmplifierGain gain);
 
-/**
- * Sets the LED brightness and color. Brightness is specified per channel in the range [0, 255].
- */
-void setLEDRGB(uint8_t red, uint8_t green, uint8_t blue);
-
+}
+}
 }

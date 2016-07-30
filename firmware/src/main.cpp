@@ -157,6 +157,7 @@ os::watchdog::Timer init()
      */
     // This is only for testing purposes, will be removed later
     board::motor::pwm::init(60000.0F, 5e-07F);
+    board::motor::driver::setGateDriverEnabled(true);
     board::motor::pwm::activate();
 
     /*
