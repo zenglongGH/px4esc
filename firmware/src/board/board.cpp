@@ -35,6 +35,7 @@
 #include <cstring>
 #include <ch.hpp>
 #include <unistd.h>
+#include <zubax_chibios/util/heapless.hpp>
 
 // Making sure that the priority level 0 (highest) is not occupied by the OS.
 #ifndef CORTEX_PRIORITY_SVCALL
@@ -165,7 +166,7 @@ os::watchdog::Timer init(unsigned watchdog_timeout_msec)
 __attribute__((noreturn))
 void die(int reason)
 {
-    chSysHalt(os::intToString(reason));
+    chSysHalt(os::heapless::intToString(reason));
     while (1)
     {
     }
