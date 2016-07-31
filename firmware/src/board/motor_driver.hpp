@@ -33,6 +33,9 @@
 
 #pragma once
 
+#include <zubax_chibios/util/heapless.hpp>
+
+
 namespace board
 {
 namespace motor
@@ -79,6 +82,13 @@ struct FailureIndicators
     bool allGood() const
     {
         return !(bad_power || overload || fault);
+    }
+
+    auto toString() const
+    {
+        return os::heapless::concatenate<40>("BadPower=", bad_power,
+                                             " Overload=", overload,
+                                             " Fault=", fault);
     }
 };
 

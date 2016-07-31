@@ -174,6 +174,22 @@ class PWMCommand : public os::shell::ICommandHandler
 } static cmd_pwm;
 
 
+class StateCommand : public os::shell::ICommandHandler
+{
+    const char* getName() const override { return "state"; }
+
+    void execute(os::shell::BaseChannelWrapper& ios, int, char**) override
+    {
+        ios.print("Driver failure indicators: %s\n",
+                  board::motor::driver::readFailureIndicators().toString().c_str());
+
+        ios.print("PWM: Frequency %.6f kHz   DeadTime %.1f nsec\n",
+                  double(board::motor::pwm::getFrequency() * 1e-3F),
+                  double(board::motor::pwm::getDeadTime() * 1e9F));
+    }
+} static cmd_state;
+
+
 class CLIThread : public chibios_rt::BaseStaticThread<2048>
 {
     os::shell::Shell<> shell_;
@@ -204,6 +220,7 @@ public:
         (void) shell_.addCommandHandler(&cmd_cfg);
         (void) shell_.addCommandHandler(&cmd_uavcan);
         (void) shell_.addCommandHandler(&cmd_pwm);
+        (void) shell_.addCommandHandler(&cmd_state);
     }
 
     virtual ~CLIThread() { }
