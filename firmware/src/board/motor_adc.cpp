@@ -38,44 +38,22 @@ namespace board
 {
 namespace motor
 {
-namespace driver
+namespace adc
 {
+namespace
+{
+
+float g_total_current_gain;     ///< Unset (zero) by default
+
+}
 
 void init()
 {
-    // Disable over current protection by default
-    palWritePad(GPIOA, GPIOA_OC_ADJ, true);
-
-    // Disable DC offset calibration mode (it's broken anyway and should never be activated)
-    // (it's a hardware bug in the driver IC)
-    palWritePad(GPIOA, GPIOA_DC_CAL, false);
-
-    // Initializing other defaults that can be changed at run time
-    setGateDriverEnabled(false);
-    setCurrentAmplifierGain(CurrentAmplifierGain::X40);
-
-    // TODO: Set up an interrupt to trigger when PWRGD goes down. Call an external handler on it, or just halt the OS.
 }
 
-void setGateDriverEnabled(bool enabled)
+void setTotalCurrentGain(float gain)
 {
-    palWritePad(GPIOA, GPIOA_EN_GATE, enabled);
-}
-
-void setCurrentAmplifierGain(CurrentAmplifierGain gain)
-{
-    palWritePad(GPIOB, GPIOB_GAIN, bool(gain));
-}
-
-FailureIndicators readFailureIndicators()
-{
-    FailureIndicators fi;
-
-    fi.bad_power = !palReadPad(GPIOC, GPIOC_POWER_GOOD);
-    fi.overload  = !palReadPad(GPIOC, GPIOC_OVER_TEMP_WARNING_INVERSE);
-    fi.fault     = !palReadPad(GPIOC, GPIOC_DRIVER_FAULT_INVERSE);
-
-    return fi;
+    g_total_current_gain = gain;
 }
 
 }

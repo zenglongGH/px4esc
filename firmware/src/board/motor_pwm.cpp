@@ -31,8 +31,7 @@
 *
 ****************************************************************************/
 
-#include <hal.h>
-#include "board.hpp"
+#include <board/board.hpp>
 
 
 namespace board

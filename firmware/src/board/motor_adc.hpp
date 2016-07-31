@@ -31,52 +31,45 @@
 *
 ****************************************************************************/
 
-#include <board/board.hpp>
+#pragma once
+
+#include <cstdint>
+#include <math.hpp>
 
 
 namespace board
 {
 namespace motor
 {
-namespace driver
+namespace adc
 {
+/**
+ * Must be invoked first.
+ *
+ * @ref setTotalCurrentGain() must be invoked after initialization to provide a meaningful gain value.
+ * Deafult gain is zero, which renders current measurements useless.
+ */
+void init();
 
-void init()
-{
-    // Disable over current protection by default
-    palWritePad(GPIOA, GPIOA_OC_ADJ, true);
+/**
+ * Informs the driver about the total gain of the current measurement curcuits.
+ * The actual hardware configuration is commanded elsewhere.
+ * The current computation is as follows:
+ *      current = adv_voltage * G
+ * The G value is set by this function, it is defined by the shunt resistance (if shunts are used) and the
+ * amplifier's gain.
+ */
+void setTotalCurrentGain(float gain);
 
-    // Disable DC offset calibration mode (it's broken anyway and should never be activated)
-    // (it's a hardware bug in the driver IC)
-    palWritePad(GPIOA, GPIOA_DC_CAL, false);
-
-    // Initializing other defaults that can be changed at run time
-    setGateDriverEnabled(false);
-    setCurrentAmplifierGain(CurrentAmplifierGain::X40);
-
-    // TODO: Set up an interrupt to trigger when PWRGD goes down. Call an external handler on it, or just halt the OS.
-}
-
-void setGateDriverEnabled(bool enabled)
-{
-    palWritePad(GPIOA, GPIOA_EN_GATE, enabled);
-}
-
-void setCurrentAmplifierGain(CurrentAmplifierGain gain)
-{
-    palWritePad(GPIOB, GPIOB_GAIN, bool(gain));
-}
-
-FailureIndicators readFailureIndicators()
-{
-    FailureIndicators fi;
-
-    fi.bad_power = !palReadPad(GPIOC, GPIOC_POWER_GOOD);
-    fi.overload  = !palReadPad(GPIOC, GPIOC_OVER_TEMP_WARNING_INVERSE);
-    fi.fault     = !palReadPad(GPIOC, GPIOC_DRIVER_FAULT_INVERSE);
-
-    return fi;
-}
+/**
+ * This function is invoked from the IRQ context when new data arrives.
+ * It must be defined elsewhere.
+ * All units are SI units (Volt, Ampere, Kelvin).
+ */
+extern void handleSampleIRQ(const math::Vector<3>& phase_voltages_abc,
+                            const math::Vector<2>& phase_currents_ab,
+                            float inverter_voltage,
+                            float inverter_temperature);
 
 }
 }
