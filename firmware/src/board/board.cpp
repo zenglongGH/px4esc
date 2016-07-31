@@ -228,17 +228,12 @@ extern "C"
 void __early_init(void)
 {
     stm32_clock_init();
-}
-
-void boardInit(void)
-{
-    os::CriticalSectionLocker locker;
 
     /*
-     * Making sure the CAN controller is disabled!
-     * The bootloader may or may not leave it enabled.
-     * Let paranoia begin.
+     * Making sure all peripherals that could be used by the bootloader are reset or disabled!
+     * The bootloader is expected to shut everything down, but one can never be too safe.
      */
+    // CAN
     RCC->APB1RSTR |=  (RCC_APB1RSTR_CAN1RST | RCC_APB1RSTR_CAN2RST);
     RCC->APB1RSTR &= ~(RCC_APB1RSTR_CAN1RST | RCC_APB1RSTR_CAN2RST);
 
@@ -254,7 +249,17 @@ void boardInit(void)
     NVIC_ClearPendingIRQ(CAN2_RX1_IRQn);
     NVIC_ClearPendingIRQ(CAN2_TX_IRQn);
     NVIC_ClearPendingIRQ(CAN2_SCE_IRQn);
-    // End of paranoia here.
+
+    // USB
+    RCC->AHB2RSTR |=  RCC_AHB2RSTR_OTGFSRST;
+    RCC->AHB2RSTR &= ~RCC_AHB2RSTR_OTGFSRST;
+
+    NVIC_ClearPendingIRQ(OTG_FS_IRQn);
+    NVIC_ClearPendingIRQ(OTG_FS_WKUP_IRQn);
+}
+
+void boardInit(void)
+{
 }
 
 }
