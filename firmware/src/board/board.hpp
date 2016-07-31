@@ -44,27 +44,53 @@
 
 namespace board
 {
-
+/**
+ * This function should be invoked immediately from main().
+ * It initializes a watchdog timer instance ASAP, which ensures that the application
+ * will not stuck forever if initialization fails.
+ */
 os::watchdog::Timer init(unsigned watchdog_timeout_msec);
 
+/**
+ * Triggers an OS panic with the specified reason code printed into the serial console.
+ */
 __attribute__((noreturn))
 void die(int reason);
 
+/**
+ * Resets the MCU via NVIC, no additional actions are performed.
+ */
 void restart();
 
+/**
+ * Returns the 128-bit hardware UID, where only the first 96 bit are used, and the rest is
+ * filled with zeros.
+ */
 typedef std::array<std::uint8_t, 16> UniqueID;
 UniqueID readUniqueID();
 
+/**
+ * RSA-1024 Signature of Authenticity management.
+ * The signature can be written only once and it is typically done by the hardware manufacturer.
+ * The read will fail if there is no signature installed.
+ */
 typedef std::array<std::uint8_t, 128> DeviceSignature;
 bool tryReadDeviceSignature(DeviceSignature& out_sign);
 bool tryWriteDeviceSignature(const DeviceSignature& sign);
 
+/**
+ * @ref detectHardwareVersion()
+ */
 struct HardwareVersion
 {
     std::uint8_t major;
     std::uint8_t minor;
 };
 
+/**
+ * The major code can be specified either by the hardware ID pins or at compile time.
+ * The minor code is specified only by the hardware ID pins.
+ */
 HardwareVersion detectHardwareVersion();
 
 /**
