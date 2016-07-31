@@ -36,6 +36,7 @@
 #include <cstdint>
 #include <array>
 #include <zubax_chibios/os.hpp>
+#include <hal.h>
 
 #include "motor_pwm.hpp"
 #include "motor_driver.hpp"
@@ -70,5 +71,33 @@ HardwareVersion detectHardwareVersion();
  * Sets the LED brightness and color. Brightness is specified per channel in the range [0, 255].
  */
 void setLEDRGB(uint8_t red, uint8_t green, uint8_t blue);
+
+/**
+ * Testpoint control.
+ * The functions are made inline to ensure minimal runtime overhead even with LTO disabled.
+ * @{
+ */
+inline void setTestPointA(bool level)
+{
+    palWritePad(GPIOD, GPIOD_TEST_1, level);
+}
+
+inline void setTestPointB(bool level)
+{
+    palWritePad(GPIOB, GPIOB_TEST_2, level);
+}
+
+inline void setTestPointC(bool level)
+{
+    palWritePad(GPIOB, GPIOB_TEST_3, level);
+}
+
+inline void setTestPointD(bool level)
+{
+    palWritePad(GPIOC, GPIOC_TEST_4, level);
+}
+/**
+ * @}
+ */
 
 }

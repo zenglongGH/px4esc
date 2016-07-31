@@ -112,7 +112,7 @@
 /*
  * Port D
  */
-#define PORTD_TEST_1                    2
+#define GPIOD_TEST_1                    2
 
 /*
  * Port E
@@ -476,7 +476,7 @@
  */
 #define VAL_GPIOD_MODER             (PIN_MODE_INPUT(0) |\
                                      PIN_MODE_INPUT(1) |\
-                                     PIN_MODE_OUTPUT(PORTD_TEST_1) |\
+                                     PIN_MODE_OUTPUT(GPIOD_TEST_1) |\
                                      PIN_MODE_INPUT(3) |\
                                      PIN_MODE_INPUT(4) |\
                                      PIN_MODE_INPUT(5) |\
@@ -493,7 +493,7 @@
 
 #define VAL_GPIOD_OTYPER            (PIN_OTYPE_PUSHPULL(0) |\
                                      PIN_OTYPE_PUSHPULL(1) |\
-                                     PIN_OTYPE_PUSHPULL(PORTD_TEST_1) |\
+                                     PIN_OTYPE_PUSHPULL(GPIOD_TEST_1) |\
                                      PIN_OTYPE_PUSHPULL(3) |\
                                      PIN_OTYPE_PUSHPULL(4) |\
                                      PIN_OTYPE_PUSHPULL(5) |\
@@ -510,7 +510,7 @@
 
 #define VAL_GPIOD_OSPEEDR           (PIN_OSPEED_2M(0) |\
                                      PIN_OSPEED_2M(1) |\
-                                     PIN_OSPEED_25M(PORTD_TEST_1) |\
+                                     PIN_OSPEED_25M(GPIOD_TEST_1) |\
                                      PIN_OSPEED_2M(3) |\
                                      PIN_OSPEED_2M(4) |\
                                      PIN_OSPEED_2M(5) |\
@@ -527,7 +527,7 @@
 
 #define VAL_GPIOD_PUPDR             (PIN_PUPDR_PULLDOWN(0) |\
                                      PIN_PUPDR_PULLDOWN(1) |\
-                                     PIN_PUPDR_FLOATING(PORTD_TEST_1) |\
+                                     PIN_PUPDR_FLOATING(GPIOD_TEST_1) |\
                                      PIN_PUPDR_PULLDOWN(3) |\
                                      PIN_PUPDR_PULLDOWN(4) |\
                                      PIN_PUPDR_PULLDOWN(5) |\
@@ -544,7 +544,7 @@
 
 #define VAL_GPIOD_ODR               (PIN_ODR_LOW(0) |\
                                      PIN_ODR_LOW(1) |\
-                                     PIN_ODR_LOW(PORTD_TEST_1) |\
+                                     PIN_ODR_LOW(GPIOD_TEST_1) |\
                                      PIN_ODR_LOW(3) |\
                                      PIN_ODR_LOW(4) |\
                                      PIN_ODR_LOW(5) |\
@@ -561,7 +561,7 @@
 
 #define VAL_GPIOD_AFRL              (PIN_AFIO_AF(0,  0) |\
                                      PIN_AFIO_AF(1,  0) |\
-                                     PIN_AFIO_AF(PORTD_TEST_1,  0) |\
+                                     PIN_AFIO_AF(GPIOD_TEST_1,  0) |\
                                      PIN_AFIO_AF(3,  0) |\
                                      PIN_AFIO_AF(4,  0) |\
                                      PIN_AFIO_AF(5,  0) |\

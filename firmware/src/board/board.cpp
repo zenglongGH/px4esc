@@ -34,7 +34,6 @@
 #include "board.hpp"
 #include <cstring>
 #include <ch.hpp>
-#include <hal.h>
 #include <unistd.h>
 
 // Making sure that the priority level 0 (highest) is not occupied by the OS.
