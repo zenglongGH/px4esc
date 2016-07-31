@@ -35,6 +35,20 @@ and the application's debug information.
 It can be loaded with a GDB debugger to perform symbol debugging using the script
 `./zubax_chibios/tools/blackmagic_flash.sh`.
 
+## MCU Usage
+
+### Timers
+
+The following list documents the current usage of hardware timers.
+
+Timer   | Resolution| Usage
+--------|-----------|--------------------------------------------------------------------------------------------------
+TIM1    | 16        | Motor PWM
+TIM2    | 32        | ADC triggering
+TIM5    | 32        | ChibiOS system tick (see `STM32_ST_USE_TIMER`); must be 32-bit
+TIM7    | 16        | Libuavcan STM32 driver
+TIM8    | 16        | ADC triggering
+
 ## Third-party Dependencies
 
 ### PX4 UAVCAN Bootloader
