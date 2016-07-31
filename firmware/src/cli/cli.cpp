@@ -32,13 +32,17 @@
 ****************************************************************************/
 
 #include "cli.hpp"
+
 #include <board/board.hpp>
 #include <bootloader_interface/bootloader_interface.hpp>
 #include <uavcan_node/uavcan_node.hpp>
+
 #include <zubax_chibios/os.hpp>
 #include <zubax_chibios/config/config.hpp>
 #include <zubax_chibios/util/shell.hpp>
 #include <zubax_chibios/util/base64.hpp>
+
+#include <cstdlib>
 
 
 namespace cli
@@ -126,6 +130,50 @@ class UAVCANCommand : public os::shell::ICommandHandler
 } static cmd_uavcan;
 
 
+class PWMCommand : public os::shell::ICommandHandler
+{
+    const char* getName() const override { return "pwm"; }
+
+    void execute(os::shell::BaseChannelWrapper& ios, int argc, char** argv) override
+    {
+        if (argc < 2)
+        {
+            ios.print("Usage: %s { on | off | <A> <B> <C> }\n", argv[0]);
+            ios.print("Where A, B, C are phase values in [0, 1]\n");
+            return;
+        }
+
+        if (0 == std::strncmp("on", argv[1], 2))
+        {
+            board::motor::pwm::activate();
+            board::motor::driver::setGateDriverEnabled(true);
+            ios.print("PWM activated, gate driver enabled\n");
+        }
+        else if (0 == std::strncmp("off", argv[1], 3))
+        {
+            board::motor::pwm::deactivate();
+            board::motor::driver::setGateDriverEnabled(false);
+            ios.print("PWM deactivated, gate driver disabled\n");
+        }
+        else
+        {
+            constexpr math::Range<> range(0, 1);
+            math::Vector<3> abc = math::Vector<3>::Zero();
+
+            for (int i = 0; i < std::min(3, argc); i++)
+            {
+                // strtof() returns 0 on failure, which is just what we need
+                using namespace std;
+                abc[i] = range.constrain(strtof(argv[i + 1], nullptr));
+            }
+
+            board::motor::pwm::set(abc);
+            ios.print("PWM set to  %.3f  %.3f  %.3f\n", double(abc[0]), double(abc[1]), double(abc[2]));
+        }
+    }
+} static cmd_pwm;
+
+
 class CLIThread : public chibios_rt::BaseStaticThread<2048>
 {
     os::shell::Shell<> shell_;
@@ -155,6 +203,7 @@ public:
         (void) shell_.addCommandHandler(&cmd_zubax_id);
         (void) shell_.addCommandHandler(&cmd_cfg);
         (void) shell_.addCommandHandler(&cmd_uavcan);
+        (void) shell_.addCommandHandler(&cmd_pwm);
     }
 
     virtual ~CLIThread() { }

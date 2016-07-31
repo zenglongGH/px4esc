@@ -159,9 +159,6 @@ os::watchdog::Timer init()
     board::motor::driver::init();
     board::motor::pwm::init(60000.0F, 5e-07F);
 
-    board::motor::driver::setGateDriverEnabled(true);
-    board::motor::pwm::activate();
-
     /*
      * UAVCAN node initialization
      */
@@ -207,10 +204,6 @@ int main()
 
         // Flying colors for testing
         board::setLEDRGB(counter, std::uint8_t(counter + 85 * 1), std::uint8_t(counter + 85 * 2));
-
-        board::motor::pwm::set({counter / 255.0F,
-                                std::uint8_t(counter + 85 * 1) / 255.0F,
-                                std::uint8_t(counter + 85 * 2) / 255.0F});
 
         ::usleep(10000);
         counter++;
