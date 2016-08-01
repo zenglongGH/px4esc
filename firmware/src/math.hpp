@@ -50,26 +50,28 @@ using Matrix = Eigen::Matrix<Scalar, Rows, Cols>;
 template <int Size>
 using Vector = Matrix<Size, 1>;
 
-
+/**
+ * Inclusive range of the form [min, max].
+ */
 template <typename T = Scalar>
 struct Range
 {
     const T min;
     const T max;
 
-    constexpr Range(T min, T max) :
+    constexpr Range(const T min, const T max) :
         min(min),
         max(max)
     {
         assert(min < max);
     }
 
-    constexpr T constrain(T value) const
+    constexpr T constrain(const T value) const
     {
         return std::min(std::max(value, min), max);
     }
 
-    constexpr bool contains(T value) const
+    constexpr bool contains(const T value) const
     {
         return (value >= min) && (value <= max);
     }

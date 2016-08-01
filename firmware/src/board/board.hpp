@@ -40,6 +40,7 @@
 
 #include "motor_pwm.hpp"
 #include "motor_driver.hpp"
+#include "motor_adc.hpp"
 
 
 namespace board
@@ -125,5 +126,16 @@ inline void setTestPointD(bool level)
 /**
  * @}
  */
+
+/**
+ * Use this helper to toggle testpoints:
+ *      RAIIToggler<setTestPointA> toggler;
+ */
+template <void Target(bool)>
+struct RAIIToggler
+{
+    RAIIToggler()  { Target(true); }
+    ~RAIIToggler() { Target(false); }
+};
 
 }

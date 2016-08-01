@@ -81,7 +81,7 @@ void deactivate();
  * This function should only be called after @ref activate() and before @ref deactivate().
  * @param abc           PWM values per channel in the range [0, 1].
  */
-void set(math::Vector<3> abc);
+void set(const math::Vector<3>& abc);
 
 /**
  * Immediately deactivates the PWM outputs (shuts down the carrier).

@@ -44,8 +44,11 @@ The following list documents the current usage of hardware timers.
 Timer   | Resolution| Usage
 --------|-----------|--------------------------------------------------------------------------------------------------
 TIM1    | 16        | Motor PWM
-TIM2    | 32        | ADC triggering
+TIM2    | 32        | Not used
+TIM3    | 16        | RGB LED PWM
+TIM4    | 16        | ADC triggering
 TIM5    | 32        | ChibiOS system tick (see `STM32_ST_USE_TIMER`); must be 32-bit
+TIM6    | 16        | Not used
 TIM7    | 16        | Libuavcan STM32 driver
 TIM8    | 16        | ADC triggering
 

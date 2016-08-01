@@ -43,9 +43,7 @@ namespace pwm
 namespace
 {
 
-constexpr float TIM1ClockFrequency = float(STM32_TIMCLK2);
-
-constexpr unsigned IRQPriority = 1;     // We don't need the highest priority here
+constexpr unsigned TIM1ClockFrequency = STM32_TIMCLK2;
 
 } // namespace
 
@@ -65,7 +63,7 @@ void init(float frequency, float dead_time)
                 TIM_CR2_CCDS | TIM_CR2_CCUS | TIM_CR2_CCPC;
 
     // Channels 1, 2, 3 are used for PWM phases A, B, C, respectively
-    // Channel 4 is used to trigger DMA events
+    // Channel 4 is used for synchronization with TIM8, so CCR4 must be always 0
     TIM1->CCMR1 = TIM_CCMR1_OC1PE | TIM_CCMR1_OC1M_1 | TIM_CCMR1_OC1M_2 |
                   TIM_CCMR1_OC2PE | TIM_CCMR1_OC2M_1 | TIM_CCMR1_OC2M_2;
 
@@ -74,16 +72,20 @@ void init(float frequency, float dead_time)
 
     TIM1->CCER = TIM_CCER_CC4E;
 
+    TIM1->CCR4 = 0;
+
     // Configuring the carrier frequency
+    assert(FrequencyRange.contains(frequency));
     frequency = FrequencyRange.constrain(frequency);
-    const auto pwm_cycle_ticks = std::uint16_t((TIM1ClockFrequency / frequency) / 2.0F + 0.5F);
+    const auto pwm_cycle_ticks = std::uint16_t((double(TIM1ClockFrequency) / double(frequency)) / 2.0 + 0.5);
     assert(pwm_cycle_ticks > 100);                      // The lower limit is an arbitrarily selected lowest sane value
 
     TIM1->ARR = pwm_cycle_ticks - 1U;
 
     // Configuring dead time
+    assert(DeadTimeRange.contains(dead_time));
     dead_time = DeadTimeRange.constrain(dead_time);
-    auto dead_time_ticks = std::uint16_t(dead_time * TIM1ClockFrequency + 0.5F);
+    auto dead_time_ticks = std::uint16_t(double(dead_time) * double(TIM1ClockFrequency) + 0.5);
     assert(dead_time_ticks < (pwm_cycle_ticks / 2));
 
     // DTS clock divider set 0, hence fDTS = input clock.
@@ -92,12 +94,6 @@ void init(float frequency, float dead_time)
     dead_time_ticks &= 0x7F;
 
     TIM1->BDTR = TIM_BDTR_AOE | TIM_BDTR_MOE | dead_time_ticks;
-
-    // Configuring interrupts
-    TIM1->DIER = TIM_DIER_CC4IE;
-
-    NVIC_SetPriority(TIM1_CC_IRQn, IRQPriority);
-    NVIC_EnableIRQ(TIM1_CC_IRQn);
 
     // Launching the timer
     os::lowsyslog("PWM: Frequency %.6f kHz, %u ticks; Dead Time %.1f ns, %u ticks\n",
@@ -108,14 +104,14 @@ void init(float frequency, float dead_time)
 
 float getFrequency()
 {
-    return TIM1ClockFrequency / float((TIM1->ARR + 1U) * 2U);
+    return float(TIM1ClockFrequency) / float((TIM1->ARR + 1U) * 2U);
 }
 
 float getDeadTime()
 {
     auto dtg = std::uint8_t(TIM1->BDTR & 0xFFU);
     assert(dtg <= 127);         // Other modes are not supported yet, see initialization for details
-    return float(dtg) / TIM1ClockFrequency;
+    return float(dtg) / float(TIM1ClockFrequency);
 }
 
 void activate()
@@ -144,7 +140,7 @@ void deactivate()
     TIM1->EGR = TIM_EGR_COMG | TIM_EGR_UG;
 }
 
-void set(math::Vector<3> abc)
+void set(const math::Vector<3>& abc)
 {
     assert((abc.array() >= 0).all() && (abc.array() <= 1).all());
 
