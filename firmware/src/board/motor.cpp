@@ -70,18 +70,23 @@ void initPWM(float pwm_frequency, float pwm_dead_time)
 
     TIM1->CR1 = TIM_CR1_CMS_0 | TIM_CR1_CMS_0;
 
-    // MMS - output event on timer update (which happens at reset)
-    TIM1->CR2 = TIM_CR2_MMS_1 | TIM_CR2_CCUS | TIM_CR2_CCPC;
+    // MMS - output event on CCR4 match
+    TIM1->CR2 = TIM_CR2_MMS_2 | TIM_CR2_MMS_1 | TIM_CR2_MMS_0 | TIM_CR2_CCUS | TIM_CR2_CCPC;
 
     // Channels 1, 2, 3 are used for PWM phases A, B, C, respectively
+    // Channel 4 is used for synchronization with TIM8, so CCR4 must be always 0
     TIM1->CCMR1 = TIM_CCMR1_OC1PE | TIM_CCMR1_OC1M_1 | TIM_CCMR1_OC1M_2 |
                   TIM_CCMR1_OC2PE | TIM_CCMR1_OC2M_1 | TIM_CCMR1_OC2M_2;
 
-    TIM1->CCMR2 = TIM_CCMR2_OC3PE | TIM_CCMR2_OC3M_1 | TIM_CCMR2_OC3M_2;
+    TIM1->CCMR2 = TIM_CCMR2_OC3PE | TIM_CCMR2_OC3M_1 | TIM_CCMR2_OC3M_2 |
+                  TIM_CCMR2_OC4PE | TIM_CCMR2_OC4M_0 | TIM_CCMR2_OC4M_1;        // CC4 toggle mode!
 
     TIM1->CCER = TIM_CCER_CC1E | TIM_CCER_CC1NE |
                  TIM_CCER_CC2E | TIM_CCER_CC2NE |
-                 TIM_CCER_CC3E | TIM_CCER_CC3NE;
+                 TIM_CCER_CC3E | TIM_CCER_CC3NE |
+                 TIM_CCER_CC4E;
+
+    TIM1->CCR4 = 0;     // Always zero!
 
     // Configuring the carrier frequency
     assert(PWMFrequencyRange.contains(pwm_frequency));
@@ -145,8 +150,9 @@ void initPWMADCSync()
     TIM8->CR2 = TIM_CR2_CCUS | TIM_CR2_CCPC;
 
     // Only channel 1 is used here - it triggers ADC conversions
-    // Mode is exactly the same as that of TIM1
-    TIM8->CCMR1 = TIM_CCMR1_OC1PE | TIM_CCMR1_OC1M_1 | TIM_CCMR1_OC1M_2;
+    // Mode is exactly the same as that of TIM1, except that it's inverted - we need positive-going pulse
+    // at the middle of the PWM period to trigger the ADC; without inversion the pulse would be negative-going.
+    TIM8->CCMR1 = TIM_CCMR1_OC1PE | TIM_CCMR1_OC1M_0 | TIM_CCMR1_OC1M_1 | TIM_CCMR1_OC1M_2;
 
     TIM8->CCER = TIM_CCER_CC1E;
 
@@ -162,22 +168,29 @@ void initPWMADCSync()
     TIM8->BDTR = TIM_BDTR_MOE;
 
     // Configuring slave mode - this is where synchronization is defined
-    TIM8->SMCR = TIM_SMCR_SMS_2;
+    // First we're starting the timer synchronously with TIM1 by entering the Trigger Mode here:
+    TIM8->SMCR = TIM_SMCR_SMS_2 | TIM_SMCR_SMS_1;
 
-    // Launching the timer
-    TIM8->CR1 |= TIM_CR1_CEN;
+    // Now, waiting for the timer to start - it will happen when TIM1 reaches zero:
+    os::lowsyslog("Motor HW Driver: Waiting for timer sync...\n");
+    while ((TIM8->CNT == 0) || ((TIM8->CR1 & TIM_CR1_CEN) == 0))
+    {
+        ::usleep(1000);
+    }
+
+    // Now timers are running, setting the reset-on-trigger slave mode:
+    TIM8->SMCR = TIM_SMCR_SMS_2;
 
     // Freezing configuration
     TIM8->BDTR |= TIM_BDTR_LOCK_0 | TIM_BDTR_LOCK_1;
 
-    assert((TIM8->SR & TIM_SR_BIF) == 0);               // Making sure there was no break
-
-    // Waiting for the timer to pick up synchronously with TIM1
-    os::lowsyslog("Motor HW Driver: Waiting for timer sync...\n");
-    while (TIM8->CNT == 0)
-    {
-        ::usleep(1000);
-    }
+#if 0
+    // Using RPM output to test timer sycnhronization
+    // CCR1 should be decreased because very short pulses are not visible
+    // This thing should only be used for hardcore driver debugging sessions!
+    TIM8->CCR1 = TIM8->ARR - 5U;
+    palSetPadMode(GPIOC, GPIOC_RPM_PULSE_FEEDBACK, PAL_STM32_OTYPE_PUSHPULL | PAL_MODE_ALTERNATE(3));
+#endif
 }
 
 void initADC()
