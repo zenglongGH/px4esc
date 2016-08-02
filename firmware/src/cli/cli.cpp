@@ -145,15 +145,13 @@ class PWMCommand : public os::shell::ICommandHandler
 
         if (0 == std::strncmp("on", argv[1], 2))
         {
-            board::motor::pwm::reset();
-            board::motor::driver::setGateDriverEnabled(true);
-            ios.print("PWM reset, gate driver enabled\n");
+            board::motor::setActive(true);
+            ios.print("Activated\n");
         }
         else if (0 == std::strncmp("off", argv[1], 3))
         {
-            board::motor::pwm::reset();
-            board::motor::driver::setGateDriverEnabled(false);
-            ios.print("PWM reset, gate driver disabled\n");
+            board::motor::setActive(false);
+            ios.print("Deactivated\n");
         }
         else
         {
@@ -167,7 +165,7 @@ class PWMCommand : public os::shell::ICommandHandler
                 abc[i] = range.constrain(strtof(argv[i + 1], nullptr));
             }
 
-            board::motor::pwm::set(abc);
+            board::motor::setPWM(abc);
             ios.print("PWM set to  %.3f  %.3f  %.3f\n", double(abc[0]), double(abc[1]), double(abc[2]));
         }
     }
@@ -180,12 +178,12 @@ class StateCommand : public os::shell::ICommandHandler
 
     void execute(os::shell::BaseChannelWrapper& ios, int, char**) override
     {
-        ios.print("Driver failure indicators: %s\n",
-                  board::motor::driver::readFailureIndicators().toString().c_str());
+        ios.print("Motor control HW: %s\n",
+                  board::motor::getStatus().toString().c_str());
 
         ios.print("PWM: Frequency %.6f kHz   DeadTime %.1f nsec\n",
-                  double(board::motor::pwm::getFrequency() * 1e-3F),
-                  double(board::motor::pwm::getDeadTime() * 1e9F));
+                  double(board::motor::getPWMFrequency() * 1e-3F),
+                  double(board::motor::getPWMDeadTime() * 1e9F));
     }
 } static cmd_state;
 

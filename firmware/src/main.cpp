@@ -156,9 +156,7 @@ os::watchdog::Timer init()
      * Motor initialization
      */
     // This is only for testing purposes, will be removed later
-    board::motor::driver::init();
-    board::motor::pwm::init(60000.0F, 4e-07F);
-    board::motor::adc::init(1, [](float x) { return x; });
+    board::motor::init(60000.0F, 4e-07F);
 
     /*
      * UAVCAN node initialization
@@ -182,7 +180,7 @@ namespace os
 
 extern void applicationHaltHook()
 {
-    board::motor::pwm::emergency();
+    board::motor::emergency();
     board::setLEDRGB(255, 0, 0);
 }
 
@@ -213,7 +211,7 @@ int main()
     /*
      * Rebooting
      */
-    board::motor::pwm::emergency();             // Just to be on the safe side
+    board::motor::emergency();             // Just to be on the safe side
 
     os::lowsyslog("Main: GOING DOWN FOR REBOOT\n");
 

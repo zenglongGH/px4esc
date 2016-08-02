@@ -38,9 +38,7 @@
 #include <zubax_chibios/os.hpp>
 #include <hal.h>
 
-#include "motor_pwm.hpp"
-#include "motor_driver.hpp"
-#include "motor_adc.hpp"
+#include "motor.hpp"
 
 
 namespace board
