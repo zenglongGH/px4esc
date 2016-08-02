@@ -32,6 +32,7 @@
 ****************************************************************************/
 
 #include <board/board.hpp>
+#include <unistd.h>
 
 
 namespace board
@@ -69,23 +70,18 @@ void initPWM(float pwm_frequency, float pwm_dead_time)
 
     TIM1->CR1 = TIM_CR1_CMS_0 | TIM_CR1_CMS_0;
 
-    TIM1->CR2 = TIM_CR2_MMS_0 | TIM_CR2_MMS_1 | TIM_CR2_MMS_2 |
-                TIM_CR2_CCDS | TIM_CR2_CCUS | TIM_CR2_CCPC;
+    // MMS - output event on timer update (which happens at reset)
+    TIM1->CR2 = TIM_CR2_MMS_1 | TIM_CR2_CCUS | TIM_CR2_CCPC;
 
     // Channels 1, 2, 3 are used for PWM phases A, B, C, respectively
-    // Channel 4 is used for synchronization with TIM8, so CCR4 must be always 0
     TIM1->CCMR1 = TIM_CCMR1_OC1PE | TIM_CCMR1_OC1M_1 | TIM_CCMR1_OC1M_2 |
                   TIM_CCMR1_OC2PE | TIM_CCMR1_OC2M_1 | TIM_CCMR1_OC2M_2;
 
-    TIM1->CCMR2 = TIM_CCMR2_OC3PE | TIM_CCMR2_OC3M_1 | TIM_CCMR2_OC3M_2 |
-                  TIM_CCMR2_OC4PE | TIM_CCMR2_OC4M_0 | TIM_CCMR2_OC4M_1;
+    TIM1->CCMR2 = TIM_CCMR2_OC3PE | TIM_CCMR2_OC3M_1 | TIM_CCMR2_OC3M_2;
 
     TIM1->CCER = TIM_CCER_CC1E | TIM_CCER_CC1NE |
                  TIM_CCER_CC2E | TIM_CCER_CC2NE |
-                 TIM_CCER_CC3E | TIM_CCER_CC3NE |
-                 TIM_CCER_CC4E;
-
-    TIM1->CCR4 = 0;
+                 TIM_CCER_CC3E | TIM_CCER_CC3NE;
 
     // Configuring the carrier frequency
     assert(PWMFrequencyRange.contains(pwm_frequency));
@@ -110,7 +106,7 @@ void initPWM(float pwm_frequency, float pwm_dead_time)
     TIM1->BDTR = TIM_BDTR_MOE | TIM_BDTR_BKP | TIM_BDTR_BKE | dead_time_ticks;
 
     // Launching the timer
-    os::lowsyslog("PWM: Frequency %.6f kHz, %u ticks; Dead Time %.1f ns, %u ticks\n",
+    os::lowsyslog("Motor HW Driver: PWM Frequency %.6f kHz, %u ticks; PWM Dead Time %.1f ns, %u ticks\n",
                   double(getPWMFrequency() * 1e-3F), pwm_cycle_ticks, double(getPWMDeadTime() * 1e9F), dead_time_ticks);
 
     TIM1->CR1 |= TIM_CR1_CEN;
@@ -121,6 +117,67 @@ void initPWM(float pwm_frequency, float pwm_dead_time)
     // From now on we'll be changing ONLY CCR[1-3] REGISTERS
 
     assert((TIM1->SR & TIM_SR_BIF) == 0);       // Making sure there was no break
+}
+
+void initPWMADCSync()
+{
+    {
+        os::CriticalSectionLocker locker;
+
+        RCC->APB2ENR  |=  RCC_APB2ENR_TIM8EN;
+        RCC->APB2RSTR |=  RCC_APB2RSTR_TIM8RST;
+        RCC->APB2RSTR &= ~RCC_APB2RSTR_TIM8RST;
+    }
+
+    /*
+     * We use TIM8 to trigger measurements and TIM1 (PWM timer) to reset TIM8 every period, thus achieving
+     * synchronization. We can't trigger the ADC directly from TIM1 because of the limitations of the ADC
+     * external trigger logic.
+     *
+     * The measurements are performed always at the top of the PWM timer counter, when all phases are shorted to
+     * the ground. This is the only point where we can sample the currents, that matches the following conditions:
+     *  1. All phases are shorted; by Kirchhoff's rule, the sum of the phase currents will be zero.
+     *  2. Phases which currents we measure are shorted to the ground, guaranteeing that the currents will flow
+     *     through the current sensors.
+     */
+    TIM8->CR1 = TIM_CR1_CMS_0 | TIM_CR1_CMS_0;
+
+    TIM8->CR2 = TIM_CR2_CCUS | TIM_CR2_CCPC;
+
+    // Only channel 1 is used here - it triggers ADC conversions
+    // Mode is exactly the same as that of TIM1
+    TIM8->CCMR1 = TIM_CCMR1_OC1PE | TIM_CCMR1_OC1M_1 | TIM_CCMR1_OC1M_2;
+
+    TIM8->CCER = TIM_CCER_CC1E;
+
+    // Same ARR
+    TIM8->ARR = TIM1->ARR;
+    assert((TIM8->ARR > 0) && (TIM8->ARR < 0xFFFF));    // Making sure it's initialized indeed
+
+    // Configuring the ADC trigger point - at the middle of the PWM period, when all phases are at the LOW level
+    TIM8->CCR1 = TIM8->ARR - 1U;
+    assert(TIM8->CCR1 < TIM8->ARR);
+
+    // We don't care about dead time or breaks here
+    TIM8->BDTR = TIM_BDTR_MOE;
+
+    // Configuring slave mode - this is where synchronization is defined
+    TIM8->SMCR = TIM_SMCR_SMS_2;
+
+    // Launching the timer
+    TIM8->CR1 |= TIM_CR1_CEN;
+
+    // Freezing configuration
+    TIM8->BDTR |= TIM_BDTR_LOCK_0 | TIM_BDTR_LOCK_1;
+
+    assert((TIM8->SR & TIM_SR_BIF) == 0);               // Making sure there was no break
+
+    // Waiting for the timer to pick up synchronously with TIM1
+    os::lowsyslog("Motor HW Driver: Waiting for timer sync...\n");
+    while (TIM8->CNT == 0)
+    {
+        ::usleep(1000);
+    }
 }
 
 void initADC()
@@ -199,23 +256,6 @@ void initADC()
     // TODO: Configure DMA
 }
 
-void initPWMADCSync()
-{
-    {
-        os::CriticalSectionLocker locker;
-
-        RCC->APB2ENR  |=  RCC_APB2ENR_TIM8EN;
-        RCC->APB2RSTR |=  RCC_APB2RSTR_TIM8RST;
-        RCC->APB2RSTR &= ~RCC_APB2RSTR_TIM8RST;
-    }
-
-    /*
-     * We use TIM8 to trigger measurements and TIM1 (PWM timer) to reset TIM8 every period, thus achieving
-     * synchronization. We can't trigger the ADC directly from TIM1 because of the limitations of the ADC
-     * external trigger logic.
-     */
-}
-
 float convertTemperatureSensorVoltageToKelvin(float voltage)
 {
     return voltage;     // TODO
@@ -243,9 +283,9 @@ void init(const float pwm_frequency,
 
     initPWM(pwm_frequency, pwm_dead_time);
 
-    initADC();
-
     initPWMADCSync();
+
+    initADC();
 }
 
 void setActive(bool active)
