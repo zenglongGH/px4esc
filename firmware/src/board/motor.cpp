@@ -83,10 +83,9 @@ void initPWM(float pwm_frequency, float pwm_dead_time)
 
     TIM1->CCER = TIM_CCER_CC1E | TIM_CCER_CC1NE |
                  TIM_CCER_CC2E | TIM_CCER_CC2NE |
-                 TIM_CCER_CC3E | TIM_CCER_CC3NE |
-                 TIM_CCER_CC4E;
+                 TIM_CCER_CC3E | TIM_CCER_CC3NE;        // We don't need to enable CC4
 
-    TIM1->CCR4 = 0;     // Always zero!
+    TIM1->CCR4 = 0;                                     // Always zero!
 
     // Configuring the carrier frequency
     assert(PWMFrequencyRange.contains(pwm_frequency));
@@ -154,8 +153,6 @@ void initPWMADCSync()
     // at the middle of the PWM period to trigger the ADC; without inversion the pulse would be negative-going.
     TIM8->CCMR1 = TIM_CCMR1_OC1PE | TIM_CCMR1_OC1M_0 | TIM_CCMR1_OC1M_1 | TIM_CCMR1_OC1M_2;
 
-    TIM8->CCER = TIM_CCER_CC1E;
-
     // Same ARR
     TIM8->ARR = TIM1->ARR;
     assert((TIM8->ARR > 0) && (TIM8->ARR < 0xFFFF));    // Making sure it's initialized indeed
@@ -172,11 +169,12 @@ void initPWMADCSync()
     TIM8->SMCR = TIM_SMCR_SMS_2 | TIM_SMCR_SMS_1;
 
     // Now, waiting for the timer to start - it will happen when TIM1 reaches zero:
-    os::lowsyslog("Motor HW Driver: Waiting for timer sync...\n");
+    DEBUG_LOG("Waiting for timer sync...\n");
     while ((TIM8->CNT == 0) || ((TIM8->CR1 & TIM_CR1_CEN) == 0))
     {
         ::usleep(1000);
     }
+    DEBUG_LOG("Timers synced\n");
 
     // Now timers are running, setting the reset-on-trigger slave mode:
     TIM8->SMCR = TIM_SMCR_SMS_2;
@@ -189,6 +187,7 @@ void initPWMADCSync()
     // CCR1 should be decreased because very short pulses are not visible
     // This thing should only be used for hardcore driver debugging sessions!
     TIM8->CCR1 = TIM8->ARR - 5U;
+    TIM8->CCER |= TIM_CCER_CC1E;
     palSetPadMode(GPIOC, GPIOC_RPM_PULSE_FEEDBACK, PAL_STM32_OTYPE_PUSHPULL | PAL_MODE_ALTERNATE(3));
 #endif
 }
