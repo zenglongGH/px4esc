@@ -145,15 +145,15 @@ class PWMCommand : public os::shell::ICommandHandler
 
         if (0 == std::strncmp("on", argv[1], 2))
         {
-            board::motor::pwm::activate();
+            board::motor::pwm::reset();
             board::motor::driver::setGateDriverEnabled(true);
-            ios.print("PWM activated, gate driver enabled\n");
+            ios.print("PWM reset, gate driver enabled\n");
         }
         else if (0 == std::strncmp("off", argv[1], 3))
         {
-            board::motor::pwm::deactivate();
+            board::motor::pwm::reset();
             board::motor::driver::setGateDriverEnabled(false);
-            ios.print("PWM deactivated, gate driver disabled\n");
+            ios.print("PWM reset, gate driver disabled\n");
         }
         else
         {

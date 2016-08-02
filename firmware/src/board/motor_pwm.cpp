@@ -70,7 +70,10 @@ void init(float frequency, float dead_time)
     TIM1->CCMR2 = TIM_CCMR2_OC3PE | TIM_CCMR2_OC3M_1 | TIM_CCMR2_OC3M_2 |
                   TIM_CCMR2_OC4PE | TIM_CCMR2_OC4M_0 | TIM_CCMR2_OC4M_1;
 
-    TIM1->CCER = TIM_CCER_CC4E;
+    TIM1->CCER = TIM_CCER_CC1E | TIM_CCER_CC1NE |
+                 TIM_CCER_CC2E | TIM_CCER_CC2NE |
+                 TIM_CCER_CC3E | TIM_CCER_CC3NE |
+                 TIM_CCER_CC4E;
 
     TIM1->CCR4 = 0;
 
@@ -93,13 +96,21 @@ void init(float frequency, float dead_time)
     // At 180 MHz one tick ~5.(5) nsec, max 127 * 5.(5) = 705.(5) nsec, which is large enough.
     dead_time_ticks &= 0x7F;
 
-    TIM1->BDTR = TIM_BDTR_AOE | TIM_BDTR_MOE | dead_time_ticks;
+    // Enabling break input; if the clock fails, PWM outputs will be disabled automatically
+    TIM1->BDTR = TIM_BDTR_MOE | TIM_BDTR_BKP | TIM_BDTR_BKE | dead_time_ticks;
 
     // Launching the timer
     os::lowsyslog("PWM: Frequency %.6f kHz, %u ticks; Dead Time %.1f ns, %u ticks\n",
                   double(getFrequency() * 1e-3F), pwm_cycle_ticks, double(getDeadTime() * 1e9F), dead_time_ticks);
 
     TIM1->CR1 |= TIM_CR1_CEN;
+    TIM1->EGR = TIM_EGR_COMG | TIM_EGR_UG;
+
+    // Freezing configuration
+    TIM1->BDTR |= TIM_BDTR_LOCK_0 | TIM_BDTR_LOCK_1;
+    // From now on we'll be changing ONLY CCR[1-3] REGISTERS
+
+    assert((TIM1->SR & TIM_SR_BIF) == 0);       // Making sure there was no break
 }
 
 float getFrequency()
@@ -114,30 +125,11 @@ float getDeadTime()
     return float(dtg) / float(TIM1ClockFrequency);
 }
 
-void activate()
+void reset()
 {
     TIM1->CCR1 = 0;
     TIM1->CCR2 = 0;
     TIM1->CCR3 = 0;
-
-    TIM1->CCER |= TIM_CCER_CC1E | TIM_CCER_CC1NE |
-                  TIM_CCER_CC2E | TIM_CCER_CC2NE |
-                  TIM_CCER_CC3E | TIM_CCER_CC3NE;
-
-    TIM1->EGR = TIM_EGR_COMG | TIM_EGR_UG;
-}
-
-void deactivate()
-{
-    TIM1->CCER &= ~(TIM_CCER_CC1E | TIM_CCER_CC1NE |
-                    TIM_CCER_CC2E | TIM_CCER_CC2NE |
-                    TIM_CCER_CC3E | TIM_CCER_CC3NE);
-
-    TIM1->CCR1 = 0;
-    TIM1->CCR2 = 0;
-    TIM1->CCR3 = 0;
-
-    TIM1->EGR = TIM_EGR_COMG | TIM_EGR_UG;
 }
 
 void set(const math::Vector<3>& abc)
@@ -146,27 +138,35 @@ void set(const math::Vector<3>& abc)
 
     const auto arr = float(TIM1->ARR);
 
-    TIM1->CCR1 = std::uint16_t(abc[0] * arr + 0.4F);
-    TIM1->CCR2 = std::uint16_t(abc[1] * arr + 0.4F);
-    TIM1->CCR3 = std::uint16_t(abc[2] * arr + 0.4F);
+    const auto c1 = std::uint16_t(abc[0] * arr + 0.4F);
+    const auto c2 = std::uint16_t(abc[1] * arr + 0.4F);
+    const auto c3 = std::uint16_t(abc[2] * arr + 0.4F);
 
-    assert(TIM1->CCR1 <= TIM1->ARR);
-    assert(TIM1->CCR2 <= TIM1->ARR);
-    assert(TIM1->CCR3 <= TIM1->ARR);
+    assert((c1 <= arr) &&
+           (c2 <= arr) &&
+           (c3 <= arr));
+
+    /*
+     * If CNT reaches zero between writes to CCR1 and CCR3, PWM will break, because the PWM signals will not
+     * be in agreement with each other (CCR1 and possibly CCR2 will be using the new values, CCR3 and possibly
+     * CCR2 will keep old values until the next update event).
+     * Therefore we need to ensure that this function is NOT invoked when CNT is close to zero. Luckily, during
+     * normal operation this requirement should be met automatically, because this function will be invoked
+     * (very indirectly) from the ADC interrupt handler, which in turn is synchronized with timer update event.
+     */
+    TIM1->CCR1 = c1;
+    TIM1->CCR2 = c2;
+    TIM1->CCR3 = c3;
 }
 
 void emergency()
 {
+    // Generating software break, this will reset the PWM outputs to zero immediately
+    TIM1->EGR = TIM_EGR_BG;
+
     // This completely wreaks the driver, further use will be impossible until it's reinitialized again
-    TIM1->CCER = 0;
-
-    TIM1->CCR1 = 0;
-    TIM1->CCR2 = 0;
-    TIM1->CCR3 = 0;
-
-    TIM1->EGR = TIM_EGR_COMG | TIM_EGR_UG;
-
     TIM1->CR1 = 0;
+    TIM1->CR2 = 0;
 }
 
 }

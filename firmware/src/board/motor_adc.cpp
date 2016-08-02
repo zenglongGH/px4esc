@@ -71,7 +71,7 @@ void initADC()
     }
 
     // Enabling all three ADC in simultaneous mode with DMA
-    ADC->CCR = ADC_CCR_ADCPRE_0 | ADC_CCR_DMA_0 | 0b10110;
+    ADC->CCR = ADC_CCR_ADCPRE_0 | ADC_CCR_DMA_0 | 0b10001;
 
     ADC1->CR1 = ADC_CR1_SCAN |  ADC_CR1_EOCIE;
     ADC2->CR1 = ADC_CR1_SCAN;
@@ -144,17 +144,12 @@ void initTimers()
         RCC->APB2ENR  |=  RCC_APB2ENR_TIM8EN;
         RCC->APB2RSTR |=  RCC_APB2RSTR_TIM8RST;
         RCC->APB2RSTR &= ~RCC_APB2RSTR_TIM8RST;
-
-        RCC->APB1ENR  |=  RCC_APB1ENR_TIM4EN;
-        RCC->APB1RSTR |=  RCC_APB1RSTR_TIM4RST;
-        RCC->APB1RSTR &= ~RCC_APB1RSTR_TIM4RST;
     }
 
     /*
-     * We use TIM8 to trigger measurements and TIM4 to trigger TIM8. TIM4 is triggered by the PWM timer TIM1.
-     * So:
-     *  TIM1 --> TIM4 --> TIM8 --> ADC
-     * Impressed yet?
+     * We use TIM8 to trigger measurements and TIM1 (PWM timer) to reset TIM8 every period, thus achieving
+     * synchronization. We can't trigger the ADC directly from TIM1 because of the limitations of the ADC
+     * external trigger logic.
      */
 }
 

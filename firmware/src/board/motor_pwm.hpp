@@ -68,14 +68,10 @@ float getFrequency();
 float getDeadTime();
 
 /**
- * Activates the outputs and initializes PWM channels to safe values.
+ * Resets all outputs to zero.
+ * Use this to reset PWM to idle state.
  */
-void activate();
-
-/**
- * Deactivates the PWM outputs (shuts down the carrier).
- */
-void deactivate();
+void reset();
 
 /**
  * This function should only be called after @ref activate() and before @ref deactivate().
