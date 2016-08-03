@@ -286,6 +286,19 @@ float convertTemperatureSensorVoltageToKelvin(float voltage)
     return voltage;     // TODO
 }
 
+enum class CurrentAmplifierGain
+{
+    X10,
+    X40
+};
+
+void setCurrentAmplifierGain(const CurrentAmplifierGain gain)
+{
+    palWritePad(GPIOB, GPIOB_GAIN, (gain == CurrentAmplifierGain::X40));
+
+    g_current_gain = (gain == CurrentAmplifierGain::X40) ? 40.0F : 10.0F;       // TODO: Proper math
+}
+
 } // namespace
 
 void init(const float pwm_frequency,
@@ -361,29 +374,6 @@ void setPWM(const math::Vector<3>& abc)
     TIM1->CCR3 = c3;
 }
 
-void setCurrentAmplifierGain(CurrentAmplifierGain gain)
-{
-    switch (gain)
-    {
-    case CurrentAmplifierGain::X10:
-    {
-        palWritePad(GPIOB, GPIOB_GAIN, false);
-        g_current_gain = 10.0F;                         // TODO: Set full gain value
-        break;
-    }
-    case CurrentAmplifierGain::X40:
-    {
-        palWritePad(GPIOB, GPIOB_GAIN, true);
-        g_current_gain = 40.0F;                         // TODO: Set full gain value
-        break;
-    }
-    default:
-    {
-        assert(false);
-    }
-    }
-}
-
 void emergency()
 {
     // Generating software break, this will reset the PWM outputs to zero immediately
@@ -421,6 +411,8 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
     board::RAIIToggler<board::setTestPointA> tp_toggler;
 
     assert((ADC->CSR & (ADC_CSR_DOVR1 | ADC_CSR_DOVR2 | ADC_CSR_DOVR3)) == 0);
+
+    // TODO: Automatic current gain control using setCurrentAmplifierGain().
 
     ADC1->SR = 0;         // Reset the IRQ flags
 }

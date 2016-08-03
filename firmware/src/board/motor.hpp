@@ -94,21 +94,6 @@ float getPWMDeadTime();
 void setPWM(const math::Vector<3>& abc);
 
 /**
- * @ref setCurrentAmplifierGain().
- */
-enum class CurrentAmplifierGain
-{
-    X10,
-    X40
-};
-
-/**
- * Writes the GAIN pin of the driver IC, and updates the ADC processing chain accordingly.
- * See @ref CurrentAmplifierGain.
- */
-void setCurrentAmplifierGain(CurrentAmplifierGain gain);
-
-/**
  * Immediately deactivates the PWM outputs (shuts down the carrier).
  * Further use of the driver may not be possible.
  * This function can be called from ANY context, e.g. from Hard Fault handler.
