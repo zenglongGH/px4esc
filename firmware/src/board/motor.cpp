@@ -49,13 +49,21 @@ constexpr unsigned PhaseBCurrentChannelIndex    = 12;
 constexpr unsigned InverterVoltageChannelIndex  = 11;
 constexpr unsigned TemperatureChannelIndex      = 10;
 
-constexpr unsigned NumADC = 3;
-
 constexpr unsigned SamplesPerADCPerIRQ = 2;
 
 constexpr unsigned ADCIRQPriority = 0;
 
-//std::uint16_t g_dma_buffer[SamplesPerADCPerIRQ * NumADC];
+constexpr std::uint32_t CanaryValue = 0xA55AA55A;
+
+
+volatile std::uint32_t g_canary_a = CanaryValue;
+std::uint16_t g_dma_buffer_inverter_voltage[SamplesPerADCPerIRQ];
+volatile std::uint32_t g_canary_b = CanaryValue;
+std::uint16_t g_dma_buffer_phase_a_current[SamplesPerADCPerIRQ];
+volatile std::uint32_t g_canary_c = CanaryValue;
+std::uint16_t g_dma_buffer_phase_b_current[SamplesPerADCPerIRQ];
+volatile std::uint32_t g_canary_d = CanaryValue;
+
 
 float g_current_gain;           ///< Unset (zero) by default
 
@@ -85,7 +93,8 @@ void initPWM(float pwm_frequency, float pwm_dead_time)
 
     TIM1->CCER = TIM_CCER_CC1E | TIM_CCER_CC1NE |
                  TIM_CCER_CC2E | TIM_CCER_CC2NE |
-                 TIM_CCER_CC3E | TIM_CCER_CC3NE;        // We don't need to enable CC4
+                 TIM_CCER_CC3E | TIM_CCER_CC3NE |
+                 TIM_CCER_CC4E;
 
     TIM1->CCR4 = 0;                                     // Always zero!
 
@@ -155,6 +164,9 @@ void initPWMADCSync()
     // at the middle of the PWM period to trigger the ADC; without inversion the pulse would be negative-going.
     TIM8->CCMR1 = TIM_CCMR1_OC1PE | TIM_CCMR1_OC1M_0 | TIM_CCMR1_OC1M_1 | TIM_CCMR1_OC1M_2;
 
+    // The output MUST BE enabled in order for synchronization to work!
+    TIM8->CCER = TIM_CCER_CC1E;
+
     // Same ARR
     TIM8->ARR = TIM1->ARR;
     assert((TIM8->ARR > 0) && (TIM8->ARR < 0xFFFF));    // Making sure it's initialized indeed
@@ -189,7 +201,6 @@ void initPWMADCSync()
     // CCR1 should be decreased because very short pulses are not visible
     // This thing should only be used for hardcore driver debugging sessions!
     TIM8->CCR1 = TIM8->ARR - 5U;
-    TIM8->CCER |= TIM_CCER_CC1E;
     palSetPadMode(GPIOC, GPIOC_RPM_PULSE_FEEDBACK, PAL_STM32_OTYPE_PUSHPULL | PAL_MODE_ALTERNATE(3));
 #endif
 }
@@ -204,18 +215,30 @@ void initADC()
         RCC->APB2RSTR &= ~RCC_APB2RSTR_ADCRST;
     }
 
-    // Enabling all three ADC in simultaneous mode with DMA
-    ADC->CCR = ADC_CCR_ADCPRE_0 | ADC_CCR_DMA_0 | 0b10001;
+    /*
+     * Enabling all three ADC in independent mode with DMA.
+     * We could use multi-ADC simulatenous mode as well, but it brings no benefit and only increases complexity.
+     * Besides, the documentation provided for multi-ADC mode is scarce at best.
+     *
+     * ADCs are running independently, but they all are triggered by the same source and perform identical
+     * number of conversions, so despite the independent mode they still operate quasi synchronously. This
+     * allows us to use only one IRQ - that of ADC1 - to handle all conversions.
+     *
+     * If there is need, it is also possible to configure different sampling modes per ADC - the advantage of
+     * independent mode.
+     */
+    ADC->CCR = ADC_CCR_ADCPRE_0;                        // Prescaler
 
-    ADC1->CR1 = ADC_CR1_SCAN |  ADC_CR1_EOCIE;
+    ADC1->CR1 = ADC_CR1_SCAN |  ADC_CR1_EOCIE;          // Only ADC1 can generate interrupts
     ADC2->CR1 = ADC_CR1_SCAN;
-    ADC3->CR1 = ADC2->CR1;
+    ADC3->CR1 = ADC_CR1_SCAN;
 
     // ADC triggering: RISING EDGE on TIM8 CC1
     constexpr unsigned ExtSel = 0b1101;
-    ADC1->CR2 = ADC_CR2_EXTEN_0 | (ExtSel << 24) | ADC_CR2_DDS | ADC_CR2_DMA;
-    ADC2->CR2 = ADC1->CR2;
-    ADC3->CR2 = ADC1->CR2;
+    constexpr unsigned CR2 = ADC_CR2_EXTEN_0 | (ExtSel << 24) | ADC_CR2_DDS | ADC_CR2_DMA;
+    ADC1->CR2 = CR2;
+    ADC2->CR2 = CR2;
+    ADC3->CR2 = CR2;
 
     /*
      * We're using 3 ticks per sample for all channels.
@@ -230,7 +253,7 @@ void initADC()
      *          ((((adc_clk_hz * adc_logn_13bit) / 1000000) * adc_r_ohm * adc_c_pf) / 1000000000 + 500) / 1000;
      *
      * adc_t_smpl_tcks used to always evaluate to about 3 samples per tick, which is the minimum supported by the
-     * hardware. Increasing the number of ticks per sample will break other things such as string timing
+     * hardware. Increasing the number of ticks per sample will break other things such as strict timing
      * requirements etc, so we probably should consider the 3 ticks per sample a hard requirement of this design and
      * mandate that the hardware adheres to it. So, you see, it's not a to-do comment, rather it's just an explanation.
      */
@@ -254,9 +277,10 @@ void initADC()
      */
     static_assert(SamplesPerADCPerIRQ <= 6, "SQR2 and SQR1 initialization must be updated");
 
-    ADC1->SQR1 = (SamplesPerADCPerIRQ - 1) << 20;       // Sequence length is identical for all ADC
-    ADC2->SQR1 = ADC1->SQR1;
-    ADC3->SQR1 = ADC1->SQR1;
+    constexpr unsigned SQR1 = (SamplesPerADCPerIRQ - 1) << 20;          // Sequence length is identical for all ADC
+    ADC1->SQR1 = SQR1;
+    ADC2->SQR1 = SQR1;
+    ADC3->SQR1 = SQR1;
 
     static constexpr auto fill_sqr = [](unsigned ch)
         {
@@ -264,18 +288,72 @@ void initADC()
         };
 
     ADC1->SQR3 = fill_sqr(InverterVoltageChannelIndex);
-    ADC2->SQR3 = fill_sqr(PhaseACurrentChannelIndex);
-    ADC3->SQR3 = fill_sqr(PhaseBCurrentChannelIndex);
+    ADC2->SQR3 = fill_sqr(PhaseACurrentChannelIndex);           // ADC2 phase A
+    ADC3->SQR3 = fill_sqr(PhaseBCurrentChannelIndex);           // ADC3 phase B
 
     // Configuring IRQ
     {
         os::CriticalSectionLocker locker;
+        nvicClearPending(ADC_IRQn);
         nvicEnableVector(ADC_IRQn, ADCIRQPriority);
     }
 
-    // Configuring DMA
+    /*
+     * Configuring DMA - three channels.
+     * Refer to 9.3.17 - Stream configuration procedure.
+     */
+    {
+        os::CriticalSectionLocker locker;
+        RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN; // No reset because it could be shared with other peripherals.
+    }
 
-    // Everything is configuring, enabling
+    static const auto configure_dma = [](DMA_Stream_TypeDef* const stream,
+                                         volatile void* const source,
+                                         void* const destination,
+                                         const unsigned channel)
+        {
+            // Resetting as per 9.3.17
+            stream->CR = 0;
+            DEBUG_LOG("Resetting DMA stream @%08x\n", unsigned(stream));
+            while (stream->CR != 0)
+            {
+                ::usleep(1000);
+            }
+
+            stream->PAR = reinterpret_cast<std::uint32_t>(source);
+            stream->M0AR = reinterpret_cast<std::uint32_t>(destination);
+
+            stream->NDTR = SamplesPerADCPerIRQ;
+            stream->FCR = 0;
+
+            stream->CR = (channel << 25) |
+                         DMA_SxCR_PL_0 | DMA_SxCR_PL_1 |        // Maximum priority
+                         DMA_SxCR_MSIZE_0 |                     // 16-bit memory
+                         DMA_SxCR_PSIZE_0 |                     // 16-bit peripheral
+                         DMA_SxCR_MINC |                        // Memory increment enabled
+                         DMA_SxCR_CIRC |                        // Circular mode
+                         DMA_SxCR_EN;
+        };
+
+    // DMA2 Stream 0 - ADC1
+    configure_dma(DMA2_Stream0,
+                  &ADC1->DR,
+                  &g_dma_buffer_inverter_voltage[0],
+                  0);
+
+    // DMA2 Stream 2 - ADC2
+    configure_dma(DMA2_Stream2,
+                  &ADC2->DR,
+                  &g_dma_buffer_phase_a_current[0],
+                  1);
+
+    // DMA2 Stream 1 - ADC3
+    configure_dma(DMA2_Stream1,
+                  &ADC3->DR,
+                  &g_dma_buffer_phase_b_current[0],
+                  2);
+
+    // Everything is configured, enabling ADC
     ADC1->CR2 |= ADC_CR2_ADON;
     ADC2->CR2 |= ADC_CR2_ADON;
     ADC3->CR2 |= ADC_CR2_ADON;
@@ -382,6 +460,9 @@ void emergency()
     // This completely wreaks the driver, further use will be impossible until it's reinitialized again
     TIM1->CR1 = 0;
     TIM1->CR2 = 0;
+
+    TIM8->CR1 = 0;
+    TIM8->CR2 = 0;
 }
 
 Status getStatus()
@@ -408,13 +489,32 @@ extern "C"
 
 CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
 {
-    board::RAIIToggler<board::setTestPointA> tp_toggler;
+    using namespace board::motor;
 
-    assert((ADC->CSR & (ADC_CSR_DOVR1 | ADC_CSR_DOVR2 | ADC_CSR_DOVR3)) == 0);
+    board::RAIIToggler<board::setTestPointA> tp_toggler;
 
     // TODO: Automatic current gain control using setCurrentAmplifierGain().
 
     ADC1->SR = 0;         // Reset the IRQ flags
+
+    /*
+     * Checking invariants
+     */
+    assert((ADC->CSR & (ADC_CSR_DOVR1 | ADC_CSR_DOVR2 | ADC_CSR_DOVR3)) == 0);                  // ADC overrun
+
+    constexpr unsigned DMAErrorMask = DMA_LISR_TEIF0 | DMA_LISR_DMEIF0 | DMA_LISR_FEIF0 |
+                                      DMA_LISR_TEIF1 | DMA_LISR_DMEIF1 | DMA_LISR_FEIF1 |
+                                      DMA_LISR_TEIF2 | DMA_LISR_DMEIF2 | DMA_LISR_FEIF2;
+    assert((DMA2->LISR & DMAErrorMask) == 0);                                                   // DMA errors
+
+    (void)g_canary_a;
+    (void)g_canary_b;
+    (void)g_canary_c;
+    (void)g_canary_d;                                                                           // Bad DMA writes
+    assert((g_canary_a == CanaryValue) &&
+           (g_canary_b == CanaryValue) &&
+           (g_canary_c == CanaryValue) &&
+           (g_canary_d == CanaryValue));
 }
 
 }
