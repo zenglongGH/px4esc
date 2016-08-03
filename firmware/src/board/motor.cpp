@@ -53,6 +53,8 @@ constexpr unsigned NumADC = 3;
 
 constexpr unsigned SamplesPerADCPerIRQ = 2;
 
+constexpr unsigned ADCIRQPriority = 0;
+
 //std::uint16_t g_dma_buffer[SamplesPerADCPerIRQ * NumADC];
 
 float g_current_gain;           ///< Unset (zero) by default
@@ -209,8 +211,9 @@ void initADC()
     ADC2->CR1 = ADC_CR1_SCAN;
     ADC3->CR1 = ADC2->CR1;
 
+    // ADC triggering: RISING EDGE on TIM8 CC1
     constexpr unsigned ExtSel = 0b1101;
-    ADC1->CR2 = ADC_CR2_EXTEN_0 | ADC_CR2_EXTEN_1 | (ExtSel << 24) | ADC_CR2_DDS | ADC_CR2_DMA;
+    ADC1->CR2 = ADC_CR2_EXTEN_0 | (ExtSel << 24) | ADC_CR2_DDS | ADC_CR2_DMA;
     ADC2->CR2 = ADC1->CR2;
     ADC3->CR2 = ADC1->CR2;
 
@@ -264,8 +267,18 @@ void initADC()
     ADC2->SQR3 = fill_sqr(PhaseACurrentChannelIndex);
     ADC3->SQR3 = fill_sqr(PhaseBCurrentChannelIndex);
 
-    // TODO: Configure triggering
-    // TODO: Configure DMA
+    // Configuring IRQ
+    {
+        os::CriticalSectionLocker locker;
+        nvicEnableVector(ADC_IRQn, ADCIRQPriority);
+    }
+
+    // Configuring DMA
+
+    // Everything is configuring, enabling
+    ADC1->CR2 |= ADC_CR2_ADON;
+    ADC2->CR2 |= ADC_CR2_ADON;
+    ADC3->CR2 |= ADC_CR2_ADON;
 }
 
 float convertTemperatureSensorVoltageToKelvin(float voltage)
@@ -295,9 +308,9 @@ void init(const float pwm_frequency,
 
     initPWM(pwm_frequency, pwm_dead_time);
 
-    initPWMADCSync();
-
     initADC();
+
+    initPWMADCSync();
 }
 
 void setActive(bool active)
@@ -406,6 +419,8 @@ extern "C"
 CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
 {
     board::RAIIToggler<board::setTestPointA> tp_toggler;
+
+    assert((ADC->CSR & (ADC_CSR_DOVR1 | ADC_CSR_DOVR2 | ADC_CSR_DOVR3)) == 0);
 
     ADC1->SR = 0;         // Reset the IRQ flags
 }
