@@ -105,7 +105,8 @@ void emergency();
  */
 struct Status
 {
-    float power_stage_temperature = 0.0F;       ///< Kelvin
+    float inverter_temperature = 0.0F;          ///< Kelvin
+    float inverter_voltage = 0.0F;              ///< Volt
 
     bool bad_power = false;                     ///< PWRGD
     bool overload = false;                      ///< OCTW
@@ -121,7 +122,8 @@ struct Status
         return os::heapless::concatenate<60>("BadPower: ", bad_power, ", ",
                                              "Overload: ", overload, ", ",
                                              "Fault: ", fault, ", ",
-                                             "PowerStageTemp: ", power_stage_temperature);
+                                             "InverterVolt: ", inverter_voltage, ", ",
+                                             "InverterTemp: ", inverter_temperature);
     }
 };
 

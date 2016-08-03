@@ -186,6 +186,23 @@ extern void applicationHaltHook()
 
 }
 
+// This is defined here for testing only
+
+namespace board
+{
+namespace motor
+{
+
+extern void handleSampleIRQ(const math::Vector<2>& phase_currents_ab,
+                            const float inverter_voltage)
+{
+    (void)phase_currents_ab;
+    (void)inverter_voltage;
+}
+
+}
+}
+
 
 int main()
 {

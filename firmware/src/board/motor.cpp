@@ -33,6 +33,8 @@
 
 #include <board/board.hpp>
 #include <unistd.h>
+#include <algorithm>
+#include <numeric>
 
 
 namespace board
@@ -41,7 +43,16 @@ namespace motor
 {
 namespace
 {
+/*
+ * Driver configuration
+ */
+constexpr unsigned SamplesPerADCPerIRQ = 2;
 
+constexpr unsigned ADCIRQPriority = 0;
+
+/*
+ * Hardware-defined parameters
+ */
 constexpr unsigned TIM1ClockFrequency = STM32_TIMCLK2;
 
 constexpr unsigned PhaseACurrentChannelIndex    = 13;
@@ -49,12 +60,13 @@ constexpr unsigned PhaseBCurrentChannelIndex    = 12;
 constexpr unsigned InverterVoltageChannelIndex  = 11;
 constexpr unsigned TemperatureChannelIndex      = 10;
 
-constexpr unsigned SamplesPerADCPerIRQ = 2;
+constexpr float ADCReferenceVoltage = 3.3F;
+constexpr unsigned ADCResolutionBits = 12;
 
-constexpr unsigned ADCIRQPriority = 0;
-
+/*
+ * ADC DMA buffers. We're using the canaries to ensure that no data corruption is happening.
+ */
 constexpr std::uint32_t CanaryValue = 0xA55AA55A;
-
 
 volatile std::uint32_t g_canary_a = CanaryValue;
 std::uint16_t g_dma_buffer_inverter_voltage[SamplesPerADCPerIRQ];
@@ -64,8 +76,71 @@ volatile std::uint32_t g_canary_c = CanaryValue;
 std::uint16_t g_dma_buffer_phase_b_current[SamplesPerADCPerIRQ];
 volatile std::uint32_t g_canary_d = CanaryValue;
 
+/*
+ * Current state variables
+ */
+float g_inverter_voltage;
 
-float g_current_gain;           ///< Unset (zero) by default
+/**
+ * This class holds parameters specific to the board we're running on.
+ * At some point we'll need to add support for other hardware revisions with different voltage dividers,
+ * different current shunt measurement circuits, etc. In that case this class will need to be modified accordingly.
+ *
+ * This class is not a good architectural solution, but we chose this way for performance reasons.
+ *
+ * TODO: REVISIT LATER, NEEDS REFACTORING.
+ */
+static class BoardFeatures final
+{
+    float inverter_voltage_gain = 0.0F;
+    float current_shunt_resistance = 0.0F;
+
+    float current_amplifier_gain = 0.0F;
+
+    static constexpr float computeResistorDividerGain(float upper, float lower)
+    {
+        return lower / (lower + upper);
+    }
+
+public:
+    void init()
+    {
+        const auto hwver = board::detectHardwareVersion();
+
+        if (hwver.major == 1 && hwver.minor == 0)
+        {
+            os::lowsyslog("Motor HW Driver: Detected Pixhawk ESC v1.6 compatible board\n");
+
+            inverter_voltage_gain = 1.0F / computeResistorDividerGain(5100 * 2, 330 * 2);
+            current_shunt_resistance = 5 * 1e-3F;
+
+            palWritePad(GPIOB, GPIOB_GAIN, true);
+            current_amplifier_gain = 1.0F / (40.0F * current_shunt_resistance);
+        }
+        else
+        {
+            assert(false);
+            os::lowsyslog("Motor HW Driver: UNSUPPORTED HARDWARE VERSION %u.%u\n", hwver.major, hwver.minor);
+        }
+    }
+
+    void adjustCurrentGain(float phase_a, float phase_b)
+    {
+        const float max_current = std::max(phase_a, phase_b);
+        (void)max_current;
+        // TODO: Automatic Gain Control
+    }
+
+    float convertADCVoltageToInverterVoltage(float v) const
+    {
+        return v * inverter_voltage_gain;
+    }
+
+    float convertADCVoltageToPhaseCurrent(float v) const
+    {
+        return (v - (ADCReferenceVoltage / 2.0F)) * current_amplifier_gain;
+    }
+} g_board_features;
 
 
 void initPWM(float pwm_frequency, float pwm_dead_time)
@@ -133,6 +208,7 @@ void initPWM(float pwm_frequency, float pwm_dead_time)
 
     assert((TIM1->SR & TIM_SR_BIF) == 0);       // Making sure there was no break
 }
+
 
 void initPWMADCSync()
 {
@@ -204,6 +280,7 @@ void initPWMADCSync()
     palSetPadMode(GPIOC, GPIOC_RPM_PULSE_FEEDBACK, PAL_STM32_OTYPE_PUSHPULL | PAL_MODE_ALTERNATE(3));
 #endif
 }
+
 
 void initADC()
 {
@@ -359,22 +436,21 @@ void initADC()
     ADC3->CR2 |= ADC_CR2_ADON;
 }
 
+
 float convertTemperatureSensorVoltageToKelvin(float voltage)
 {
     return voltage;     // TODO
 }
 
-enum class CurrentAmplifierGain
-{
-    X10,
-    X40
-};
 
-void setCurrentAmplifierGain(const CurrentAmplifierGain gain)
+template <unsigned NumSamples>
+inline float convertADCSamplesToVoltage(const std::uint16_t (&x)[NumSamples])
 {
-    palWritePad(GPIOB, GPIOB_GAIN, (gain == CurrentAmplifierGain::X40));
+    constexpr double VoltsPerLSB = double(ADCReferenceVoltage) / double((1 << ADCResolutionBits) - 1);
 
-    g_current_gain = (gain == CurrentAmplifierGain::X40) ? 40.0F : 10.0F;       // TODO: Proper math
+    constexpr float ConversionMultiplier = float(VoltsPerLSB / double(NumSamples));
+
+    return float(std::accumulate(std::begin(x), std::end(x), 0U)) * ConversionMultiplier;
 }
 
 } // namespace
@@ -392,10 +468,9 @@ void init(const float pwm_frequency,
     // Disable the driver outputs by default (they should be disabled anyway though...)
     palWritePad(GPIOA, GPIOA_EN_GATE, false);
 
-    // Initializing other defaults that can be changed at run time
-    setCurrentAmplifierGain(CurrentAmplifierGain::X40);
-
     // TODO: Set up an interrupt to trigger when PWRGD goes down. Call an external handler on it, or just halt the OS.
+
+    g_board_features.init();
 
     initPWM(pwm_frequency, pwm_dead_time);
 
@@ -469,7 +544,8 @@ Status getStatus()
 {
     Status s;
 
-    s.power_stage_temperature = convertTemperatureSensorVoltageToKelvin(0.0F);  // TODO Temperature
+    s.inverter_temperature = convertTemperatureSensorVoltageToKelvin(0.0F);  // TODO Temperature
+    s.inverter_voltage = g_inverter_voltage;
 
     s.bad_power = !palReadPad(GPIOC, GPIOC_POWER_GOOD);
     s.overload  = !palReadPad(GPIOC, GPIOC_OVER_TEMP_WARNING_INVERSE);
@@ -493,12 +569,38 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
 
     board::RAIIToggler<board::setTestPointA> tp_toggler;
 
-    // TODO: Automatic current gain control using setCurrentAmplifierGain().
+    /*
+     * Processing the samples and invoking the application handler.
+     * These tasks need to be completed ASAP in order to minimize latency.
+     */
+    const float current_a =
+        g_board_features.convertADCVoltageToPhaseCurrent(convertADCSamplesToVoltage(g_dma_buffer_phase_a_current));
+
+    const float current_b =
+        g_board_features.convertADCVoltageToPhaseCurrent(convertADCSamplesToVoltage(g_dma_buffer_phase_b_current));
+
+    {
+        const float new_inverter_voltage =
+            g_board_features.convertADCVoltageToInverterVoltage(
+                convertADCSamplesToVoltage(g_dma_buffer_inverter_voltage));
+
+        // Basic low-pass filter
+        g_inverter_voltage = (g_inverter_voltage + new_inverter_voltage) / 2.0F;
+    }
+
+    handleSampleIRQ({current_a, current_b}, g_inverter_voltage);
+
+    /*
+     * Performing less time-critical tasks after the application's handler has been executed.
+     */
+    g_board_features.adjustCurrentGain(current_a, current_b);
+
+    // TODO: Current zero offset calibration!
 
     ADC1->SR = 0;         // Reset the IRQ flags
 
     /*
-     * Checking invariants
+     * Checking invariants.
      */
     assert((ADC->CSR & (ADC_CSR_DOVR1 | ADC_CSR_DOVR2 | ADC_CSR_DOVR3)) == 0);                  // ADC overrun
 
