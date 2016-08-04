@@ -47,19 +47,9 @@ namespace board
 namespace motor
 {
 /**
- * Limits imposed by the hardware.
- */
-constexpr math::Range<> PWMFrequencyRange(50000, 80000);
-constexpr math::Range<> PWMDeadTimeRange(0.0F, 700e-9F);
-
-/**
  * After initialization the driver will enter the inactive mode.
- *
- * @param pwm_frequency                 Preferred PWM frequency in Hertz
- * @param pwm_dead_time                 Preferred PWM dead time in seconds
  */
-void init(const float pwm_frequency,
-          const float pwm_dead_time);
+void init();
 
 /**
  * Activates/deactivates the power stage hardware.

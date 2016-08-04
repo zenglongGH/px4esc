@@ -78,6 +78,12 @@ std::uint16_t g_dma_buffer_phase_b_current[SamplesPerADCPerIRQ];
 volatile std::uint32_t g_canary_d = CanaryValue;
 
 /*
+ * Configuration parameters
+ */
+os::config::Param<float> g_config_pwm_frequency_khz             ("drv.pwm_frq_khz",     60.0F,     50.0F,     80.0F);
+os::config::Param<float> g_config_pwm_dead_time_nsec            ("drv.pwm_dead_ns",    400.0F,     50.0F,    900.0F);
+
+/*
  * Current state variables
  */
 float g_pwm_period;
@@ -155,7 +161,8 @@ public:
 } g_board_features;
 
 
-void initPWM(float pwm_frequency, float pwm_dead_time)
+void initPWM(const double pwm_frequency,
+             const double pwm_dead_time)
 {
     {
         os::CriticalSectionLocker locker;
@@ -186,17 +193,13 @@ void initPWM(float pwm_frequency, float pwm_dead_time)
     TIM1->CCR4 = 0;                                     // Always zero!
 
     // Configuring the carrier frequency
-    assert(PWMFrequencyRange.contains(pwm_frequency));
-    pwm_frequency = PWMFrequencyRange.constrain(pwm_frequency);
-    const auto pwm_cycle_ticks = std::uint16_t((double(TIM1ClockFrequency) / double(pwm_frequency)) / 2.0 + 0.5);
+    const auto pwm_cycle_ticks = std::uint16_t((double(TIM1ClockFrequency) / pwm_frequency) / 2.0 + 0.5);
     assert(pwm_cycle_ticks > 100);                      // The lower limit is an arbitrarily selected lowest sane value
 
     TIM1->ARR = pwm_cycle_ticks - 1U;
 
     // Configuring dead time
-    assert(PWMDeadTimeRange.contains(pwm_dead_time));
-    pwm_dead_time = PWMDeadTimeRange.constrain(pwm_dead_time);
-    auto dead_time_ticks = std::uint16_t(double(pwm_dead_time) * double(TIM1ClockFrequency) + 0.5);
+    auto dead_time_ticks = std::uint16_t(pwm_dead_time * double(TIM1ClockFrequency) + 0.5);
     assert(dead_time_ticks < (pwm_cycle_ticks / 2));
 
     // DTS clock divider set 0, hence fDTS = input clock.
@@ -489,8 +492,7 @@ inline void checkInvariants()
 } // namespace
 
 
-void init(const float pwm_frequency,
-          const float pwm_dead_time)
+void init()
 {
     /*
      * Initializing GPIO
@@ -512,7 +514,8 @@ void init(const float pwm_frequency,
     /*
      * Initializing the MCU peripherals
      */
-    initPWM(pwm_frequency, pwm_dead_time);
+    initPWM(double(g_config_pwm_frequency_khz.get()) * 1e3,
+            double(g_config_pwm_dead_time_nsec.get()) * 1e-9);
 
     initADC();
 
@@ -521,9 +524,9 @@ void init(const float pwm_frequency,
     /*
      * Initializing state variables and constants
      */
-    g_pwm_period = float((TIM1->ARR + 1U) * 2U) / float(TIM1ClockFrequency);
+    g_pwm_period = float(double((TIM1->ARR + 1U) * 2U) / double(TIM1ClockFrequency));
 
-    g_dead_time = float(TIM1->BDTR & 0xFFU) / float(TIM1ClockFrequency);
+    g_dead_time = float(double(TIM1->BDTR & 0xFFU) / double(TIM1ClockFrequency));
 }
 
 void setActive(bool active)

@@ -156,7 +156,7 @@ os::watchdog::Timer init()
      * Motor initialization
      */
     // This is only for testing purposes, will be removed later
-    board::motor::init(60000.0F, 4e-07F);
+    board::motor::init();
 
     /*
      * UAVCAN node initialization
@@ -229,7 +229,7 @@ int main()
 
         if (counter == 0)
         {
-            os::lowsyslog("%g    %g\n",
+            os::lowsyslog("%.1f\t%.1f\n",
                           double(board::motor::g_phase_currents[0]),
                           double(board::motor::g_phase_currents[1]));
         }

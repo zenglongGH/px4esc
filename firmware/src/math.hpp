@@ -37,6 +37,7 @@
 #include <algorithm>
 #include <utility>
 #include <cassert>
+#include <cmath>
 
 
 namespace math
