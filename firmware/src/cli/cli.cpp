@@ -155,18 +155,25 @@ class PWMCommand : public os::shell::ICommandHandler
         }
         else
         {
-            constexpr math::Range<> range(0, 1);
-            math::Vector<3> abc = math::Vector<3>::Zero();
-
-            for (int i = 0; i < std::min(3, argc); i++)
+            if (board::motor::isActive())
             {
-                // strtof() returns 0 on failure, which is just what we need
-                using namespace std;
-                abc[i] = range.constrain(strtof(argv[i + 1], nullptr));
-            }
+                constexpr math::Range<> range(0, 1);
+                math::Vector<3> abc = math::Vector<3>::Zero();
 
-            board::motor::setPWM(abc);
-            ios.print("PWM set to  %.3f  %.3f  %.3f\n", double(abc[0]), double(abc[1]), double(abc[2]));
+                for (int i = 0; i < std::min(3, argc); i++)
+                {
+                    // strtof() returns 0 on failure, which is just what we need
+                    using namespace std;
+                    abc[i] = range.constrain(strtof(argv[i + 1], nullptr));
+                }
+
+                board::motor::setPWM(abc);
+                ios.print("PWM set to  %.3f  %.3f  %.3f\n", double(abc[0]), double(abc[1]), double(abc[2]));
+            }
+            else
+            {
+                ios.print("Driver is not active, command ignored\n");
+            }
         }
     }
 } static cmd_pwm;
