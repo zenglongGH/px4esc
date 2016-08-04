@@ -686,7 +686,7 @@ Status getStatus()
         g_board_features.convertADCVoltageToInverterTemperature(g_inverter_temperature_sensor_voltage);
     s.inverter_voltage = g_inverter_voltage;
 
-    s.current_adc_zero_offset = g_phase_current_zero_offset;
+    s.phase_current_zero_offset = g_phase_current_zero_offset;
 
     s.power_ok  =  palReadPad(GPIOC, GPIOC_POWER_GOOD);
     s.overload  = !palReadPad(GPIOC, GPIOC_OVER_TEMP_WARNING_INVERSE);

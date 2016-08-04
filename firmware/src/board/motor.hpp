@@ -105,7 +105,7 @@ struct Status
     float inverter_temperature = 0.0F;          ///< Kelvin
     float inverter_voltage = 0.0F;              ///< Volt
 
-    math::Vector<2> current_adc_zero_offset;    ///< Volt
+    math::Vector<2> phase_current_zero_offset;  ///< Volt
 
     bool power_ok = false;                      ///< PWRGD
     bool overload = false;                      ///< OCTW
@@ -127,7 +127,7 @@ struct Status
                                     "Fault               : %u\n",
                                     double(math::convertKelvinToCelsius(inverter_temperature)),
                                     double(inverter_voltage),
-                                    double(current_adc_zero_offset[0]), double(current_adc_zero_offset[1]),
+                                    double(phase_current_zero_offset[0]), double(phase_current_zero_offset[1]),
                                     power_ok,
                                     overload,
                                     fault);

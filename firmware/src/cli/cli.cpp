@@ -209,8 +209,8 @@ class CalibrateCommand : public os::shell::ICommandHandler
 
         const auto status = board::motor::getStatus();
         ios.print("Current zero offsets: %.3f, %.3f\n",
-                  double(status.current_adc_zero_offset[0]),
-                  double(status.current_adc_zero_offset[1]));
+                  double(status.phase_current_zero_offset[0]),
+                  double(status.phase_current_zero_offset[1]));
     }
 } static cmd_calibrate;
 
