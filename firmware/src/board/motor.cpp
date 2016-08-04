@@ -473,12 +473,13 @@ inline void checkInvariants()
     constexpr unsigned DMAErrorMask = DMA_LISR_TEIF0 | DMA_LISR_DMEIF0 | DMA_LISR_FEIF0 |
                                       DMA_LISR_TEIF1 | DMA_LISR_DMEIF1 | DMA_LISR_FEIF1 |
                                       DMA_LISR_TEIF2 | DMA_LISR_DMEIF2 | DMA_LISR_FEIF2;
+    (void) DMAErrorMask;
     assert((DMA2->LISR & DMAErrorMask) == 0);                                                   // DMA errors
 
-    (void)g_canary_a;
-    (void)g_canary_b;
-    (void)g_canary_c;
-    (void)g_canary_d;                                                                           // Bad DMA writes
+    (void) g_canary_a;
+    (void) g_canary_b;
+    (void) g_canary_c;
+    (void) g_canary_d;                                                                           // Bad DMA writes
     assert((g_canary_a == CanaryValue) &&
            (g_canary_b == CanaryValue) &&
            (g_canary_c == CanaryValue) &&
@@ -619,6 +620,16 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
     using namespace board::motor;
 
     board::RAIIToggler<board::setTestPointA> tp_toggler;
+
+    /*
+     * By the time we get here, the DMA controller should have completed all transfers.
+     * Making sure this assumption is true.
+     */
+#ifndef NDEBUG
+    constexpr unsigned DMATransferCompleteMask = DMA_LISR_TCIF0 | DMA_LISR_TCIF1 | DMA_LISR_TCIF2;
+    assert((DMA2->LISR & DMATransferCompleteMask) == DMATransferCompleteMask);
+    DMA2->LIFCR = DMATransferCompleteMask;
+#endif
 
     /*
      * Processing the samples and invoking the application handler.
