@@ -227,7 +227,7 @@ int main()
         ::usleep(10000);
         counter++;
 
-        if (counter == 0)
+        if (counter % 100 == 0)
         {
             os::lowsyslog("%.1f\t%.1f\n",
                           double(board::motor::g_phase_currents[0]),

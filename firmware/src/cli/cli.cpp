@@ -172,20 +172,22 @@ class PWMCommand : public os::shell::ICommandHandler
 } static cmd_pwm;
 
 
-class StateCommand : public os::shell::ICommandHandler
+class StatusCommand : public os::shell::ICommandHandler
 {
-    const char* getName() const override { return "state"; }
+    const char* getName() const override { return "status"; }
 
     void execute(os::shell::BaseChannelWrapper& ios, int, char**) override
     {
-        ios.print("Motor control HW: %s\n",
-                  board::motor::getStatus().toString().c_str());
+        ios.print("Motor control HW:\n");
+        ios.print("%s---\n", board::motor::getStatus().toString().c_str());
 
-        ios.print("PWM: Frequency %.6f kHz   DeadTime %.1f nsec\n",
-                  double(board::motor::getPWMFrequency() * 1e-3F),
-                  double(board::motor::getPWMDeadTime() * 1e9F));
+        ios.print("PWM:\n"
+                  "Frequency: %.6f kHz\n"
+                  "DeadTime : %.1f nsec\n",
+                  1e-3 / double(board::motor::getPWMPeriod()),
+                  double(board::motor::getPWMDeadTime()) * 1e9);
     }
-} static cmd_state;
+} static cmd_status;
 
 
 class CLIThread : public chibios_rt::BaseStaticThread<2048>
@@ -218,7 +220,7 @@ public:
         (void) shell_.addCommandHandler(&cmd_cfg);
         (void) shell_.addCommandHandler(&cmd_uavcan);
         (void) shell_.addCommandHandler(&cmd_pwm);
-        (void) shell_.addCommandHandler(&cmd_state);
+        (void) shell_.addCommandHandler(&cmd_status);
     }
 
     virtual ~CLIThread() { }

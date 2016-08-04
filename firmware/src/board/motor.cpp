@@ -211,8 +211,7 @@ void initPWM(const double pwm_frequency,
     TIM1->BDTR = TIM_BDTR_MOE | TIM_BDTR_BKP | TIM_BDTR_BKE | dead_time_ticks;
 
     // Launching the timer
-    os::lowsyslog("Motor HW Driver: PWM Frequency %.6f kHz, %u ticks; PWM Dead Time %.1f ns, %u ticks\n",
-                  double(getPWMFrequency() * 1e-3F), pwm_cycle_ticks, double(getPWMDeadTime() * 1e9F), dead_time_ticks);
+    os::lowsyslog("Motor HW Driver: PWM cycle %u ticks, dead time %u ticks\n", pwm_cycle_ticks, dead_time_ticks);
 
     TIM1->CR1 |= TIM_CR1_CEN;
     TIM1->EGR = TIM_EGR_COMG | TIM_EGR_UG;
@@ -545,9 +544,9 @@ bool isActive()
     return g_is_active;
 }
 
-float getPWMFrequency()
+float getPWMPeriod()
 {
-    return 1.0F / g_pwm_period;
+    return g_pwm_period;
 }
 
 float getPWMDeadTime()
@@ -602,7 +601,9 @@ Status getStatus()
     s.inverter_temperature = convertTemperatureSensorVoltageToKelvin(0.0F);  // TODO Temperature
     s.inverter_voltage = g_inverter_voltage;
 
-    s.bad_power = !palReadPad(GPIOC, GPIOC_POWER_GOOD);
+    s.current_adc_zero_offset = g_current_zero_offset;
+
+    s.power_ok  =  palReadPad(GPIOC, GPIOC_POWER_GOOD);
     s.overload  = !palReadPad(GPIOC, GPIOC_OVER_TEMP_WARNING_INVERSE);
     s.fault     = !palReadPad(GPIOC, GPIOC_DRIVER_FAULT_INVERSE);
 

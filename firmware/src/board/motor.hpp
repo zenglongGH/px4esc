@@ -66,9 +66,9 @@ bool isActive();
 
 /**
  * Meaningful results guaranteed only after initialization.
- * @return PWM carrier frequency in Hertz.
+ * @return PWM carrier period in seconds.
  */
-float getPWMFrequency();
+float getPWMPeriod();
 
 /**
  * Meaningful results guaranteed only after initialization.
@@ -97,22 +97,32 @@ struct Status
     float inverter_temperature = 0.0F;          ///< Kelvin
     float inverter_voltage = 0.0F;              ///< Volt
 
-    bool bad_power = false;                     ///< PWRGD
+    math::Vector<2> current_adc_zero_offset;    ///< Volt
+
+    bool power_ok = false;                      ///< PWRGD
     bool overload = false;                      ///< OCTW
     bool fault = false;                         ///< FAULT
 
     bool isOkay() const
     {
-        return !(bad_power || overload || fault);
+        const bool bad = (!power_ok) || overload || fault;
+        return !bad;
     }
 
     auto toString() const
     {
-        return os::heapless::concatenate<60>("BadPower: ", bad_power, ", ",
-                                             "Overload: ", overload, ", ",
-                                             "Fault: ", fault, ", ",
-                                             "InverterVolt: ", inverter_voltage, ", ",
-                                             "InverterTemp: ", inverter_temperature);
+        return os::heapless::format("Inverter Temperature: %.1f\n"
+                                    "Inverter Voltage    : %.1f\n"
+                                    "Current ADC Z-Offset: %.3f, %.3f\n"
+                                    "Power OK            : %u\n"
+                                    "Overload            : %u\n"
+                                    "Fault               : %u\n",
+                                    double(inverter_temperature),
+                                    double(inverter_voltage),
+                                    double(current_adc_zero_offset[0]), double(current_adc_zero_offset[1]),
+                                    power_ok,
+                                    overload,
+                                    fault);
     }
 };
 
