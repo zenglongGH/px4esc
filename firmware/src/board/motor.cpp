@@ -35,6 +35,7 @@
 #include <zubax_chibios/config/config.hpp>
 #include <unistd.h>
 #include <algorithm>
+#include <functional>
 #include <numeric>
 
 
@@ -50,6 +51,8 @@ namespace
 constexpr unsigned SamplesPerADCPerIRQ = 2;
 
 constexpr unsigned ADCIRQPriority = 0;
+
+constexpr float TemperatureInnovationWeight = 0.01F;
 
 /*
  * Hardware-defined parameters
@@ -93,6 +96,9 @@ float g_dead_time;
 /// Sometimes referred to as VBAT
 float g_inverter_voltage;
 
+/// Raw output voltage of the temperature sensor (not converted to Kelvin)
+float g_temperature_sensor_voltage;
+
 /// True ADC zero offset on the current channels. TODO: CALIBRATION
 math::Vector<2> g_current_zero_offset = math::Vector<2>::Ones() * (ADCReferenceVoltage / 2.0F);
 
@@ -115,6 +121,14 @@ static class BoardFeatures final
     float current_shunt_resistance_ = 0.0F;
     float current_amplifier_gain_ = 0.0F;
 
+    std::function<float (float)> temperature_transfer_function_ = [](float x) { return x; };
+
+    /// Transfer function [Voltage] --> [Kelvin] for temperature sensors MCP9700/MCP9700A
+    static float temperatureTransferFunctionMCP9700(float voltage)
+    {
+        return (100.0F * (voltage - 0.5F)) + 273.15F;
+    }
+
     static constexpr float computeResistorDividerGain(float upper, float lower)
     {
         return lower / (lower + upper);
@@ -134,6 +148,8 @@ public:
 
             palWritePad(GPIOB, GPIOB_GAIN, true);
             current_amplifier_gain_ = 1.0F / (40.0F * current_shunt_resistance_);
+
+            temperature_transfer_function_ = &BoardFeatures::temperatureTransferFunctionMCP9700;
         }
         else
         {
@@ -157,6 +173,11 @@ public:
     math::Vector<2> convertADCVoltagesToPhaseCurrents(const math::Vector<2>& voltages_without_zero_offset) const
     {
         return voltages_without_zero_offset * current_amplifier_gain_;
+    }
+
+    float convertADCVoltageToInverterTemperature(float voltage) const
+    {
+        return temperature_transfer_function_(voltage);
     }
 } g_board_features;
 
@@ -359,12 +380,11 @@ void initADC()
 
     /*
      * Initializing the sequences. ADC assignment is as follows:
-     *  ADC1 - inverter voltage
-     *  ADC2 - phase current A
-     *  ADC3 - phase current B
-     *
-     * TODO: Temperature is currently not yet being sampled. Probably it should be sampled as injected channel
-     *       automatically immediately after the main channels (set the bit JAUTO in CR1).
+     *  ADC     Regular Mode            Injected Mode
+     *  -------------------------------------------------------------
+     *  ADC1    inverter voltage        inverter temperature
+     *  ADC2    phase current A         nothing
+     *  ADC3    phase current B         nothing
      */
     static_assert(SamplesPerADCPerIRQ <= 6, "SQR2 and SQR1 initialization must be updated");
 
@@ -381,6 +401,10 @@ void initADC()
     ADC1->SQR3 = fill_sqr(InverterVoltageChannelIndex);
     ADC2->SQR3 = fill_sqr(PhaseACurrentChannelIndex);           // ADC2 phase A
     ADC3->SQR3 = fill_sqr(PhaseBCurrentChannelIndex);           // ADC3 phase B
+
+    // Configuring injected channels
+    ADC1->JSQR = TemperatureChannelIndex << 15;                 // Temperature
+    ADC1->CR1 |= ADC_CR1_JAUTO;                                 // Perform automatic injected conversions after regular
 
     // Configuring IRQ
     {
@@ -448,12 +472,6 @@ void initADC()
     ADC1->CR2 |= ADC_CR2_ADON;
     ADC2->CR2 |= ADC_CR2_ADON;
     ADC3->CR2 |= ADC_CR2_ADON;
-}
-
-
-float convertTemperatureSensorVoltageToKelvin(float voltage)
-{
-    return voltage;     // TODO
 }
 
 
@@ -598,7 +616,7 @@ Status getStatus()
 {
     Status s;
 
-    s.inverter_temperature = convertTemperatureSensorVoltageToKelvin(0.0F);  // TODO Temperature
+    s.inverter_temperature = g_board_features.convertADCVoltageToInverterTemperature(g_temperature_sensor_voltage);
     s.inverter_voltage = g_inverter_voltage;
 
     s.current_adc_zero_offset = g_current_zero_offset;
@@ -666,6 +684,13 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
      * Performing less time-critical tasks after the application's handler has been executed.
      */
     g_board_features.adjustCurrentGain(phase_currents);
+
+    // Temperature processing (conversion should be finished by this time; even if not, it's also fine)
+    {
+        const std::uint16_t temperature_sample[1] = { std::uint16_t(ADC1->JDR1) };
+        const float new_temperature = convertADCSamplesToVoltage(temperature_sample);
+        g_temperature_sensor_voltage += TemperatureInnovationWeight * (new_temperature - g_temperature_sensor_voltage);
+    }
 
     ADC1->SR = 0;         // Reset the IRQ flags
 

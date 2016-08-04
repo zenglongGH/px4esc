@@ -34,7 +34,6 @@
 #pragma once
 
 #include <cstdint>
-#include <functional>
 #include <math.hpp>
 #include <zubax_chibios/util/heapless.hpp>
 
@@ -111,13 +110,13 @@ struct Status
 
     auto toString() const
     {
-        return os::heapless::format("Inverter Temperature: %.1f\n"
+        return os::heapless::format("Inverter Temperature: %.0f C\n"
                                     "Inverter Voltage    : %.1f\n"
                                     "Current ADC Z-Offset: %.3f, %.3f\n"
                                     "Power OK            : %u\n"
                                     "Overload            : %u\n"
                                     "Fault               : %u\n",
-                                    double(inverter_temperature),
+                                    double(math::convertKelvinToCelsius(inverter_temperature)),
                                     double(inverter_voltage),
                                     double(current_adc_zero_offset[0]), double(current_adc_zero_offset[1]),
                                     power_ok,

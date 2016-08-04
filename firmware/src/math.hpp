@@ -51,6 +51,12 @@ using Matrix = Eigen::Matrix<Scalar, Rows, Cols>;
 template <int Size>
 using Vector = Matrix<Size, 1>;
 
+
+constexpr inline float convertKelvinToCelsius(float kelvin)
+{
+    return kelvin - 273.15F;
+}
+
 /**
  * Inclusive range of the form [min, max].
  */
