@@ -94,16 +94,49 @@ float g_pwm_period;
 float g_dead_time;
 
 /// Sometimes referred to as VBAT
-float g_inverter_voltage;
+volatile float g_inverter_voltage;
 
 /// Raw output voltage of the temperature sensor (not converted to Kelvin)
-float g_temperature_sensor_voltage;
+volatile float g_temperature_sensor_voltage;
 
-/// True ADC zero offset on the current channels. TODO: CALIBRATION
+/// True ADC zero offset on the current channels.
 math::Vector<2> g_current_zero_offset = math::Vector<2>::Ones() * (ADCReferenceVoltage / 2.0F);
 
 /// True if PWM outputs are active and the driver outputs are enabled
-bool g_is_active = false;
+volatile bool g_is_active = false;
+
+/**
+ * This is used for current zero offset calibration.
+ * We can't use math::Vector<> here becasuse we need volatile specification.
+ */
+class CurrentZeroOffsetAverager
+{
+    volatile float accumulator_ab_[2] = { 0, 0 };
+    volatile unsigned num_samples_ = 0;
+
+public:
+    void add(const math::Vector<2>& value) volatile
+    {
+        accumulator_ab_[0] += value[0];
+        accumulator_ab_[1] += value[1];
+        num_samples_++;
+    }
+
+    math::Vector<2> getAverage() const volatile
+    {
+        math::Vector<2> out = math::Vector<2>::Zero();
+        if (num_samples_ > 0)
+        {
+            out[0] = accumulator_ab_[0] / float(num_samples_);
+            out[1] = accumulator_ab_[1] / float(num_samples_);
+        }
+        return out;
+    }
+
+    unsigned getNumSamples() const volatile { return num_samples_; }
+};
+
+volatile CurrentZeroOffsetAverager* volatile g_current_zero_offset_averager = nullptr;
 
 /**
  * This class holds parameters specific to the board we're running on.
@@ -475,6 +508,25 @@ void initADC()
 }
 
 
+inline void setRawPWM(const std::uint16_t a, const std::uint16_t b, const std::uint16_t c)
+{
+    assert((a <= TIM1->ARR) &&
+           (b <= TIM1->ARR) &&
+           (c <= TIM1->ARR));
+    /*
+     * If CNT reaches zero between writes to CCR1 and CCR3, PWM will break, because the PWM signals will not
+     * be in agreement with each other (CCR1 and possibly CCR2 will be using the new values, CCR3 and possibly
+     * CCR2 will keep old values until the next update event).
+     * Therefore we need to ensure that this function is NOT invoked when CNT is close to zero. Luckily, during
+     * normal operation this requirement should be met automatically, because this function will be invoked
+     * (very indirectly) from the ADC interrupt handler, which in turn is synchronized with timer update event.
+     */
+    TIM1->CCR1 = a;
+    TIM1->CCR2 = b;
+    TIM1->CCR3 = c;
+}
+
+
 template <unsigned NumSamples>
 inline float convertADCSamplesToVoltage(const std::uint16_t (&x)[NumSamples])
 {
@@ -548,11 +600,11 @@ void init()
 
 void setActive(bool active)
 {
-    setPWM({0, 0, 0});
+    setRawPWM(0, 0, 0);
 
     palWritePad(GPIOA, GPIOA_EN_GATE, active);
 
-    setPWM({0, 0, 0});
+    setRawPWM(0, 0, 0);
 
     g_is_active = active;
 }
@@ -560,6 +612,35 @@ void setActive(bool active)
 bool isActive()
 {
     return g_is_active;
+}
+
+void calibrate(const float duration)
+{
+    struct TovarischVladimirIlyich
+    {
+        const bool original_state = isActive();
+        TovarischVladimirIlyich()  { setActive(false); }
+        ~TovarischVladimirIlyich() { setActive(original_state); }
+    } raii_guard;
+
+    // Enabling the gate output and waiting a few milliseconds for everything to stabilize
+    palWritePad(GPIOA, GPIOA_EN_GATE, true);
+    ::usleep(10000);
+
+    volatile CurrentZeroOffsetAverager averager;
+    g_current_zero_offset_averager = &averager;
+
+    const unsigned num_samples_needed = unsigned(math::Range<>(0.1F, 10.0F).constrain(duration) / g_pwm_period + 0.5F);
+    assert(num_samples_needed > 0);
+
+    while (averager.getNumSamples() < num_samples_needed)
+    {
+        ::usleep(10000);
+    }
+
+    g_current_zero_offset_averager = nullptr;
+
+    g_current_zero_offset = averager.getAverage();
 }
 
 float getPWMPeriod()
@@ -574,29 +655,14 @@ float getPWMDeadTime()
 
 void setPWM(const math::Vector<3>& abc)
 {
+    assert(g_is_active);
     assert((abc.array() >= 0).all() && (abc.array() <= 1).all());
 
     const auto arr = float(TIM1->ARR);
 
-    const auto c1 = std::uint16_t(abc[0] * arr + 0.4F);
-    const auto c2 = std::uint16_t(abc[1] * arr + 0.4F);
-    const auto c3 = std::uint16_t(abc[2] * arr + 0.4F);
-
-    assert((c1 <= arr) &&
-           (c2 <= arr) &&
-           (c3 <= arr));
-
-    /*
-     * If CNT reaches zero between writes to CCR1 and CCR3, PWM will break, because the PWM signals will not
-     * be in agreement with each other (CCR1 and possibly CCR2 will be using the new values, CCR3 and possibly
-     * CCR2 will keep old values until the next update event).
-     * Therefore we need to ensure that this function is NOT invoked when CNT is close to zero. Luckily, during
-     * normal operation this requirement should be met automatically, because this function will be invoked
-     * (very indirectly) from the ADC interrupt handler, which in turn is synchronized with timer update event.
-     */
-    TIM1->CCR1 = c1;
-    TIM1->CCR2 = c2;
-    TIM1->CCR3 = c3;
+    setRawPWM(std::uint16_t(abc[0] * arr + 0.4F),
+              std::uint16_t(abc[1] * arr + 0.4F),
+              std::uint16_t(abc[2] * arr + 0.4F));
 }
 
 void emergency()
@@ -685,7 +751,15 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
      */
     g_board_features.adjustCurrentGain(phase_currents);
 
-    // Temperature processing (conversion should be finished by this time; even if not, it's also fine)
+    if (!g_is_active)
+    {
+        if (g_current_zero_offset_averager != nullptr)
+        {
+            g_current_zero_offset_averager->add(phase_currents_adc_voltages);
+        }
+    }
+
+    // Temperature processing (injected conversion should be finished by this time; even if not, it's also fine)
     {
         const std::uint16_t temperature_sample[1] = { std::uint16_t(ADC1->JDR1) };
         const float new_temperature = convertADCSamplesToVoltage(temperature_sample);

@@ -157,6 +157,8 @@ os::watchdog::Timer init()
      */
     // This is only for testing purposes, will be removed later
     board::motor::init();
+    board::motor::calibrate(1.0F);
+    os::lowsyslog("Main: Motor driver status:\n%s\n", board::motor::getStatus().toString().c_str());
 
     /*
      * UAVCAN node initialization
@@ -227,7 +229,7 @@ int main()
         ::usleep(10000);
         counter++;
 
-        if (counter % 100 == 0)
+        if (counter == 0)
         {
             os::lowsyslog("%.1f\t%.1f\n",
                           double(board::motor::g_phase_currents[0]),

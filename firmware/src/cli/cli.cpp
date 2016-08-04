@@ -190,6 +190,24 @@ class StatusCommand : public os::shell::ICommandHandler
 } static cmd_status;
 
 
+class CalibrateCommand : public os::shell::ICommandHandler
+{
+    const char* getName() const override { return "calibrate"; }
+
+    void execute(os::shell::BaseChannelWrapper& ios, int argc, char** argv) override
+    {
+        const float duration = (argc > 1) ? float(std::atof(argv[1])) : 1.0F;
+
+        board::motor::calibrate(duration);
+
+        const auto status = board::motor::getStatus();
+        ios.print("Current zero offsets: %.3f, %.3f\n",
+                  double(status.current_adc_zero_offset[0]),
+                  double(status.current_adc_zero_offset[1]));
+    }
+} static cmd_calibrate;
+
+
 class CLIThread : public chibios_rt::BaseStaticThread<2048>
 {
     os::shell::Shell<> shell_;
@@ -221,6 +239,7 @@ public:
         (void) shell_.addCommandHandler(&cmd_uavcan);
         (void) shell_.addCommandHandler(&cmd_pwm);
         (void) shell_.addCommandHandler(&cmd_status);
+        (void) shell_.addCommandHandler(&cmd_calibrate);
     }
 
     virtual ~CLIThread() { }

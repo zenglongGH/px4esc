@@ -54,6 +54,7 @@ void init();
  * Activates/deactivates the power stage hardware.
  * Must be activated before the motor can be started.
  * Must be deactivated after the motor is stopped.
+ * In inactive mode, all current measurements will be reported as zero.
  * The default state is deactivated.
  */
 void setActive(bool active);
@@ -62,6 +63,14 @@ void setActive(bool active);
  * @ref setActive().
  */
 bool isActive();
+
+/**
+ * This function can be invoked to perform zero offset calibration.
+ * It must be guaranteed that during such calibration the motor is NOT spinning,
+ * and that no other component will be using the driver while the calibration is in progress.
+ * @param duration      Duration of the calibration process, in seconds
+ */
+void calibrate(const float duration);
 
 /**
  * Meaningful results guaranteed only after initialization.
