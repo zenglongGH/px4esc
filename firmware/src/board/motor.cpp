@@ -32,6 +32,7 @@
 ****************************************************************************/
 
 #include <board/board.hpp>
+#include <zubax_chibios/config/config.hpp>
 #include <unistd.h>
 #include <algorithm>
 #include <numeric>
@@ -79,7 +80,18 @@ volatile std::uint32_t g_canary_d = CanaryValue;
 /*
  * Current state variables
  */
+float g_pwm_period;
+
+float g_dead_time;
+
+/// Sometimes referred to as VBAT
 float g_inverter_voltage;
+
+/// True ADC zero offset on the current channels. TODO: CALIBRATION
+math::Vector<2> g_current_zero_offset = math::Vector<2>::Ones() * (ADCReferenceVoltage / 2.0F);
+
+/// True if PWM outputs are active and the driver outputs are enabled
+bool g_is_active = false;
 
 /**
  * This class holds parameters specific to the board we're running on.
@@ -92,10 +104,10 @@ float g_inverter_voltage;
  */
 static class BoardFeatures final
 {
-    float inverter_voltage_gain = 0.0F;
-    float current_shunt_resistance = 0.0F;
+    float inverter_voltage_gain_ = 0.0F;
 
-    float current_amplifier_gain = 0.0F;
+    float current_shunt_resistance_ = 0.0F;
+    float current_amplifier_gain_ = 0.0F;
 
     static constexpr float computeResistorDividerGain(float upper, float lower)
     {
@@ -111,11 +123,11 @@ public:
         {
             os::lowsyslog("Motor HW Driver: Detected Pixhawk ESC v1.6 compatible board\n");
 
-            inverter_voltage_gain = 1.0F / computeResistorDividerGain(5100 * 2, 330 * 2);
-            current_shunt_resistance = 5 * 1e-3F;
+            inverter_voltage_gain_ = 1.0F / computeResistorDividerGain(5100 * 2, 330 * 2);
+            current_shunt_resistance_ = 1 * 1e-3F;
 
             palWritePad(GPIOB, GPIOB_GAIN, true);
-            current_amplifier_gain = 1.0F / (40.0F * current_shunt_resistance);
+            current_amplifier_gain_ = 1.0F / (40.0F * current_shunt_resistance_);
         }
         else
         {
@@ -124,21 +136,21 @@ public:
         }
     }
 
-    void adjustCurrentGain(float phase_a, float phase_b)
+    void adjustCurrentGain(const math::Vector<2>& v)
     {
-        const float max_current = std::max(phase_a, phase_b);
+        const float max_current = v.maxCoeff();
         (void)max_current;
         // TODO: Automatic Gain Control
     }
 
-    float convertADCVoltageToInverterVoltage(float v) const
+    float convertADCVoltageToInverterVoltage(float voltage) const
     {
-        return v * inverter_voltage_gain;
+        return voltage * inverter_voltage_gain_;
     }
 
-    float convertADCVoltageToPhaseCurrent(float v) const
+    math::Vector<2> convertADCVoltagesToPhaseCurrents(const math::Vector<2>& voltages_without_zero_offset) const
     {
-        return (v - (ADCReferenceVoltage / 2.0F)) * current_amplifier_gain;
+        return voltages_without_zero_offset * current_amplifier_gain_;
     }
 } g_board_features;
 
@@ -453,11 +465,35 @@ inline float convertADCSamplesToVoltage(const std::uint16_t (&x)[NumSamples])
     return float(std::accumulate(std::begin(x), std::end(x), 0U)) * ConversionMultiplier;
 }
 
+
+inline void checkInvariants()
+{
+    assert((ADC->CSR & (ADC_CSR_DOVR1 | ADC_CSR_DOVR2 | ADC_CSR_DOVR3)) == 0);                  // ADC overrun
+
+    constexpr unsigned DMAErrorMask = DMA_LISR_TEIF0 | DMA_LISR_DMEIF0 | DMA_LISR_FEIF0 |
+                                      DMA_LISR_TEIF1 | DMA_LISR_DMEIF1 | DMA_LISR_FEIF1 |
+                                      DMA_LISR_TEIF2 | DMA_LISR_DMEIF2 | DMA_LISR_FEIF2;
+    assert((DMA2->LISR & DMAErrorMask) == 0);                                                   // DMA errors
+
+    (void)g_canary_a;
+    (void)g_canary_b;
+    (void)g_canary_c;
+    (void)g_canary_d;                                                                           // Bad DMA writes
+    assert((g_canary_a == CanaryValue) &&
+           (g_canary_b == CanaryValue) &&
+           (g_canary_c == CanaryValue) &&
+           (g_canary_d == CanaryValue));
+}
+
 } // namespace
+
 
 void init(const float pwm_frequency,
           const float pwm_dead_time)
 {
+    /*
+     * Initializing GPIO
+     */
     // Disable over current protection by default
     palWritePad(GPIOA, GPIOA_OC_ADJ, true);
 
@@ -472,11 +508,21 @@ void init(const float pwm_frequency,
 
     g_board_features.init();
 
+    /*
+     * Initializing the MCU peripherals
+     */
     initPWM(pwm_frequency, pwm_dead_time);
 
     initADC();
 
     initPWMADCSync();
+
+    /*
+     * Initializing state variables and constants
+     */
+    g_pwm_period = float((TIM1->ARR + 1U) * 2U) / float(TIM1ClockFrequency);
+
+    g_dead_time = float(TIM1->BDTR & 0xFFU) / float(TIM1ClockFrequency);
 }
 
 void setActive(bool active)
@@ -486,18 +532,23 @@ void setActive(bool active)
     palWritePad(GPIOA, GPIOA_EN_GATE, active);
 
     setPWM({0, 0, 0});
+
+    g_is_active = active;
+}
+
+bool isActive()
+{
+    return g_is_active;
 }
 
 float getPWMFrequency()
 {
-    return float(TIM1ClockFrequency) / float((TIM1->ARR + 1U) * 2U);
+    return 1.0F / g_pwm_period;
 }
 
 float getPWMDeadTime()
 {
-    auto dtg = std::uint8_t(TIM1->BDTR & 0xFFU);
-    assert(dtg <= 127);         // Other modes are not supported yet, see initialization for details
-    return float(dtg) / float(TIM1ClockFrequency);
+    return g_dead_time;
 }
 
 void setPWM(const math::Vector<3>& abc)
@@ -573,11 +624,17 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
      * Processing the samples and invoking the application handler.
      * These tasks need to be completed ASAP in order to minimize latency.
      */
-    const float current_a =
-        g_board_features.convertADCVoltageToPhaseCurrent(convertADCSamplesToVoltage(g_dma_buffer_phase_a_current));
+    const math::Vector<2> phase_currents_adc_voltages
+    {
+        convertADCSamplesToVoltage(g_dma_buffer_phase_a_current),
+        convertADCSamplesToVoltage(g_dma_buffer_phase_b_current)
+    };
 
-    const float current_b =
-        g_board_features.convertADCVoltageToPhaseCurrent(convertADCSamplesToVoltage(g_dma_buffer_phase_b_current));
+    // While EN_GATE is low, the current amplifiers are shut down, so we're measuring garbage
+    const auto phase_currents =
+        g_is_active ?
+        g_board_features.convertADCVoltagesToPhaseCurrents(phase_currents_adc_voltages - g_current_zero_offset) :
+        math::Vector<2>::Zero();
 
     {
         const float new_inverter_voltage =
@@ -588,35 +645,16 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
         g_inverter_voltage = (g_inverter_voltage + new_inverter_voltage) / 2.0F;
     }
 
-    handleSampleIRQ({current_a, current_b}, g_inverter_voltage);
+    handleSampleIRQ(phase_currents, g_inverter_voltage);
 
     /*
      * Performing less time-critical tasks after the application's handler has been executed.
      */
-    g_board_features.adjustCurrentGain(current_a, current_b);
-
-    // TODO: Current zero offset calibration!
+    g_board_features.adjustCurrentGain(phase_currents);
 
     ADC1->SR = 0;         // Reset the IRQ flags
 
-    /*
-     * Checking invariants.
-     */
-    assert((ADC->CSR & (ADC_CSR_DOVR1 | ADC_CSR_DOVR2 | ADC_CSR_DOVR3)) == 0);                  // ADC overrun
-
-    constexpr unsigned DMAErrorMask = DMA_LISR_TEIF0 | DMA_LISR_DMEIF0 | DMA_LISR_FEIF0 |
-                                      DMA_LISR_TEIF1 | DMA_LISR_DMEIF1 | DMA_LISR_FEIF1 |
-                                      DMA_LISR_TEIF2 | DMA_LISR_DMEIF2 | DMA_LISR_FEIF2;
-    assert((DMA2->LISR & DMAErrorMask) == 0);                                                   // DMA errors
-
-    (void)g_canary_a;
-    (void)g_canary_b;
-    (void)g_canary_c;
-    (void)g_canary_d;                                                                           // Bad DMA writes
-    assert((g_canary_a == CanaryValue) &&
-           (g_canary_b == CanaryValue) &&
-           (g_canary_c == CanaryValue) &&
-           (g_canary_d == CanaryValue));
+    checkInvariants();
 }
 
 }

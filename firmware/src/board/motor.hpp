@@ -53,13 +53,7 @@ constexpr math::Range<> PWMFrequencyRange(50000, 80000);
 constexpr math::Range<> PWMDeadTimeRange(0.0F, 700e-9F);
 
 /**
- * Must be invoked first.
- *
- * The GPIO interface of the driver IC will be initialized as follows:
- * - Current limiting disabled
- * - DC_CAL disabled (it's broken anyway, so this function is not exposed via the module API)
- * - EN_GATE disabled (driver disabled)
- * - Current amplification set at x40
+ * After initialization the driver will enter the inactive mode.
  *
  * @param pwm_frequency                 Preferred PWM frequency in Hertz
  * @param pwm_dead_time                 Preferred PWM dead time in seconds
@@ -74,6 +68,11 @@ void init(const float pwm_frequency,
  * The default state is deactivated.
  */
 void setActive(bool active);
+
+/**
+ * @ref setActive().
+ */
+bool isActive();
 
 /**
  * Meaningful results guaranteed only after initialization.
