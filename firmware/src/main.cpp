@@ -193,11 +193,14 @@ namespace board
 namespace motor
 {
 
+math::Vector<2> g_phase_currents;
+
 extern void handleSampleIRQ(const math::Vector<2>& phase_currents_ab,
                             const float inverter_voltage)
 {
-    (void)phase_currents_ab;
     (void)inverter_voltage;
+
+    g_phase_currents = phase_currents_ab;
 }
 
 }
@@ -223,6 +226,13 @@ int main()
 
         ::usleep(10000);
         counter++;
+
+        if (counter == 0)
+        {
+            os::lowsyslog("%g    %g\n",
+                          double(board::motor::g_phase_currents[0]),
+                          double(board::motor::g_phase_currents[1]));
+        }
     }
 
     /*
