@@ -77,4 +77,52 @@ struct Range
     }
 };
 
+/**
+ * First-order IIR low pass filter.
+ */
+template <typename ValueType = Scalar,
+          typename ScalarType = Scalar>
+class LowPassIIRFilter
+{
+    ValueType y_;
+    const ScalarType f_cutoff_;
+    bool needs_initialization_;
+
+public:
+    LowPassIIRFilter(const ScalarType& cutoff_frequency, const ValueType& init_value) :
+        y_(init_value),
+        f_cutoff_(cutoff_frequency),
+        needs_initialization_(false)
+    { }
+
+    LowPassIIRFilter(const ScalarType& cutoff_frequency) :
+        f_cutoff_(cutoff_frequency),
+        needs_initialization_(true)
+    { }
+
+    const ValueType& update(const ValueType& x, const ScalarType& dt)
+    {
+        assert(dt > 0);
+
+        if (needs_initialization_)
+        {
+            needs_initialization_ = false;
+            y_ = x;
+        }
+        else
+        {
+            constexpr ScalarType Pi2 = ScalarType(M_PI * 2);
+
+            const ScalarType pi2_dt_cutoff = Pi2 * dt * f_cutoff_;
+            const ScalarType alpha = pi2_dt_cutoff / (pi2_dt_cutoff + 1);
+
+            y_ += alpha * (x - y_);
+        }
+
+        return y_;
+    }
+
+    const ValueType& get() const { return y_; }
+};
+
 }
