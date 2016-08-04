@@ -97,10 +97,10 @@ float g_dead_time;
 volatile float g_inverter_voltage;
 
 /// Raw output voltage of the temperature sensor (not converted to Kelvin)
-volatile float g_temperature_sensor_voltage;
+volatile float g_inverter_temperature_sensor_voltage;
 
 /// True ADC zero offset on the current channels.
-math::Vector<2> g_current_zero_offset = math::Vector<2>::Ones() * (ADCReferenceVoltage / 2.0F);
+math::Vector<2> g_phase_current_zero_offset = math::Vector<2>::Ones() * (ADCReferenceVoltage / 2.0F);
 
 /// True if PWM outputs are active and the driver outputs are enabled
 volatile bool g_is_active = false;
@@ -136,7 +136,7 @@ public:
     unsigned getNumSamples() const volatile { return num_samples_; }
 };
 
-volatile CurrentZeroOffsetAverager* volatile g_current_zero_offset_averager = nullptr;
+volatile CurrentZeroOffsetAverager* volatile g_phase_current_zero_offset_averager = nullptr;
 
 /**
  * This class holds parameters specific to the board we're running on.
@@ -628,7 +628,7 @@ void calibrate(const float duration)
     ::usleep(10000);
 
     volatile CurrentZeroOffsetAverager averager;
-    g_current_zero_offset_averager = &averager;
+    g_phase_current_zero_offset_averager = &averager;
 
     const unsigned num_samples_needed = unsigned(math::Range<>(0.1F, 10.0F).constrain(duration) / g_pwm_period + 0.5F);
     assert(num_samples_needed > 0);
@@ -638,9 +638,9 @@ void calibrate(const float duration)
         ::usleep(10000);
     }
 
-    g_current_zero_offset_averager = nullptr;
+    g_phase_current_zero_offset_averager = nullptr;
 
-    g_current_zero_offset = averager.getAverage();
+    g_phase_current_zero_offset = averager.getAverage();
 }
 
 float getPWMPeriod()
@@ -682,10 +682,11 @@ Status getStatus()
 {
     Status s;
 
-    s.inverter_temperature = g_board_features.convertADCVoltageToInverterTemperature(g_temperature_sensor_voltage);
+    s.inverter_temperature =
+        g_board_features.convertADCVoltageToInverterTemperature(g_inverter_temperature_sensor_voltage);
     s.inverter_voltage = g_inverter_voltage;
 
-    s.current_adc_zero_offset = g_current_zero_offset;
+    s.current_adc_zero_offset = g_phase_current_zero_offset;
 
     s.power_ok  =  palReadPad(GPIOC, GPIOC_POWER_GOOD);
     s.overload  = !palReadPad(GPIOC, GPIOC_OVER_TEMP_WARNING_INVERSE);
@@ -732,7 +733,7 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
     // While EN_GATE is low, the current amplifiers are shut down, so we're measuring garbage
     const auto phase_currents =
         g_is_active ?
-        g_board_features.convertADCVoltagesToPhaseCurrents(phase_currents_adc_voltages - g_current_zero_offset) :
+        g_board_features.convertADCVoltagesToPhaseCurrents(phase_currents_adc_voltages - g_phase_current_zero_offset) :
         math::Vector<2>::Zero();
 
     {
@@ -753,9 +754,9 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
 
     if (!g_is_active)
     {
-        if (g_current_zero_offset_averager != nullptr)
+        if (g_phase_current_zero_offset_averager != nullptr)
         {
-            g_current_zero_offset_averager->add(phase_currents_adc_voltages);
+            g_phase_current_zero_offset_averager->add(phase_currents_adc_voltages);
         }
     }
 
@@ -763,7 +764,8 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
     {
         const std::uint16_t temperature_sample[1] = { std::uint16_t(ADC1->JDR1) };
         const float new_temperature = convertADCSamplesToVoltage(temperature_sample);
-        g_temperature_sensor_voltage += TemperatureInnovationWeight * (new_temperature - g_temperature_sensor_voltage);
+        g_inverter_temperature_sensor_voltage +=
+            TemperatureInnovationWeight * (new_temperature - g_inverter_temperature_sensor_voltage);
     }
 
     ADC1->SR = 0;         // Reset the IRQ flags
