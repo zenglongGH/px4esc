@@ -85,7 +85,7 @@ float getPWMPeriod();
 float getPWMDeadTime();
 
 /**
- * This function should only be called after @ref activate() and before @ref deactivate().
+ * This function must not be called if the driver is not active; see @ref setActive().
  * @param abc           PWM values per channel in the range [0, 1].
  */
 void setPWM(const math::Vector<3>& abc);
@@ -140,7 +140,8 @@ struct Status
 Status getStatus();
 
 /**
- * This function is invoked from the IRQ context when new data arrives. It must be defined elsewhere.
+ * This function is invoked from the IRQ context when new measurements become available.
+ * It must be defined elsewhere.
  * All units are SI units.
  */
 extern void handleSampleIRQ(const math::Vector<2>& phase_currents_ab,
