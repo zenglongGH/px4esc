@@ -86,6 +86,14 @@ APPLICATION_OFFSET = 49152
 DDEFS += -DCORTEX_VTOR_INIT=$(APPLICATION_OFFSET)       \
          -DCRT1_AREAS_NUMBER=0
 
+# IRQ levels are assigned as follows:
+#   0 - Motor Hardware Driver IRQ (ADC measurements and related processing)
+#   1 - Low-priority FOC IRQ
+#   2 - RTOS SVC IRQ
+#   3 - CAN driver (normal RTOS IRQ)
+#   Rest - Other RTOS IRQ
+DDEFS += -DCORTEX_PRIORITY_SVCALL=2
+
 USE_LTO := no
 
 SERIAL_CLI_PORT_NUMBER = 3

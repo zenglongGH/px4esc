@@ -54,6 +54,8 @@ constexpr unsigned ADCIRQPriority = 0;
 
 constexpr float TemperatureInnovationWeight = 0.01F;
 
+static_assert(ADCIRQPriority < CORTEX_PRIORITY_SVCALL, "Sensor IRQ must be able to preempt the RTOS");
+
 /*
  * Hardware-defined parameters
  */
