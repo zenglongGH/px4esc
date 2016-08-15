@@ -42,6 +42,8 @@
 #include <zubax_chibios/util/shell.hpp>
 #include <zubax_chibios/util/base64.hpp>
 
+#include <foc/svm.hpp>
+
 #include <cstdlib>
 
 
