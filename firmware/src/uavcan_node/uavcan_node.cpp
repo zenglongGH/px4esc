@@ -295,10 +295,11 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
         std::printf("Transfers RX/TX: %llu / %llu\n", perf.getRxTransferCount(), perf.getTxTransferCount());
         std::printf("Transfer errors: %llu\n", perf.getErrorCount());
 
-        for (unsigned i = 0; i < num_ifaces; i++)
+        for (std::uint8_t i = 0; i < num_ifaces; i++)
         {
             std::printf("CAN iface %u:\n", i);
             std::printf("    Frames RX/TX: %llu / %llu\n", iface_perf[i].frames_rx, iface_perf[i].frames_tx);
+            std::printf("    RX overflows: %lu\n", g_can.driver.getIface(i)->getRxQueueOverflowCount());
             std::printf("    Errors:       %llu\n", iface_perf[i].errors);
         }
     }
