@@ -270,6 +270,11 @@ class SpinCommand : public os::shell::ICommandHandler
         ios.print("Spinning at %.1f rad/s, %.1f V. Type any character to stop.\n",
                   double(angular_velocity), double(voltage));
 
+        while (ios.getChar(0) > 0)
+        {
+            ;   // Clearing the input buffer
+        }
+
         auto prev_ts = chVTGetSystemTimeX();
         float angle = 0.0F;
 
@@ -311,6 +316,9 @@ class SpinCommand : public os::shell::ICommandHandler
             max_setpoint = std::max(max_setpoint, setpoint[0]);
             min_inverter_voltage = std::min(min_inverter_voltage, inverter_voltage);
             max_inverter_voltage = std::max(max_inverter_voltage, inverter_voltage);
+
+            // This line allows to monitor the setpoint values using the serial plotting script
+            //ios.print("$%.3f,%.3f,%.3f\n", double(setpoint[0]), double(setpoint[1]), double(setpoint[2]));
         }
 
         board::motor::setPWM(math::Vector<3>::Zero());
