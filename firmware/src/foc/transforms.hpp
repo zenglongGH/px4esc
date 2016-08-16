@@ -47,13 +47,25 @@ namespace foc
  *     FullSimplify[2/3 {{1, -(1/2), -(1/2)},
  *                       {0, \[Sqrt]3/2, -(\[Sqrt]3/2)},
  *                       {1/2, 1/2, 1/2}} . {{a},{b},{c}}, a + b + c == 0] // TraditionalForm
+ *
+ * Result:
+ *
+ *     a
+ *     (b - c) / sqrt(3)
+ *
+ * Where C can be eliminated:
+ *
+ *     a
+ *     (a + 2b) / sqrt(3)
+ *
+ * So the third component, if present, should be ignored.
  */
-inline math::Vector<2> performClarkeTransform(const math::Vector<3>& input)
+inline math::Vector<2> performClarkeTransform(const Scalar a, const Scalar b)
 {
     constexpr auto SquareRootOf3 = math::Scalar(1.7320508075688772);
 
-    const math::Scalar alpha = input[0];
-    const math::Scalar beta = (input[1] - input[2]) / SquareRootOf3;
+    const math::Scalar alpha = a;
+    const math::Scalar beta = (a + b * 2.0F) / SquareRootOf3;
 
     return { alpha, beta };
 }
