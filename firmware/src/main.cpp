@@ -228,13 +228,6 @@ int main()
 
         ::usleep(10000);
         counter++;
-
-        if (counter == 0)
-        {
-            os::lowsyslog("%.1f\t%.1f\n",
-                          double(board::motor::g_phase_currents[0]),
-                          double(board::motor::g_phase_currents[1]));
-        }
     }
 
     /*
