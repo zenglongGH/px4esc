@@ -273,6 +273,11 @@ class SpinCommand : public os::shell::ICommandHandler
         auto prev_ts = chVTGetSystemTimeX();
         float angle = 0.0F;
 
+        float min_setpoint = 1.0F;
+        float max_setpoint = 0.0F;
+        float min_inverter_voltage = board::motor::getInverterVoltage();
+        float max_inverter_voltage = board::motor::getInverterVoltage();
+
         while (ios.getChar(1) <= 0)
         {
             // Computing dt (it may be very small or even zero but that's alright)
@@ -293,17 +298,26 @@ class SpinCommand : public os::shell::ICommandHandler
 
             const auto alpha = math::sin(angle) * voltage;
             const auto beta  = math::cos(angle) * voltage;
+            const auto inverter_voltage = board::motor::getInverterVoltage();
 
             const auto setpoint =
                 foc::normalizePhaseVoltagesToPWMSetpoint(foc::performSpaceVectorTransform({alpha, beta}),
-                                                         board::motor::getInverterVoltage());
+                                                         inverter_voltage);
 
             board::motor::setPWM(setpoint);
+
+            // Collecting statistics
+            min_setpoint = std::min(min_setpoint, setpoint[0]);
+            max_setpoint = std::max(max_setpoint, setpoint[0]);
+            min_inverter_voltage = std::min(min_inverter_voltage, inverter_voltage);
+            max_inverter_voltage = std::max(max_inverter_voltage, inverter_voltage);
         }
 
         board::motor::setPWM(math::Vector<3>::Zero());
 
-        ios.print("Stopped\n");
+        ios.print("Stopped; min/max PWM setpoints: %.3f/%.3f; min/max inverter voltage: %.1f/%.1f\n",
+                  double(min_setpoint), double(max_setpoint),
+                  double(min_inverter_voltage), double(max_inverter_voltage));
     }
 } static cmd_spin;
 

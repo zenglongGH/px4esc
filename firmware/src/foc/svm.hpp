@@ -97,13 +97,13 @@ inline math::Vector<3> performSpaceVectorTransform(const math::Vector<2>& refere
     case 1:
     case 4:
     {
-        ta = (x - z) / 2.0F;
+        ta = (-y - z) / 2.0F;
         break;
     }
     case 2:
     case 5:
     {
-        ta = (-y - z) / 2.0F;
+        ta = (x - z) / 2.0F;
         break;
     }
     default:
