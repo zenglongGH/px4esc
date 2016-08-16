@@ -34,7 +34,7 @@
 #pragma once
 
 #include <cstdint>
-#include <math.hpp>
+#include <math/math.hpp>
 #include <zubax_chibios/util/heapless.hpp>
 
 
@@ -83,6 +83,11 @@ float getPWMPeriod();
  * @return PWM dead time in seconds.
  */
 float getPWMDeadTime();
+
+/**
+ * Returns the power stage voltage, aka VBAT, in volts.
+ */
+float getInverterVoltage();
 
 /**
  * This function must not be called if the driver is not active; see @ref setActive().

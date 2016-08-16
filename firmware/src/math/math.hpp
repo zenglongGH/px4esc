@@ -58,6 +58,11 @@ constexpr inline float convertKelvinToCelsius(float kelvin)
 }
 
 /**
+ * Constants
+ */
+constexpr auto Pi = Scalar(3.141592653589793);
+
+/**
  * Inclusive range of the form [min, max].
  */
 template <typename T = Scalar>
@@ -131,5 +136,34 @@ public:
 
     const ValueType& get() const { return y_; }
 };
+
+/**
+ * Wrappers over the CMSIS DSP library.
+ * Note that the CMSIS math headers MUST NOT be included, because they dump a pile of garbage into the global scope.
+ * @{
+ */
+namespace impl_
+{
+extern "C"
+{
+
+float arm_sin_f32(float);
+float arm_cos_f32(float);
+
+}
+}
+
+inline Scalar sin(Scalar x)
+{
+    return impl_::arm_sin_f32(x);
+}
+
+inline Scalar cos(Scalar x)
+{
+    return impl_::arm_cos_f32(x);
+}
+/**
+ * @}
+ */
 
 }

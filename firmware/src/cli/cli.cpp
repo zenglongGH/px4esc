@@ -217,6 +217,97 @@ class CalibrateCommand : public os::shell::ICommandHandler
 } static cmd_calibrate;
 
 
+class SpinCommand : public os::shell::ICommandHandler
+{
+    const char* getName() const override { return "spin"; }
+
+    void execute(os::shell::BaseChannelWrapper& ios, int argc, char** argv) override
+    {
+        constexpr float DefaultVoltage = 1.0F;
+
+        if (argc <= 1)
+        {
+            ios.print("Spin the motor by means of blind rotation of the voltage vector.\n"
+                      "This command is inteneded for testing and debugging purposes. Usage:\n");
+            ios.print("\t%s <angular velocity, rad/sec electrical> [voltage magnitude]\n"
+                      "Voltage magnitude defaults to %.fV. Press any key to stop rotation.\n",
+                      argv[0], double(DefaultVoltage));
+            return;
+        }
+
+        /*
+         * Parsing the arguments
+         */
+        using namespace std;
+        const float angular_velocity = strtof(argv[1], nullptr);
+        if (os::float_eq::closeToZero(angular_velocity))
+        {
+            ios.print("Invalid angular velocity\n");
+            return;
+        }
+
+        float voltage = DefaultVoltage;
+        if (argc > 2)
+        {
+            voltage = strtof(argv[2], nullptr);
+            if (voltage <= 0)
+            {
+                ios.print("Invalid voltage\n");
+                return;
+            }
+        }
+
+        /*
+         * Spinning until keyhit
+         */
+        struct Activator
+        {
+            const bool original_state = board::motor::isActive();
+            Activator()  { board::motor::setActive(true); }
+            ~Activator() { board::motor::setActive(original_state); }
+        } const volatile raii_activator;
+
+        ios.print("Spinning at %.1f rad/s, %.1f V. Type any character to stop.\n",
+                  double(angular_velocity), double(voltage));
+
+        auto prev_ts = chVTGetSystemTimeX();
+        float angle = 0.0F;
+
+        while (ios.getChar(1) <= 0)
+        {
+            // Computing dt (it may be very small or even zero but that's alright)
+            const auto new_ts = chVTGetSystemTimeX();
+            const auto dt = float(ST2US(new_ts - prev_ts)) * 1e-6F;
+            prev_ts = new_ts;
+
+            // Computing PWM settings
+            angle += angular_velocity * dt;
+            if (angle >= 2.0F * math::Pi)
+            {
+                angle = 0.0F;
+            }
+            if (angle <= -2.0F * math::Pi)
+            {
+                angle = 0.0F;
+            }
+
+            const auto alpha = math::sin(angle) * voltage;
+            const auto beta  = math::cos(angle) * voltage;
+
+            const auto setpoint =
+                foc::normalizePhaseVoltagesToPWMSetpoint(foc::performSpaceVectorTransform({alpha, beta}),
+                                                         board::motor::getInverterVoltage());
+
+            board::motor::setPWM(setpoint);
+        }
+
+        board::motor::setPWM(math::Vector<3>::Zero());
+
+        ios.print("Stopped\n");
+    }
+} static cmd_spin;
+
+
 class CLIThread : public chibios_rt::BaseStaticThread<2048>
 {
     os::shell::Shell<> shell_;
@@ -249,6 +340,7 @@ public:
         (void) shell_.addCommandHandler(&cmd_pwm);
         (void) shell_.addCommandHandler(&cmd_status);
         (void) shell_.addCommandHandler(&cmd_calibrate);
+        (void) shell_.addCommandHandler(&cmd_spin);
     }
 
     virtual ~CLIThread() { }

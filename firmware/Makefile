@@ -46,6 +46,10 @@ UDEFS += -DCONFIG_PARAM_MAX_NAME_LENGTH=16
 USE_OPT += -Wno-deprecated-declarations
 UINCDIR += eigen
 
+# CMSIS DSP library
+UDEFS += -DARM_MATH_CM4=1
+UINCDIR += src/math/cmsis_dsp_lib/
+
 #
 # UAVCAN library
 #

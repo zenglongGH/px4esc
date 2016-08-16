@@ -33,7 +33,7 @@
 
 #pragma once
 
-#include <math.hpp>
+#include <math/math.hpp>
 #include <cstdint>
 #include <cassert>
 

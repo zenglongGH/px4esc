@@ -602,6 +602,8 @@ void init()
 
 void setActive(bool active)
 {
+    os::CriticalSectionLocker locker;
+
     setRawPWM(0, 0, 0);
 
     palWritePad(GPIOA, GPIOA_EN_GATE, active);
@@ -623,7 +625,7 @@ void calibrate(const float duration)
         const bool original_state = isActive();
         TovarischVladimirIlyich()  { setActive(false); }
         ~TovarischVladimirIlyich() { setActive(original_state); }
-    } raii_guard;
+    } const volatile raii_guard;
 
     // Enabling the gate output and waiting a few milliseconds for everything to stabilize
     palWritePad(GPIOA, GPIOA_EN_GATE, true);
@@ -653,6 +655,11 @@ float getPWMPeriod()
 float getPWMDeadTime()
 {
     return g_dead_time;
+}
+
+float getInverterVoltage()
+{
+    return g_inverter_voltage;
 }
 
 void setPWM(const math::Vector<3>& abc)
