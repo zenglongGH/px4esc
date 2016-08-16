@@ -31,13 +31,33 @@
 *
 ****************************************************************************/
 
-#include "foc.hpp"
-#include "svm.hpp"
-#include "pid.hpp"
-#include "transforms.hpp"
+#pragma once
+
+#include <math/math.hpp>
 
 
 namespace foc
 {
+/**
+ * Simplified Clarke transformation for balanced systems.
+ * Overview: https://en.wikipedia.org/wiki/Alpha%E2%80%93beta_transformation
+ *
+ * Derivation from the full form (it looks ugly in plain text, use Mathematica):
+ *
+ *     FullSimplify[2/3 {{1, -(1/2), -(1/2)},
+ *                       {0, \[Sqrt]3/2, -(\[Sqrt]3/2)},
+ *                       {1/2, 1/2, 1/2}} . {{a},{b},{c}}, a + b + c == 0] // TraditionalForm
+ */
+inline math::Vector<2> performClarkeTransform(const math::Vector<3>& input)
+{
+    constexpr auto SquareRootOf3 = math::Scalar(1.7320508075688772);
+
+    const math::Scalar alpha = input[0];
+    const math::Scalar beta = (input[1] - input[2]) / SquareRootOf3;
+
+    return { alpha, beta };
+}
+
+
 
 }
