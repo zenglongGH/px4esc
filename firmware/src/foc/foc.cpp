@@ -31,93 +31,12 @@
 *
 ****************************************************************************/
 
-#pragma once
-
-#include <Eigen/Eigen>
-#include <algorithm>
-#include <utility>
-#include <cassert>
-#include <cmath>
+#include "foc.hpp"
+#include "svm.hpp"
+#include "pid.hpp"
 
 
-namespace math
+namespace foc
 {
-
-using Scalar = float;
-
-template <int Rows, int Cols>
-using Matrix = Eigen::Matrix<Scalar, Rows, Cols>;
-
-template <int Size>
-using Vector = Matrix<Size, 1>;
-
-
-constexpr inline float convertKelvinToCelsius(float kelvin)
-{
-    return kelvin - 273.15F;
-}
-
-/**
- * Constants
- */
-constexpr auto Pi = Scalar(3.141592653589793);
-
-/**
- * Inclusive range of the form [min, max].
- */
-template <typename T = Scalar>
-struct Range
-{
-    T min = T(0);
-    T max = T(0);
-
-    constexpr Range() { }
-
-    constexpr Range(const T min, const T max) :
-        min(min),
-        max(max)
-    {
-        assert(min < max);
-    }
-
-    constexpr T constrain(const T value) const
-    {
-        return std::min(std::max(value, min), max);
-    }
-
-    constexpr bool contains(const T value) const
-    {
-        return (value >= min) && (value <= max);
-    }
-};
-
-/**
- * Wrappers over the CMSIS DSP library.
- * Note that the CMSIS math headers MUST NOT be included, because they dump a pile of garbage into the global scope.
- * @{
- */
-namespace impl_
-{
-extern "C"
-{
-
-float arm_sin_f32(float);
-float arm_cos_f32(float);
-
-}
-}
-
-inline Scalar sin(Scalar x)
-{
-    return impl_::arm_sin_f32(x);
-}
-
-inline Scalar cos(Scalar x)
-{
-    return impl_::arm_cos_f32(x);
-}
-/**
- * @}
- */
 
 }
