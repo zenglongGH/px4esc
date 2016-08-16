@@ -60,7 +60,8 @@ namespace foc
  *
  * So the third component, if present, should be ignored.
  */
-inline math::Vector<2> performClarkeTransform(const Scalar a, const Scalar b)
+inline math::Vector<2> performClarkeTransform(const math::Scalar a,
+                                              const math::Scalar b)
 {
     constexpr auto SquareRootOf3 = math::Scalar(1.7320508075688772);
 
@@ -70,6 +71,28 @@ inline math::Vector<2> performClarkeTransform(const Scalar a, const Scalar b)
     return { alpha, beta };
 }
 
+/**
+ * Park transform.
+ * Implementation derived from someplace else (well, it's quite standard).
+ */
+inline math::Vector<2> performParkTransform(const math::Vector<2>& alpha_beta,
+                                            const math::Scalar angle_sine,
+                                            const math::Scalar angle_cosine)
+{
+    return { alpha_beta[0] * angle_cosine + alpha_beta[1] * angle_sine,
+            -alpha_beta[0] * angle_sine   + alpha_beta[1] * angle_cosine };
+}
 
+/**
+ * Inverse Park transform.
+ * Nothing special, move along please.
+ */
+inline math::Vector<2> performInverseParkTransform(const math::Vector<2>& dq,
+                                                   const math::Scalar angle_sine,
+                                                   const math::Scalar angle_cosine)
+{
+    return { dq[0] * angle_cosine - dq[1] * angle_sine,
+             dq[0] * angle_sine   + dq[1] * angle_cosine};
+}
 
 }
