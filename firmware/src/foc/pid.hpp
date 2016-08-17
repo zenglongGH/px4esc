@@ -44,33 +44,31 @@ namespace foc
  */
 struct PIDControllerSettings
 {
-    typedef math::Scalar Scalar;
+    math::Scalar p = math::Scalar(0);
+    math::Scalar i = math::Scalar(0);
+    math::Scalar d = math::Scalar(0);
 
-    Scalar p = Scalar(0);
-    Scalar i = Scalar(0);
-    Scalar d = Scalar(0);
-
-    math::Range<Scalar> integration_limits;
+    math::Range<math::Scalar> integration_limits;
 
     PIDControllerSettings() { }
 
-    PIDControllerSettings(const Scalar p,
-                          const Scalar i,
-                          const Scalar d,
-                          const math::Range<Scalar>& integration_limits) :
+    PIDControllerSettings(math::Const p,
+                          math::Const i,
+                          math::Const d,
+                          const math::Range<math::Scalar>& integration_limits) :
         p(p),
         i(i),
         d(d),
         integration_limits(integration_limits)
     {
         assert(std::isfinite(p) && std::isfinite(i) && std::isfinite(d));
-        assert(integration_limits.contains(Scalar(0)));
+        assert(integration_limits.contains(math::Scalar(0)));
     }
 
-    PIDControllerSettings(const Scalar p,
-                          const Scalar i,
-                          const Scalar d,
-                          const Scalar integration_limit) :
+    PIDControllerSettings(math::Const p,
+                          math::Const i,
+                          math::Const d,
+                          math::Const integration_limit) :
         PIDControllerSettings(p, i, d,
                               {-std::abs(integration_limit),
                                 std::abs(integration_limit)})
@@ -101,12 +99,10 @@ struct PIDControllerSettings
  */
 class PIDController
 {
-    typedef math::Scalar Scalar;
-
     PIDControllerSettings cfg_;
 
-    Scalar integral_ = Scalar(0);
-    Scalar prev_error_ = Scalar(0);
+    math::Scalar integral_ = math::Scalar(0);
+    math::Scalar prev_error_ = math::Scalar(0);
 
     bool initialized_ = false;
 
@@ -119,13 +115,13 @@ public:
 
     void setSettings(const PIDControllerSettings& settings) { cfg_ = settings; }
 
-    Scalar update(const Scalar setpoint,
-                  const Scalar process_variable,
-                  const Scalar time_delta)
+    math::Scalar update(math::Const setpoint,
+                        math::Const process_variable,
+                        math::Const time_delta)
     {
         assert(time_delta > 0);
 
-        const Scalar error = setpoint - process_variable;
+        math::Const error = setpoint - process_variable;
 
         if (!initialized_)
         {
@@ -133,8 +129,8 @@ public:
             prev_error_ = error;
         }
 
-        const Scalar p = error * cfg_.p;
-        const Scalar d = (error - prev_error_) * cfg_.d / time_delta;
+        math::Const p = error * cfg_.p;
+        math::Const d = (error - prev_error_) * cfg_.d / time_delta;
 
         // The I gain defines the speed of change of the integrated error, not its weight.
         // This enables us to change the I term at any moment without upsetting the output.

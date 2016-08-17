@@ -44,6 +44,7 @@ namespace math
 {
 
 using Scalar = float;
+using Const = const Scalar;
 
 template <int Rows, int Cols>
 using Matrix = Eigen::Matrix<Scalar, Rows, Cols>;

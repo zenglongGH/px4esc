@@ -60,13 +60,13 @@ namespace foc
  *
  * So the third component, if present, should be ignored.
  */
-inline math::Vector<2> performClarkeTransform(const math::Scalar a,
-                                              const math::Scalar b)
+inline math::Vector<2> performClarkeTransform(math::Const a,
+                                              math::Const b)
 {
     constexpr auto SquareRootOf3 = math::Scalar(1.7320508075688772);
 
-    const math::Scalar alpha = a;
-    const math::Scalar beta = (a + b * 2.0F) / SquareRootOf3;
+    math::Const alpha = a;
+    math::Const beta = (a + b * 2.0F) / SquareRootOf3;
 
     return { alpha, beta };
 }
@@ -76,8 +76,8 @@ inline math::Vector<2> performClarkeTransform(const math::Scalar a,
  * Implementation derived from someplace else (well, it's quite standard).
  */
 inline math::Vector<2> performParkTransform(const math::Vector<2>& alpha_beta,
-                                            const math::Scalar angle_sine,
-                                            const math::Scalar angle_cosine)
+                                            math::Const angle_sine,
+                                            math::Const angle_cosine)
 {
     return { alpha_beta[0] * angle_cosine + alpha_beta[1] * angle_sine,
             -alpha_beta[0] * angle_sine   + alpha_beta[1] * angle_cosine };
@@ -88,8 +88,8 @@ inline math::Vector<2> performParkTransform(const math::Vector<2>& alpha_beta,
  * Nothing special, move along please.
  */
 inline math::Vector<2> performInverseParkTransform(const math::Vector<2>& dq,
-                                                   const math::Scalar angle_sine,
-                                                   const math::Scalar angle_cosine)
+                                                   math::Const angle_sine,
+                                                   math::Const angle_cosine)
 {
     return { dq[0] * angle_cosine - dq[1] * angle_sine,
              dq[0] * angle_sine   + dq[1] * angle_cosine};

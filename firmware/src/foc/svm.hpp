@@ -123,7 +123,7 @@ inline math::Vector<3> performSpaceVectorTransform(const math::Vector<2>& refere
  * @return                              PWM setpoint vector; each component is in [0, 1].
  */
 inline math::Vector<3> normalizePhaseVoltagesToPWMSetpoint(const math::Vector<3>& phase_voltages,
-                                                           const math::Scalar inverter_voltage)
+                                                           math::Const inverter_voltage)
 {
     return (phase_voltages / inverter_voltage).array() + 0.5F;
 }
