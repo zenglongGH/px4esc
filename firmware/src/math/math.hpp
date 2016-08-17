@@ -121,4 +121,77 @@ inline Scalar cos(Scalar x)
  * @}
  */
 
+/**
+ * Implementation details, do not use directly.
+ */
+namespace impl_
+{
+
+template <typename Scalar, int Size>
+using RowVector = Eigen::Matrix<Scalar, 1, Size, Eigen::RowMajor>;
+
+template <typename Scalar, int Size, typename Head>
+inline void fillVector(RowVector<Scalar, Size>& vector, int next_index, Head head)
+{
+    vector[next_index] = static_cast<Scalar>(head);
+}
+
+template <typename Scalar, int Size, typename Head, typename... Tail>
+inline void fillVector(RowVector<Scalar, Size>& vector, int next_index, Head head, Tail... tail)
+{
+    vector[next_index] = static_cast<Scalar>(head);
+    fillVector(vector, next_index + 1, tail...);
+}
+
+template <typename Scalar, int Rows, int Columns>
+inline void fillMatrix(Eigen::Matrix<Scalar, Rows, Columns>& matrix, int next_row,
+                       const impl_::RowVector<Scalar, Columns>& head)
+{
+    matrix.row(next_row) = head;
+}
+
+template <typename Scalar, int Rows, int Columns, typename... Tail>
+inline void fillMatrix(Eigen::Matrix<Scalar, Rows, Columns>& matrix, int next_row,
+                       const impl_::RowVector<Scalar, Columns>& head, Tail... tail)
+{
+    matrix.row(next_row) = head;
+    fillMatrix(matrix, next_row + 1, tail...);
+}
+
+} // namespace impl_
+
+/**
+ * Creates a row vector of arbitrary length, represented as a static row vector Eigen::Matrix<>.
+ * Scalar type can be overriden.
+ * See also @ref makeMatrix().
+ */
+template <typename Scalar = Scalar, typename... Tail>
+inline impl_::RowVector<Scalar, sizeof...(Tail)>
+makeRow(Tail... tail)
+{
+    impl_::RowVector<Scalar, sizeof...(Tail)> vector;
+    impl_::fillVector(vector, 0, tail...);
+    return vector;
+}
+
+/**
+ * Creates a static matrix (Eigen::Matrix<>) of arbitrary size from a set of row vectors.
+ * The matrix will use default layout, which is columnn-major for Eigen.
+ * Note that row vectors of unequal size trigger a compile-time error.
+ * Scalar type will be deduced automatically from the first row.
+ * This function is totally type safe.
+ * Usage:
+ *      makeMatrix(makeRow(1, 2),
+ *                 makeRow(3, 4))  // Produces a 2x2 matrix
+ */
+template <typename Scalar, int Columns, typename... Tail>
+inline Eigen::Matrix<Scalar, sizeof...(Tail) + 1, Columns>
+makeMatrix(const impl_::RowVector<Scalar, Columns>& head, Tail... tail)
+{
+    Eigen::Matrix<Scalar, sizeof...(Tail) + 1, Columns> matrix;
+    matrix.setZero();
+    impl_::fillMatrix(matrix, 0, head, tail...);
+    return matrix;
+}
+
 }
