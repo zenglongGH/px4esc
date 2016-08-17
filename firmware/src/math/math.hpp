@@ -131,31 +131,57 @@ template <typename Scalar, int Size>
 using RowVector = Eigen::Matrix<Scalar, 1, Size, Eigen::RowMajor>;
 
 template <typename Scalar, int Size, typename Head>
-inline void fillVector(RowVector<Scalar, Size>& vector, int next_index, Head head)
+inline void fillVector(RowVector<Scalar, Size>& vector,
+                       int next_index,
+                       Head head)
 {
     vector[next_index] = static_cast<Scalar>(head);
 }
 
 template <typename Scalar, int Size, typename Head, typename... Tail>
-inline void fillVector(RowVector<Scalar, Size>& vector, int next_index, Head head, Tail... tail)
+inline void fillVector(RowVector<Scalar, Size>& vector,
+                       int next_index,
+                       Head head,
+                       Tail... tail)
 {
     vector[next_index] = static_cast<Scalar>(head);
     fillVector(vector, next_index + 1, tail...);
 }
 
 template <typename Scalar, int Rows, int Columns>
-inline void fillMatrix(Eigen::Matrix<Scalar, Rows, Columns>& matrix, int next_row,
+inline void fillMatrix(Eigen::Matrix<Scalar, Rows, Columns>& matrix,
+                       int next_row,
                        const impl_::RowVector<Scalar, Columns>& head)
 {
     matrix.row(next_row) = head;
 }
 
 template <typename Scalar, int Rows, int Columns, typename... Tail>
-inline void fillMatrix(Eigen::Matrix<Scalar, Rows, Columns>& matrix, int next_row,
-                       const impl_::RowVector<Scalar, Columns>& head, Tail... tail)
+inline void fillMatrix(Eigen::Matrix<Scalar, Rows, Columns>& matrix,
+                       int next_row,
+                       const impl_::RowVector<Scalar, Columns>& head,
+                       Tail... tail)
 {
     matrix.row(next_row) = head;
     fillMatrix(matrix, next_row + 1, tail...);
+}
+
+template <typename Scalar, int DiagonalSize>
+inline void fillDiagonalMatrix(Eigen::Matrix<Scalar, DiagonalSize, DiagonalSize>& matrix,
+                               int next_position,
+                               Scalar head)
+{
+    matrix(next_position, next_position) = static_cast<Scalar>(head);
+}
+
+template <typename Scalar, int DiagonalSize, typename... Tail>
+inline void fillDiagonalMatrix(Eigen::Matrix<Scalar, DiagonalSize, DiagonalSize>& matrix,
+                               int next_position,
+                               Scalar head,
+                               Tail... tail)
+{
+    matrix(next_position, next_position) = static_cast<Scalar>(head);
+    fillDiagonalMatrix<Scalar, DiagonalSize>(matrix, next_position + 1, tail...);
 }
 
 } // namespace impl_
@@ -186,11 +212,27 @@ makeRow(Tail... tail)
  */
 template <typename Scalar, int Columns, typename... Tail>
 inline Eigen::Matrix<Scalar, sizeof...(Tail) + 1, Columns>
-makeMatrix(const impl_::RowVector<Scalar, Columns>& head, Tail... tail)
+makeMatrix(const impl_::RowVector<Scalar, Columns>& head,
+           Tail... tail)
 {
     Eigen::Matrix<Scalar, sizeof...(Tail) + 1, Columns> matrix;
     matrix.setZero();
     impl_::fillMatrix(matrix, 0, head, tail...);
+    return matrix;
+}
+
+/**
+ * A helper like @ref makeMatrix() that creates diagonal matrix.
+ * Size is dereved from the argument list.
+ * Scalar type can be overriden.
+ */
+template <typename Scalar = Scalar, typename... Diagonal>
+inline Eigen::Matrix<Scalar, sizeof...(Diagonal), sizeof...(Diagonal)>
+makeDiagonalMatrix(Diagonal... diag)
+{
+    Eigen::Matrix<Scalar, sizeof...(Diagonal), sizeof...(Diagonal)> matrix;
+    matrix.setZero();
+    impl_::fillDiagonalMatrix<Scalar, sizeof...(Diagonal)>(matrix, 0, diag...);
     return matrix;
 }
 
