@@ -63,6 +63,24 @@ using math::Vector;
 using math::Matrix;
 
 
+math::Scalar Observer::constrainAngularPosition(Const x)
+{
+    constexpr Const Pi2 = math::Pi * 2.0F;
+
+    if (x >= Pi2)
+    {
+        return x - Pi2;
+    }
+    else if (x < 0)
+    {
+        return x + Pi2;
+    }
+    else
+    {
+        return x;
+    }
+}
+
 Observer::Observer(Const field_flux,
                    Const stator_phase_inductance_direct,
                    Const stator_phase_inductance_quadrature,
@@ -155,6 +173,7 @@ void Observer::update(Const dt,
     const Matrix<4, 2> K = Pout * C_.transpose() * (C_ * Pout * C_.transpose() + R_).inverse();
 
     x_ = Xout + K * (y - C_ * Xout);
+    x_[StateIndexAngularPosition] = constrainAngularPosition(x_[StateIndexAngularPosition]);
 
     P_ = (Matrix<4, 4>::Identity() - K * C_) * Pout;
 }

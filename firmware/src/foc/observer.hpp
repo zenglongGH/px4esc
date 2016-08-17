@@ -63,6 +63,8 @@ class Observer
     math::Vector<4> x_;
     math::Matrix<4, 4> P_;
 
+    static math::Scalar constrainAngularPosition(math::Const x);
+
 public:
     Observer(math::Const field_flux,
              math::Const stator_phase_inductance_direct,
@@ -83,7 +85,7 @@ public:
      */
     math::Scalar getInterpolatedAngularPosition(math::Const time_since_update) const
     {
-        return x_[StateIndexAngularPosition] + time_since_update * getAngularVelocity();
+        return constrainAngularPosition(x_[StateIndexAngularPosition] + time_since_update * getAngularVelocity());
     }
 };
 
