@@ -40,6 +40,8 @@ namespace foc
 namespace
 {
 
+os::config::Param<float> g_param_cross_coupling_compensation("foc.obs.cc_comp", 0.0F, 0.0F, 10.0F);
+
 os::config::Param<float> g_param_Q_11("foc.obs.q_11",      100.0F,  1e-6F,  1e+6F);
 os::config::Param<float> g_param_Q_22("foc.obs.q_22",      100.0F,  1e-6F,  1e+6F);
 os::config::Param<float> g_param_Q_33("foc.obs.q_33",     5000.0F,  1e-6F,  1e+6F);
@@ -84,16 +86,16 @@ math::Scalar Observer::constrainAngularPosition(Const x)
 Observer::Observer(Const field_flux,
                    Const stator_phase_inductance_direct,
                    Const stator_phase_inductance_quadrature,
-                   Const stator_phase_resistance,
-                   Const cross_coupling_compensation) :
-    // System model
+                   Const stator_phase_resistance) :
+    // Motor model
     phi_(field_flux),
     ld_(stator_phase_inductance_direct),
     lq_(stator_phase_inductance_quadrature),
     r_(stator_phase_resistance),
-    cross_coupling_comp_(cross_coupling_compensation),
 
     // Filter constants
+    cross_coupling_comp_(g_param_cross_coupling_compensation.get()),
+
     C_(makeMatrix(makeRow(1, 0, 0, 0),
                   makeRow(0, 1, 0, 0))),
 

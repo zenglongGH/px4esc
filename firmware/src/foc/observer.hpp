@@ -69,8 +69,7 @@ public:
     Observer(math::Const field_flux,
              math::Const stator_phase_inductance_direct,
              math::Const stator_phase_inductance_quadrature,
-             math::Const stator_phase_resistance,
-             math::Const cross_coupling_compensation);
+             math::Const stator_phase_resistance);
 
     void update(math::Const dt,
                 const math::Vector<2>& idq,
