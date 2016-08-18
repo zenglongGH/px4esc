@@ -221,7 +221,7 @@ void initPWM(const double pwm_frequency,
              const double pwm_dead_time)
 {
     {
-        os::CriticalSectionLocker locker;
+        AbsoluteCriticalSectionLocker locker;
 
         RCC->APB2ENR |= RCC_APB2ENR_TIM1EN;
         RCC->APB2RSTR |= RCC_APB2RSTR_TIM1RST;
@@ -283,7 +283,7 @@ void initPWM(const double pwm_frequency,
 void initPWMADCSync()
 {
     {
-        os::CriticalSectionLocker locker;
+        AbsoluteCriticalSectionLocker locker;
 
         RCC->APB2ENR  |=  RCC_APB2ENR_TIM8EN;
         RCC->APB2RSTR |=  RCC_APB2RSTR_TIM8RST;
@@ -355,7 +355,7 @@ void initPWMADCSync()
 void initADC()
 {
     {
-        os::CriticalSectionLocker locker;
+        AbsoluteCriticalSectionLocker locker;
 
         RCC->APB2ENR |= RCC_APB2ENR_ADC1EN | RCC_APB2ENR_ADC2EN | RCC_APB2ENR_ADC3EN;
         RCC->APB2RSTR |=  RCC_APB2RSTR_ADCRST;
@@ -443,7 +443,7 @@ void initADC()
 
     // Configuring IRQ
     {
-        os::CriticalSectionLocker locker;
+        AbsoluteCriticalSectionLocker locker;
         nvicClearPending(ADC_IRQn);
         nvicEnableVector(ADC_IRQn, ADCIRQPriority);
     }
@@ -453,7 +453,7 @@ void initADC()
      * Refer to 9.3.17 - Stream configuration procedure.
      */
     {
-        os::CriticalSectionLocker locker;
+        AbsoluteCriticalSectionLocker locker;
         RCC->AHB1ENR |= RCC_AHB1ENR_DMA2EN; // No reset because it could be shared with other peripherals.
     }
 
@@ -602,7 +602,7 @@ void init()
 
 void setActive(bool active)
 {
-    os::CriticalSectionLocker locker;
+    AbsoluteCriticalSectionLocker locker;
 
     setRawPWM(0, 0, 0);
 
@@ -620,6 +620,9 @@ bool isActive()
 
 void calibrate(const float duration)
 {
+    static chibios_rt::Mutex mutex;
+    os::MutexLocker mutex_locker(mutex);
+
     struct TovarischVladimirIlyich
     {
         const bool original_state = isActive();
@@ -659,7 +662,7 @@ float getPWMDeadTime()
 
 float getInverterVoltage()
 {
-    return g_inverter_voltage;
+    return g_inverter_voltage;          // Atomic read, no need to lock
 }
 
 void setPWM(const math::Vector<3>& abc)
@@ -676,6 +679,8 @@ void setPWM(const math::Vector<3>& abc)
 
 void emergency()
 {
+    AbsoluteCriticalSectionLocker mighty_locker;
+
     // Generating software break, this will reset the PWM outputs to zero immediately
     TIM1->EGR = TIM_EGR_BG;
 
