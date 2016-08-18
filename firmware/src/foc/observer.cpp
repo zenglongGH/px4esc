@@ -40,7 +40,7 @@ namespace foc
 namespace
 {
 
-os::config::Param<float> g_param_cross_coupling_compensation("foc.obs.cc_comp", 0.0F, 0.0F, 10.0F);
+os::config::Param<float> g_param_cross_coupling_compensation("foc.obs.cc_comp", 0.5F, 0.0F, 10.0F);
 
 os::config::Param<float> g_param_Q_11("foc.obs.q_11",      100.0F,  1e-6F,  1e+6F);
 os::config::Param<float> g_param_Q_22("foc.obs.q_22",      100.0F,  1e-6F,  1e+6F);
