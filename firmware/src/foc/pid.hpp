@@ -40,15 +40,43 @@
 namespace foc
 {
 /**
- * See @ref PIDController.
+ * See @ref PIController.
  */
-struct PIDControllerSettings
+struct PIControllerSettings
 {
     math::Scalar p = math::Scalar(0);
     math::Scalar i = math::Scalar(0);
-    math::Scalar d = math::Scalar(0);
 
     math::Range<math::Scalar> integration_limits;
+
+    PIControllerSettings() { }
+
+    PIControllerSettings(math::Const p,
+                         math::Const i,
+                         const math::Range<math::Scalar>& integration_limits) :
+        p(p),
+        i(i),
+        integration_limits(integration_limits)
+    {
+        assert(std::isfinite(p) && std::isfinite(i));
+        assert(integration_limits.contains(math::Scalar(0)));
+    }
+
+    PIControllerSettings(math::Const p,
+                         math::Const i,
+                         math::Const integration_limit) :
+        PIControllerSettings(p, i,
+                             {-std::abs(integration_limit),
+                               std::abs(integration_limit)})
+    { }
+};
+
+/**
+ * See @ref PIDController.
+ */
+struct PIDControllerSettings : public PIControllerSettings
+{
+    math::Scalar d = math::Scalar(0);
 
     PIDControllerSettings() { }
 
@@ -56,13 +84,10 @@ struct PIDControllerSettings
                           math::Const i,
                           math::Const d,
                           const math::Range<math::Scalar>& integration_limits) :
-        p(p),
-        i(i),
-        d(d),
-        integration_limits(integration_limits)
+        PIControllerSettings(p, i, integration_limits),
+        d(d)
     {
-        assert(std::isfinite(p) && std::isfinite(i) && std::isfinite(d));
-        assert(integration_limits.contains(math::Scalar(0)));
+        assert(std::isfinite(d));
     }
 
     PIDControllerSettings(math::Const p,
@@ -73,6 +98,55 @@ struct PIDControllerSettings
                               {-std::abs(integration_limit),
                                 std::abs(integration_limit)})
     { }
+};
+
+/**
+ * Non-polymorphic base for PI and PID controllers.
+ */
+template <typename Settings>
+class PIControllerBase
+{
+protected:
+    Settings cfg_;
+
+    math::Scalar integral_ = math::Scalar(0);
+
+    PIControllerBase() { }
+
+    PIControllerBase(const Settings& settings) : cfg_(settings) { }
+
+public:
+    const Settings& getSettings() const { return cfg_; }
+
+    void setSettings(const Settings& settings) { cfg_ = settings; }
+};
+
+/**
+ * PI controller implemented from scratch because removal of the D term simplifies the algorithm substantially.
+ */
+class PIController : public PIControllerBase<PIControllerSettings>
+{
+public:
+    PIController() { }
+
+    explicit PIController(const PIControllerSettings& settings) :
+        PIControllerBase<PIControllerSettings>(settings)
+    { }
+
+    math::Scalar update(math::Const setpoint,
+                        math::Const process_variable,
+                        math::Const time_delta)
+    {
+        assert(time_delta > 0);
+
+        math::Const error = setpoint - process_variable;
+
+        // The I gain defines the speed of change of the integrated error, not its weight.
+        // This enables us to change the I term at any moment without upsetting the output.
+        integral_ = cfg_.integration_limits.constrain(integral_ + error * time_delta * cfg_.i);
+
+        return (error * cfg_.p) + integral_;
+    }
 };
 
 /**
@@ -97,11 +171,8 @@ struct PIDControllerSettings
  *     outputs = update[#1, #2, 0.1] & @@@ ({setpoints, procvar}\[Transpose]);
  *     ListLinePlot[{setpoints, procvar, outputs}, PlotLegends -> Automatic]
  */
-class PIDController
+class PIDController : public PIControllerBase<PIDControllerSettings>
 {
-    PIDControllerSettings cfg_;
-
-    math::Scalar integral_ = math::Scalar(0);
     math::Scalar prev_error_ = math::Scalar(0);
 
     bool initialized_ = false;
@@ -109,11 +180,9 @@ class PIDController
 public:
     PIDController() { }
 
-    explicit PIDController(const PIDControllerSettings& settings) : cfg_(settings) { }
-
-    const PIDControllerSettings& getSettings() const { return cfg_; }
-
-    void setSettings(const PIDControllerSettings& settings) { cfg_ = settings; }
+    explicit PIDController(const PIDControllerSettings& settings) :
+        PIControllerBase<PIDControllerSettings>(settings)
+    { }
 
     math::Scalar update(math::Const setpoint,
                         math::Const process_variable,
