@@ -33,33 +33,93 @@
 
 #pragma once
 
+#include "motor_parameters.hpp"
 #include <math/math.hpp>
 #include <cstdint>
+#include <utility>
 
 
 namespace foc
 {
 /**
  * Must be invoked in the first order, exactly once.
- * This function may trigger automatic identification.
+ * This function may block for a few seconds.
+ * All other API functions are non-blocking, except stated otherwise.
  */
 void init();
 
 /**
+ * Motor parameters must be set after initialization before the motor can be started.
+ */
+void setMotorParameters(const MotorParameters& params);
+
+MotorParameters getMotorParameters();
+
+/**
+ * Greater modes (listed later) allow to identify more parameters,
+ * but impose more restrictions on the connected load.
+ * Read the comments for details.
+ */
+enum class MotorIdentificationMode
+{
+    /**
+     * In this mode, the motor will not rotate, therefore it doesn't matter what load it is connected to.
+     * Estimated parameters: Rab, Lab.
+     */
+    Static,
+
+    /**
+     * In this mode, the motor WILL SPIN.
+     * In order to achieve correct results, the motor MUST NOT BE CONNECTED TO ANY MECHANICAL LOAD.
+     * Estimated parameters: Rab, Lab, Phi.
+     */
+    DynamicNoLoad
+};
+
+/**
+ * Begins the asynchronous process of motor identification.
+ * See @ref MotorIdentificationMode.
+ * Completion of the process can be detected by means of monitoring the current state of the controller, see @ref State.
+ * The identified parameters can be read via @ref getMotorParameters().
+ */
+void beginMotorIdentification(MotorIdentificationMode mode);
+
+/**
  * State of the control logic.
  * Some of the functions may be unavailable in certain states.
- * TODO: Needs review.
  */
 enum class State
 {
-    Standby,            ///< The control logic is doing nothing and is ready to accept requests.
-    Busy,               ///< Internal activities are underway (e.g. calibration, auto ID), requests cannot be accepted.
-    Spinup,             ///< The motor is starting.
-    Running,            ///< The motor is running.
-    Stalled,            ///< The motor stopped unexpectedly, possibly due to high mechanical load or software error.
-    Locked,             ///< The motor was stalled too many times, controller locked up. Call @ref stop() to reset.
-    InvalidConfig,      ///< The configuration is invalid. The motor cannot be started.
-    HardwareFailure     ///< The hardware or the motor are dysfunctional. This is a terminal state.
+    /**
+     * The control logic is doing nothing and is ready to accept commands.
+     * If the motor stalled or another error occurred, an error code will be set.
+     */
+    Idle,
+
+    /**
+     * Motor identification is in progress, commands cannot be accepted.
+     * @ref beginMotorIdentification().
+     */
+    MotorIdentification,
+
+    /**
+     * The motor is starting, or some pre-start procedures are underway. This is a transient state.
+     * Possible outcomes:
+     *  - Started successfully  -> Running
+     *  - Failed to start       -> Idle or Fault
+     */
+    Spinup,
+
+    /**
+     * The motor is running. Next state is normally Idle.
+     */
+    Running,
+
+    /**
+     * The controller has encountered a serious error and will not start the motor until the error is reset.
+     * In order to reset the error, call @ref stop(), or set a zero setpoint (which is equivalent to calling stop()).
+     */
+    Fault
 };
 
 /**
@@ -68,19 +128,37 @@ enum class State
 State getState();
 
 /**
+ * Error codes complement the states defined above with additional failure information.
+ * Errors are just indications, they do not require any actions from the user except when the state is Fault.
+ */
+enum class Error
+{
+    None,
+    SpinupUnsuccessful,
+    HardwareFailure,
+    InvalidMotorParameters
+};
+
+/**
+ * Returns the code of the last encountered error and the total number of errors encountered since the motor was
+ * last stopped or since reboot, whichever was the last. See @ref Error.
+ */
+std::pair<Error, std::uint32_t> getLastErrorWithErrorCount();
+
+/**
  * Various control modes.
  * See the function definitions below for usages.
  */
 enum class ControlMode
 {
-    RelativePower,      ///< Abstract units in [-1, 1]
+    Relative,           ///< Abstract units in [-1, 1]
     Torque,             ///< Newton meters
     AngularVelocity     ///< Radian per second
 };
 
 /**
  * Assigns new setpoint; the units depend on the selected control mode.
- * The value of zero stops the motor.
+ * The value of zero stops the motor and clears the fault state, which is equivalent to calling @ref stop().
  * Negative values indicate reverse rotation.
  *
  * @param control_mode          See @ref ControlMode.
@@ -99,7 +177,7 @@ ControlMode getControlMode();
 
 /**
  * Stops the motor normally if it is running.
- * Does nothing if the motor is not running.
+ * Clears the fault state if the motor is not running.
  */
 void stop();
 
@@ -129,14 +207,9 @@ void beep(math::Const frequency,
           math::Const duration);
 
 /**
- * Returns the total number of errors encountered since the motor was last stopped or since reboot,
- * whichever was the last.
- */
-std::uint32_t getErrorCount();
-
-/**
  * Prints the current status information into stdout.
  * This command is mostly useful for debugging, diagnostics and tuning.
+ * The function makes blocking calls to printf() and may moderately disturb IRQ processing due to critical sections.
  */
 void printStatusInfo();
 
