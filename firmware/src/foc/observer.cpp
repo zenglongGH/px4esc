@@ -83,7 +83,8 @@ math::Scalar Observer::constrainAngularPosition(Const x)
     }
 }
 
-Observer::Observer(Const field_flux,
+Observer::Observer(const ObserverParameters& parameters,
+                   Const field_flux,
                    Const stator_phase_inductance_direct,
                    Const stator_phase_inductance_quadrature,
                    Const stator_phase_resistance) :
@@ -94,26 +95,15 @@ Observer::Observer(Const field_flux,
     r_(stator_phase_resistance),
 
     // Filter constants
-    cross_coupling_comp_(g_param_cross_coupling_compensation.get()),
-
+    cross_coupling_comp_(parameters.cross_coupling_compensation),
+    Q_(parameters.Q),
+    R_(parameters.R),
     C_(makeMatrix(makeRow(1, 0, 0, 0),
                   makeRow(0, 1, 0, 0))),
 
-    Q_(makeDiagonalMatrix(g_param_Q_11.get(),
-                          g_param_Q_22.get(),
-                          g_param_Q_33.get(),
-                          g_param_Q_44.get())),
-
-    R_(makeDiagonalMatrix(g_param_R_11.get(),
-                          g_param_R_22.get())),
-
     // Filter state
     x_(decltype(x_)::Zero()),
-
-    P_(makeDiagonalMatrix(g_param_P0_11.get(),
-                          g_param_P0_22.get(),
-                          g_param_P0_33.get(),
-                          g_param_P0_44.get()))
+    P_(parameters.P0)
 {
     assert(std::isfinite(phi_));
     assert(std::isfinite(ld_));

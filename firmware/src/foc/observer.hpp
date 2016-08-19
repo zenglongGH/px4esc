@@ -40,6 +40,34 @@
 namespace foc
 {
 /**
+ * Observer constants that are invariant to the motor model.
+ * Model of the motor is defined separately.
+ * All parameters here are set to reasonable default values.
+ */
+struct ObserverParameters
+{
+    math::DiagonalMatrix<4> Q  = math::makeDiagonalMatrix(100.0F,
+                                                          100.0F,
+                                                          5000.0F,
+                                                          5.0F);
+
+    math::DiagonalMatrix<2> R  = math::makeDiagonalMatrix(2.0F,
+                                                          2.0F);
+
+    math::DiagonalMatrix<4> P0 = math::makeDiagonalMatrix(100.0F,
+                                                          100.0F,
+                                                          5000.0F,
+                                                          5000.0F);
+
+    math::Scalar cross_coupling_compensation = 0.5F;
+
+    auto toString() const
+    {
+        return "<NOT IMPLEMENTED>";
+    }
+};
+
+/**
  * Dmitry's ingenious observer.
  * Refer to the Simulink model for derivations.
  * All units are SI units (Weber, Henry, Ohm, Volt, Second, Radian).
@@ -50,14 +78,16 @@ class Observer
     math::Const ld_;
     math::Const lq_;
     math::Const r_;
-    math::Const cross_coupling_comp_;
-
-    const math::Matrix<2, 4> C_;
-    const math::Matrix<4, 4> Q_;
-    const math::Matrix<2, 2> R_;
 
     static constexpr unsigned StateIndexAngularVelocity = 2;
     static constexpr unsigned StateIndexAngularPosition = 3;
+
+    math::Const cross_coupling_comp_;
+
+    const math::Matrix<4, 4> Q_;
+    const math::Matrix<2, 2> R_;
+
+    const math::Matrix<2, 4> C_;
 
     // Filter states
     math::Vector<4> x_;
@@ -66,7 +96,8 @@ class Observer
     static math::Scalar constrainAngularPosition(math::Const x);
 
 public:
-    Observer(math::Const field_flux,
+    Observer(const ObserverParameters& parameters,
+             math::Const field_flux,
              math::Const stator_phase_inductance_direct,
              math::Const stator_phase_inductance_quadrature,
              math::Const stator_phase_resistance);
