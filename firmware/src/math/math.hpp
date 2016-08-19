@@ -49,6 +49,9 @@ using Const = const Scalar;
 template <int Rows, int Cols>
 using Matrix = Eigen::Matrix<Scalar, Rows, Cols>;
 
+template <int Rows>
+using DiagonalMatrix = Eigen::DiagonalMatrix<Scalar, Rows>;
+
 template <int Size>
 using Vector = Matrix<Size, 1>;
 
@@ -167,20 +170,20 @@ inline void fillMatrix(Eigen::Matrix<Scalar, Rows, Columns>& matrix,
 }
 
 template <typename Scalar, int DiagonalSize>
-inline void fillDiagonalMatrix(Eigen::Matrix<Scalar, DiagonalSize, DiagonalSize>& matrix,
+inline void fillDiagonalMatrix(Eigen::DiagonalMatrix<Scalar, DiagonalSize>& matrix,
                                int next_position,
                                Scalar head)
 {
-    matrix(next_position, next_position) = static_cast<Scalar>(head);
+    matrix.diagonal()[next_position] = static_cast<Scalar>(head);
 }
 
 template <typename Scalar, int DiagonalSize, typename... Tail>
-inline void fillDiagonalMatrix(Eigen::Matrix<Scalar, DiagonalSize, DiagonalSize>& matrix,
+inline void fillDiagonalMatrix(Eigen::DiagonalMatrix<Scalar, DiagonalSize>& matrix,
                                int next_position,
                                Scalar head,
                                Tail... tail)
 {
-    matrix(next_position, next_position) = static_cast<Scalar>(head);
+    matrix.diagonal()[next_position] = static_cast<Scalar>(head);
     fillDiagonalMatrix<Scalar, DiagonalSize>(matrix, next_position + 1, tail...);
 }
 
@@ -227,10 +230,10 @@ makeMatrix(const impl_::RowVector<Scalar, Columns>& head,
  * Scalar type can be overriden.
  */
 template <typename Scalar = Scalar, typename... Diagonal>
-inline Eigen::Matrix<Scalar, sizeof...(Diagonal), sizeof...(Diagonal)>
+inline Eigen::DiagonalMatrix<Scalar, sizeof...(Diagonal)>
 makeDiagonalMatrix(Diagonal... diag)
 {
-    Eigen::Matrix<Scalar, sizeof...(Diagonal), sizeof...(Diagonal)> matrix;
+    Eigen::DiagonalMatrix<Scalar, sizeof...(Diagonal)> matrix;
     matrix.setZero();
     impl_::fillDiagonalMatrix<Scalar, sizeof...(Diagonal)>(matrix, 0, diag...);
     return matrix;
