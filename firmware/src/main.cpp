@@ -148,11 +148,6 @@ os::watchdog::Timer init()
     }
 
     /*
-     * CLI initialization
-     */
-    cli::init(&onRebootRequested);
-
-    /*
      * Motor initialization
      */
     // This is only for testing purposes, will be removed later
@@ -165,6 +160,11 @@ os::watchdog::Timer init()
     }
 
     os::lowsyslog("Main: Motor driver status:\n%s\n", board::motor::getStatus().toString().c_str());
+
+    /*
+     * CLI initialization
+     */
+    cli::init(&onRebootRequested);
 
     /*
      * UAVCAN node initialization
@@ -203,12 +203,19 @@ namespace motor
 
 math::Vector<2> g_phase_currents;
 
-extern void handleSampleIRQ(const math::Vector<2>& phase_currents_ab,
-                            const float inverter_voltage)
+extern void handleMainIRQ(const float period,
+                          const math::Vector<2>& phase_currents_ab,
+                          const float inverter_voltage)
 {
+    (void)period;
     (void)inverter_voltage;
 
     g_phase_currents = phase_currents_ab;
+}
+
+extern void handleFastIRQ(const float period)
+{
+    (void)period;
 }
 
 }

@@ -152,12 +152,26 @@ struct Status
 Status getStatus();
 
 /**
- * This function is invoked from the IRQ context when new measurements become available.
- * It must be defined elsewhere.
- * All units are SI units.
+ * This external handler is invoked from the SECOND HIGHEST PRIORITY IRQ context shortly after the middle of every
+ * N-th PWM period. The N is defined by the driver. This handler is preemptible by the fast IRQ only.
+ *
+ * @param period                        Equals N * @ref getPWMPeriod(), in seconds.
+ * @param phase_currents_ab             Instant currents of phases A and B, in Amperes.
+ * @param inverter_voltage              Low-pass filtered VBUS voltage of the inverter, in Volts.
  */
-extern void handleSampleIRQ(const math::Vector<2>& phase_currents_ab,
-                            const float inverter_voltage);
+extern void handleMainIRQ(const float period,
+                          const math::Vector<2>& phase_currents_ab,
+                          const float inverter_voltage);
+
+/**
+ * This external handler is invoked from the HIGHEST PRIORITY IRQ context at some fixed point of each PWM period.
+ * The point is chosen in such a way as to make sure that the freshly computed PWM values will be applied on the very
+ * next PWM period, without any additional latency.
+ * This IRQ preempts every other process and IRQ handler in the system.
+ *
+ * @param period                        Equals @ref getPWMPeriod(), in seconds.
+ */
+extern void handleFastIRQ(const float period);
 
 /**
  * This critical section disables ALL maskable IRQ, including the motor control ones.
