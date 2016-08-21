@@ -147,6 +147,8 @@ os::watchdog::Timer init()
         os::lowsyslog("Main: Bootloader struct is NOT present\n");
     }
 
+    os::lowsyslog("Main: Priority grouping: %02x\n", unsigned(NVIC_GetPriorityGrouping()));
+
     /*
      * Motor initialization
      */
@@ -211,6 +213,11 @@ extern void handleMainIRQ(const float period,
     (void)inverter_voltage;
 
     g_phase_currents = phase_currents_ab;
+
+    for (int i = 0; i < 3000; i++)
+    {
+        asm volatile ("nop");
+    }
 }
 
 extern void handleFastIRQ(const float period)

@@ -518,7 +518,7 @@ void initADC()
         nvicEnableVector(ADC_IRQn, MainIRQPriority);
         // Once the IRQ is configured, disable it back, because not everything is ready to handle the IRQ yet.
         // The IRQ will be normally enabled from the Fast IRQ handler.
-        nvicDisableVector(ADC_IRQn);
+        NVIC_DisableIRQ(ADC_IRQn);
     }
 
     /*
