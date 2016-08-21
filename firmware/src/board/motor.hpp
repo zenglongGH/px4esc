@@ -42,6 +42,7 @@ namespace board
 {
 /**
  * This namespace contains API to the motor control hardware - PWM, ADC, Driver IC, etc.
+ * All functions except init() may be invoked from IRQ context.
  */
 namespace motor
 {
@@ -68,9 +69,15 @@ bool isActive();
  * This function can be invoked to perform zero offset calibration.
  * It must be guaranteed that during such calibration the motor is NOT spinning,
  * and that no other component will be using the driver while the calibration is in progress.
- * @param duration      Duration of the calibration process, in seconds
+ * The driver activity state will be restored upon completion of the calibration process.
+ * See also @ref isCalibrationInProgress().
  */
-void calibrate(const float duration);
+void beginCalibration();
+
+/**
+ * Always returns false unless @ref beginCalibration() was invoked recently.
+ */
+bool isCalibrationInProgress();
 
 /**
  * Meaningful results guaranteed only after initialization.

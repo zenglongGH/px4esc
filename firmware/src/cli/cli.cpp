@@ -45,6 +45,7 @@
 #include <foc/svm.hpp>
 
 #include <cstdlib>
+#include <unistd.h>
 
 
 namespace cli
@@ -203,11 +204,14 @@ class CalibrateCommand : public os::shell::ICommandHandler
 {
     const char* getName() const override { return "calibrate"; }
 
-    void execute(os::shell::BaseChannelWrapper& ios, int argc, char** argv) override
+    void execute(os::shell::BaseChannelWrapper& ios, int, char**) override
     {
-        const float duration = (argc > 1) ? float(std::atof(argv[1])) : 1.0F;
+        board::motor::beginCalibration();
 
-        board::motor::calibrate(duration);
+        while (board::motor::isCalibrationInProgress())
+        {
+            ::sleep(1);
+        }
 
         const auto status = board::motor::getStatus();
         ios.print("Current zero offsets: %.3f, %.3f\n",

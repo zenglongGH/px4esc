@@ -54,6 +54,8 @@ constexpr unsigned ADCIRQPriority = 0;
 
 constexpr float TemperatureInnovationWeight = 0.01F;
 
+constexpr float CalibrationDuration = 1.0F;
+
 static_assert(ADCIRQPriority < CORTEX_PRIORITY_SVCALL, "Sensor IRQ must be able to preempt the RTOS");
 
 /*
@@ -109,36 +111,53 @@ volatile bool g_is_active = false;
 
 /**
  * This is used for current zero offset calibration.
- * We can't use math::Vector<> here becasuse we need volatile specification.
+ * It is instantiated from @ref beginCalibration(), which may be invoked from IRQ context,
+ * and destroyed in the local IRQ handler.
  */
-class CurrentZeroOffsetAverager
+class Calibrator
 {
-    volatile float accumulator_ab_[2] = { 0, 0 };
-    volatile unsigned num_samples_ = 0;
+    math::Vector<2> phase_current_adc_voltages_accumulator_ = {0.0F, 0.0F};
+    unsigned num_samples_collected_ = 0;
+
+    const unsigned num_samples_needed_;
+
+    const bool original_driver_state_ = isActive();
 
 public:
-    void add(const math::Vector<2>& value) volatile
+    Calibrator(unsigned num_samples_required) :
+        num_samples_needed_(num_samples_required)
     {
-        accumulator_ab_[0] += value[0];
-        accumulator_ab_[1] += value[1];
-        num_samples_++;
+        setActive(false);
+        palWritePad(GPIOA, GPIOA_EN_GATE, true);
     }
 
-    math::Vector<2> getAverage() const volatile
+    ~Calibrator()
     {
-        math::Vector<2> out = math::Vector<2>::Zero();
-        if (num_samples_ > 0)
+        setActive(original_driver_state_);
+    }
+
+    void addSample(const math::Vector<2>& phase_current_adc_voltages)
+    {
+        phase_current_adc_voltages_accumulator_ += phase_current_adc_voltages;
+        num_samples_collected_++;
+    }
+
+    bool isComplete() const { return num_samples_collected_ >= num_samples_needed_; }
+
+    math::Vector<2> getPhaseCurrentZeroOffset() const
+    {
+        if (num_samples_collected_ > 0)
         {
-            out[0] = accumulator_ab_[0] / float(num_samples_);
-            out[1] = accumulator_ab_[1] / float(num_samples_);
+            return phase_current_adc_voltages_accumulator_ / float(num_samples_collected_);
         }
-        return out;
+        else
+        {
+            return math::Vector<2>::Zero();
+        }
     }
-
-    unsigned getNumSamples() const volatile { return num_samples_; }
 };
 
-volatile CurrentZeroOffsetAverager* volatile g_phase_current_zero_offset_averager = nullptr;
+Calibrator* volatile g_calibrator = nullptr;
 
 /**
  * This class holds parameters specific to the board we're running on.
@@ -618,36 +637,31 @@ bool isActive()
     return g_is_active;
 }
 
-void calibrate(const float duration)
+void beginCalibration()
 {
-    static chibios_rt::Mutex mutex;
-    os::MutexLocker mutex_locker(mutex);
-
-    struct TovarischVladimirIlyich
+    /*
+     * There is no race condition here. The pointer to the calibrator instance can be only cleared to nullptr
+     * from the IRQ, so if it was already zeroed at the moment of this check, it is guaranteed to stay this way
+     * until we assigned it again later in this function.
+     */
+    if (g_calibrator != nullptr)
     {
-        const bool original_state = isActive();
-        TovarischVladimirIlyich()  { setActive(false); }
-        ~TovarischVladimirIlyich() { setActive(original_state); }
-    } const volatile raii_guard;
-
-    // Enabling the gate output and waiting a few milliseconds for everything to stabilize
-    palWritePad(GPIOA, GPIOA_EN_GATE, true);
-    ::usleep(10000);
-
-    volatile CurrentZeroOffsetAverager averager;
-    g_phase_current_zero_offset_averager = &averager;
-
-    const unsigned num_samples_needed = unsigned(math::Range<>(0.1F, 10.0F).constrain(duration) / g_pwm_period + 0.5F);
-    assert(num_samples_needed > 0);
-
-    while (averager.getNumSamples() < num_samples_needed)
-    {
-        ::usleep(10000);
+        return;         // Already in progress, or just finished - exiting
     }
 
-    g_phase_current_zero_offset_averager = nullptr;
+    __DMB();            // Preventing memory access reordering relative to the previous check
+    __DSB();
 
-    g_phase_current_zero_offset = averager.getAverage();
+    const unsigned num_samples_needed = std::max(1000U, unsigned(CalibrationDuration / g_pwm_period + 0.5F));
+
+    alignas(16) static std::uint8_t storage[sizeof(Calibrator)];
+
+    g_calibrator = new (&storage[0]) Calibrator(num_samples_needed);
+}
+
+bool isCalibrationInProgress()
+{
+    return g_calibrator != nullptr;
 }
 
 float getPWMPeriod()
@@ -768,9 +782,17 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
 
     if (!g_is_active)
     {
-        if (g_phase_current_zero_offset_averager != nullptr)
+        if (g_calibrator != nullptr)
         {
-            g_phase_current_zero_offset_averager->add(phase_currents_adc_voltages);
+            g_calibrator->addSample(phase_currents_adc_voltages);
+
+            if (g_calibrator->isComplete())
+            {
+                g_phase_current_zero_offset = g_calibrator->getPhaseCurrentZeroOffset();
+
+                g_calibrator->~Calibrator();
+                g_calibrator = nullptr;
+            }
         }
     }
 
