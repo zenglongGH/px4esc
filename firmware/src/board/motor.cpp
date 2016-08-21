@@ -515,10 +515,8 @@ void initADC()
         AbsoluteCriticalSectionLocker locker;
         nvicClearPending(ADC_IRQn);
         nvicEnableVector(ADC_IRQn, MainIRQPriority);
-        /*
-         * TODO: If the IRQ is not disabled back here, the firmware hardfaults somewhere.
-         *       This workaround doesn't really break anything, but its causes must be investigated.
-         */
+        // Once the IRQ is configured, disable it back, because not everything is ready to handle the IRQ yet.
+        // The IRQ will be normally enabled from the Fast IRQ handler.
         nvicDisableVector(ADC_IRQn);
     }
 
@@ -797,6 +795,14 @@ Status getStatus()
  */
 extern "C"
 {
+
+#ifndef NDEBUG
+/// This is used to check DMA logic in debug builds.
+/// Note that we're not checking the inverter voltage DMA channel, because it works asynchronously (see constants).
+constexpr unsigned DMATransferCompleteMask = DMA_LISR_TCIF1 | DMA_LISR_TCIF2;
+#endif
+
+
 /// MAIN IRQ (every N-th PWM period, ASAP after the ADC samples are ready)
 CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
 {
@@ -808,11 +814,7 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
      * By the time we get here, the DMA controller should have completed all transfers.
      * Making sure this assumption is true.
      */
-#ifndef NDEBUG
-    constexpr unsigned DMATransferCompleteMask = DMA_LISR_TCIF0 | DMA_LISR_TCIF1 | DMA_LISR_TCIF2;
     assert((DMA2->LISR & DMATransferCompleteMask) == DMATransferCompleteMask);
-    DMA2->LIFCR = DMATransferCompleteMask;
-#endif
 
     /*
      * Processing the samples and invoking the application handler.
@@ -936,6 +938,11 @@ CH_FAST_IRQ_HANDLER(STM32_TIM8_CC_HANDLER)
         __DMB();
         __DSB();
         NVIC_EnableIRQ(ADC_IRQn);
+
+        // Runtime checks. See the main handler for the counterparts.
+#ifndef NDEBUG
+        DMA2->LIFCR = DMATransferCompleteMask;  // Complete flags must be set by the time we get into the ADC handler
+#endif
     }
 
     /*
