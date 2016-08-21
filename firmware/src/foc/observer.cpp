@@ -40,21 +40,6 @@ namespace foc
 namespace
 {
 
-os::config::Param<float> g_param_cross_coupling_compensation("foc.obs.cc_comp", 0.5F, 0.0F, 10.0F);
-
-os::config::Param<float> g_param_Q_11("foc.obs.q_11",      100.0F,  1e-6F,  1e+6F);
-os::config::Param<float> g_param_Q_22("foc.obs.q_22",      100.0F,  1e-6F,  1e+6F);
-os::config::Param<float> g_param_Q_33("foc.obs.q_33",     5000.0F,  1e-6F,  1e+6F);
-os::config::Param<float> g_param_Q_44("foc.obs.q_44",        5.0F,  1e-6F,  1e+6F);
-
-os::config::Param<float> g_param_R_11("foc.obs.r_11",        2.0F,  1e-6F,  1e+6F);
-os::config::Param<float> g_param_R_22("foc.obs.r_22",        2.0F,  1e-6F,  1e+6F);
-
-os::config::Param<float> g_param_P0_11("foc.obs.p0_11",      0.1F,  1e-6F,  1e+6F);
-os::config::Param<float> g_param_P0_22("foc.obs.p0_22",      0.1F,  1e-6F,  1e+6F);
-os::config::Param<float> g_param_P0_33("foc.obs.p0_33",      0.1F,  1e-6F,  1e+6F);
-os::config::Param<float> g_param_P0_44("foc.obs.p0_44",      0.1F,  1e-6F,  1e+6F);
-
 } // namespace
 
 using math::makeMatrix;
