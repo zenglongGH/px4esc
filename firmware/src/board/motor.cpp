@@ -66,7 +66,8 @@ constexpr unsigned MainIRQPriority = 1;
 
 constexpr float MainIRQPreferredPeriod = 150e-6F;
 
-constexpr float TemperatureInnovationWeight = 0.01F;
+constexpr float InverterVoltageInnovationWeight = 0.1F;         ///< Has to account for possible aliasing effect
+constexpr float TemperatureInnovationWeight     = 0.001F;       ///< The input is noisy, high damping is necessary
 
 constexpr float CalibrationDuration = 1.0F;
 
@@ -116,11 +117,11 @@ float g_main_irq_period;
 
 unsigned g_fast_irq_to_main_irq_period_ratio;
 
-/// Sometimes referred to as VBAT
-volatile float g_inverter_voltage;
+/// Sometimes referred to as VBAT (ideally it should be volatile)
+float g_inverter_voltage;
 
-/// Raw output voltage of the temperature sensor (not converted to Kelvin)
-volatile float g_inverter_temperature_sensor_voltage;
+/// Raw output voltage of the temperature sensor (not converted to Kelvin) (ideally it should be volatile)
+float g_inverter_temperature_sensor_voltage;
 
 /// True ADC zero offset on the current channels.
 math::Vector<2> g_phase_current_zero_offset = math::Vector<2>::Ones() * (ADCReferenceVoltage / 2.0F);
@@ -833,12 +834,10 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
         math::Vector<2>::Zero();
 
     {
-        const float new_inverter_voltage =
-            g_board_features.convertADCVoltageToInverterVoltage(
-                convertADCSamplesToVoltage(g_dma_buffer_inverter_voltage));
+        const float new_inverter_voltage = g_board_features.convertADCVoltageToInverterVoltage(
+            convertADCSamplesToVoltage(g_dma_buffer_inverter_voltage));
 
-        // Basic low-pass filter
-        g_inverter_voltage = (g_inverter_voltage + new_inverter_voltage) / 2.0F;
+        g_inverter_voltage += InverterVoltageInnovationWeight * (new_inverter_voltage - g_inverter_voltage);
     }
 
     handleMainIRQ(g_main_irq_period, phase_currents, g_inverter_voltage);
@@ -873,7 +872,6 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
     }
 
     ADC1->SR = 0;               // Reset the IRQ flags
-
     NVIC_DisableIRQ(ADC_IRQn);  // Disabling until the next Main IRQ
 
     checkInvariants();
@@ -932,11 +930,7 @@ CH_FAST_IRQ_HANDLER(STM32_TIM8_CC_HANDLER)
 
         // When the next conversion is finished, the IRQ will be triggered, then its handler will disable it again.
         ADC1->SR = 0;
-        __DMB();
-        __DSB();
         NVIC_ClearPendingIRQ(ADC_IRQn);
-        __DMB();
-        __DSB();
         NVIC_EnableIRQ(ADC_IRQn);
 
         // Runtime checks. See the main handler for the counterparts.
