@@ -60,13 +60,12 @@ namespace foc
  *
  * So the third component, if present, should be ignored.
  */
-inline math::Vector<2> performClarkeTransform(math::Const a,
-                                              math::Const b)
+inline math::Vector<2> performClarkeTransform(const math::Vector<2>& ab)
 {
     constexpr auto SquareRootOf3 = math::Scalar(1.7320508075688772);
 
-    math::Const alpha = a;
-    math::Const beta = (a + b * 2.0F) / SquareRootOf3;
+    math::Const alpha = ab[0];
+    math::Const beta = (ab[0] + ab[1] * 2.0F) / SquareRootOf3;
 
     return { alpha, beta };
 }

@@ -93,17 +93,16 @@ struct Context
 {
     Observer observer;
 
-    Scalar angular_velocity = 0;                        ///< Radian per second
+    Scalar angular_velocity = 0;                        ///< Radian per second, read in the fast IRQ
     Scalar angular_position = 0;                        ///< Radians [0, Pi*2]; extrapolated in the fast IRQ
 
-    PIController pid_Id;
-    PIController pid_Iq;
+    PIController pid_Id;                                ///< Used only in the fast IRQ
+    PIController pid_Iq;                                ///< Used only in the fast IRQ
 
     Vector<2> estimated_Idq = Vector<2>::Zero();        ///< Ampere, updated from the fast IRQ
-    Scalar reference_Iq = 0;                            ///< Ampere
+    Vector<2> reference_Udq = Vector<2>::Zero();        ///< Volt, updated from the fast IRQ
 
-    Vector<3> pwm_setpoint = Vector<3>::Zero();         ///< Updated from the fast IRQ
-    std::uint_fast8_t sector_index = 0;                 ///< Updated from the fast IRQ
+    Scalar reference_Iq = 0;                            ///< Ampere, read in the fast IRQ
 
     Context(const ObserverParameters& observer_params,
             math::Const field_flux,
@@ -298,10 +297,6 @@ void handleFastIRQ(Const period,
 {
     const auto state = g_state;                 // Avoiding excessive volatile reads
 
-    (void)period;
-    (void)phase_currents_ab;
-    (void)inverter_voltage;
-
     /*
      * In normal operating mode, we're using this IRQ to do the following:
      *  - Idq estimation
@@ -312,7 +307,45 @@ void handleFastIRQ(Const period,
     if (state == State::Running ||
         state == State::Spinup)
     {
-        assert(g_context != nullptr);
+        /*
+         * Computing Idq, Udq
+         */
+        Const angle_sine   = math::sin(g_context->angular_position);
+        Const angle_cosine = math::cos(g_context->angular_position);
+
+        const auto estimated_I_alpha_beta = performClarkeTransform(phase_currents_ab);
+
+        g_context->estimated_Idq = performParkTransform(estimated_I_alpha_beta, angle_sine, angle_cosine);
+
+        /*
+         * Running PIDs, estimating reference voltage in the rotating reference frame
+         */
+        g_context->reference_Udq[0] = g_context->pid_Id.update(0.0F,
+                                                               g_context->estimated_Idq[0], period);
+
+        g_context->reference_Udq[1] = g_context->pid_Iq.update(g_context->reference_Iq,
+                                                               g_context->estimated_Idq[1], period);
+
+        /*
+         * Transforming back to the stationary reference frame, updating the PWM outputs
+         * TODO: Dead time compensation
+         */
+        const auto reference_U_alpha_beta = performInverseParkTransform(g_context->reference_Udq,
+                                                                        angle_sine, angle_cosine);
+
+        const auto phase_voltages_and_sector_number = performSpaceVectorTransform(reference_U_alpha_beta);
+        // Sector number is not used
+
+        const auto pwm_setpoint = normalizePhaseVoltagesToPWMSetpoint(phase_voltages_and_sector_number.first,
+                                                                      inverter_voltage);
+
+        board::motor::setPWM(pwm_setpoint);
+
+        /*
+         * Position extrapolation
+         */
+        g_context->angular_position =
+            constrainAngularPosition(g_context->angular_position + g_context->angular_velocity * period);
     }
 
     /*
