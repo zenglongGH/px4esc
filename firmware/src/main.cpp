@@ -205,7 +205,7 @@ os::watchdog::Timer init()
     foc::MotorParameters motor_params;
     motor_params.start_current = 2.0F;
     motor_params.max_current = 10.0F;
-    motor_params.max_voltage = 15.0F;
+    motor_params.max_voltage = 2.0F;                    // Testing...
     motor_params.field_flux = 0.001125161011F;
     motor_params.r_ab = 0.28F;
     motor_params.l_ab = 0.000083340F;

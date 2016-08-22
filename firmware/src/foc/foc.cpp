@@ -91,6 +91,9 @@ struct ErrorCounter
 
 struct Context
 {
+    const math::Range<> motor_voltage_limit;
+    const math::Range<> motor_current_limit;
+
     Observer observer;
 
     Scalar angular_velocity = 0;                        ///< Radian per second, read in the fast IRQ
@@ -109,8 +112,12 @@ struct Context
             math::Const stator_phase_inductance_direct,
             math::Const stator_phase_inductance_quadrature,
             math::Const stator_phase_resistance,
+            math::Const max_voltage,
+            math::Const max_current,
             const PIControllerSettings& pid_settings_Id,
             const PIControllerSettings& pid_settings_Iq) :
+        motor_voltage_limit(-max_voltage, max_voltage),
+        motor_current_limit(-max_current, max_current),
         observer(observer_params,
                  field_flux,
                  stator_phase_inductance_direct,
@@ -289,6 +296,8 @@ void handleMainIRQ(Const period)
     /*
      * It is guaranteed by the driver that the main IRQ is always invoked immediately after the fast IRQ
      * of the same period. This guarantees that the context struct contains the most recent data.
+     * The Spinup/Running case must be processed first, because synchronization with the fast IRQ is important,
+     * and because we care about latency.
      */
     if (g_state == State::Running ||
         g_state == State::Spinup)
@@ -318,6 +327,7 @@ void handleMainIRQ(Const period)
         g_context->angular_position = constrainAngularPosition(g_context->observer.getAngularPosition() + angle_slip);
     }
 }
+
 
 void handleFastIRQ(Const period,
                    const math::Vector<2>& phase_currents_ab,
@@ -358,8 +368,14 @@ void handleFastIRQ(Const period,
          * Transforming back to the stationary reference frame, updating the PWM outputs
          * TODO: Dead time compensation
          */
-        const auto reference_U_alpha_beta = performInverseParkTransform(g_context->reference_Udq,
-                                                                        angle_sine, angle_cosine);
+        auto reference_U_alpha_beta = performInverseParkTransform(g_context->reference_Udq,
+                                                                  angle_sine, angle_cosine);
+
+        // Voltage limiting
+        for (int i = 0; i <= 1; i++)
+        {
+            reference_U_alpha_beta[i] = g_context->motor_voltage_limit.constrain(reference_U_alpha_beta[i]);
+        }
 
         const auto phase_voltages_and_sector_number = performSpaceVectorTransform(reference_U_alpha_beta);
         // Sector number is not used
