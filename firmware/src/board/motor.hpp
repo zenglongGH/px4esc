@@ -152,26 +152,37 @@ struct Status
 Status getStatus();
 
 /**
- * This external handler is invoked from the SECOND HIGHEST PRIORITY IRQ context shortly after the middle of every
- * N-th PWM period. The N is defined by the driver. This handler is preemptible by the fast IRQ only.
+ * This external handler is invoked from the HIGHEST PRIORITY IRQ context shortly after the middle of every PWM
+ * period, as soon as the corresponding ADC measurements are processed.
+ * Steps were taken to minimize the measurement latency, so the application code can rely on that.
+ * The PWM update latency is also minimized: the freshly computed PWM values will be applied on the very next period.
+ * This IRQ preempts every other process and maskable IRQ handler in the system.
  *
- * @param period                        Equals N * @ref getPWMPeriod(), in seconds.
+ * @param period                        Equals @ref getPWMPeriod(), in seconds.
  * @param phase_currents_ab             Instant currents of phases A and B, in Amperes.
  * @param inverter_voltage              Low-pass filtered VBUS voltage of the inverter, in Volts.
  */
-extern void handleMainIRQ(const float period,
+extern void handleFastIRQ(const float period,
                           const math::Vector<2>& phase_currents_ab,
                           const float inverter_voltage);
 
 /**
- * This external handler is invoked from the HIGHEST PRIORITY IRQ context at some fixed point of each PWM period.
- * The point is chosen in such a way as to make sure that the freshly computed PWM values will be applied on the very
- * next PWM period, without any additional latency.
- * This IRQ preempts every other process and IRQ handler in the system.
+ * This external handler is invoked from the SECOND HIGHEST PRIORITY IRQ context shortly after the middle of every
+ * N-th PWM period. The N is defined by the driver. This handler is preemptible by the fast IRQ only.
+ * When the fast IRQ and the main IRQ are triggered at the same PWM period, the fast IRQ is executed shortly
+ * after the middle of the period (see the fast IRQ docs for explanation), and the main IRQ is invoked
+ * IMMEDIATELY AFTER THE FAST IRQ IS FINISHED. The processor core does not return to the main context between
+ * these two IRQs.
  *
- * @param period                        Equals @ref getPWMPeriod(), in seconds.
+ * Graphically, F - fast IRQ, M - main IRQ:
+ *
+ *      F       F       F       F       F       F...
+ *       MMMMMMMMMMMMMMMMMMM             MMMMMMMM...
+ *
+ * @param period                        Equals N * @ref getPWMPeriod(), in seconds.
+ * @param inverter_voltage              See fast IRQ
  */
-extern void handleFastIRQ(const float period,
+extern void handleMainIRQ(const float period,
                           const float inverter_voltage);
 
 /**

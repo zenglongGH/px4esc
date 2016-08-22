@@ -37,6 +37,7 @@
 #include <algorithm>
 #include <functional>
 #include <numeric>
+#include <cassert>
 
 
 namespace board
@@ -112,8 +113,6 @@ os::config::Param<float> g_config_pwm_dead_time_nsec            ("drv.pwm_dead_n
 float g_pwm_period;
 
 float g_dead_time;
-
-float g_main_irq_period;
 
 unsigned g_fast_irq_to_main_irq_period_ratio;
 
@@ -345,14 +344,12 @@ void initSynchronizationTimer()
     TIM8->CR2 = TIM_CR2_CCUS | TIM_CR2_CCPC;
 
     // Channel 1 triggers ADC conversions.
-    // Channel 2 triggers the Fast IRQ.
     // Mode is exactly the same as that of TIM1, except that it's inverted - we need positive-going pulse
     // at the middle of the PWM period to trigger the ADC; without inversion the pulse would be negative-going.
-    TIM8->CCMR1 = TIM_CCMR1_OC1PE | TIM_CCMR1_OC1M_0 | TIM_CCMR1_OC1M_1 | TIM_CCMR1_OC1M_2 |
-                  TIM_CCMR1_OC2PE | TIM_CCMR1_OC2M_0 | TIM_CCMR1_OC2M_1 | TIM_CCMR1_OC2M_2;
+    TIM8->CCMR1 = TIM_CCMR1_OC1PE | TIM_CCMR1_OC1M_0 | TIM_CCMR1_OC1M_1 | TIM_CCMR1_OC1M_2;
 
     // The output MUST BE enabled in order for synchronization to work!
-    TIM8->CCER = TIM_CCER_CC1E | TIM_CCER_CC2E;
+    TIM8->CCER = TIM_CCER_CC1E;
 
     // Same ARR
     TIM8->ARR = TIM1->ARR;
@@ -362,27 +359,9 @@ void initSynchronizationTimer()
     TIM8->CCR1 = TIM8->ARR - 1U;
     assert(TIM8->CCR1 < TIM8->ARR);
 
-    // The Fast IRQ should be triggered at the point that matches the following requirements:
-    //
-    //  - IRQ handler should be finished well before the next PWM update event (this ensures minimal latency of
-    //    PWM update). It should be also guaranteed that the PWM update will not happen between writes to CCR1..3,
-    //    because that would skew the PWM waveforms.
-    //
-    //  - It must be executed well before or after the ADC IRQ is triggered (explained in the comments in the handler).
-    //
-    // Since we're in CMS mode 1, it is easier to generate IRQ on the up counting stage.
-    //   /\    /
-    //  /  \  /
-    // /    \/
-    // ^ ^  ^  ^
-    // | |  PWM reload points (counter overflow and underflow)
-    // | ADC trigger point
-    // Fast IRQ trigger point
-    TIM8->CCR2 = 1U;
-    assert(TIM8->CCR2 < TIM8->ARR);
-
-    // Configuring IRQ sources
-    TIM8->DIER = TIM_DIER_CC2IE;
+    // Explicitly ensuring that IRQ are disabled. We use the TIM8 CC IRQ vector for the main IRQ handler, but we
+    // trigger it manually because it makes sense and because it's easier. Read the Fast IRQ handler for explanation.
+    TIM8->DIER = 0;
 
     // We don't care about dead time or breaks here
     TIM8->BDTR = TIM_BDTR_MOE;
@@ -412,13 +391,6 @@ void initSynchronizationTimer()
     TIM8->CCR1 = TIM8->ARR - 5U;
     palSetPadMode(GPIOC, GPIOC_RPM_PULSE_FEEDBACK, PAL_STM32_OTYPE_PUSHPULL | PAL_MODE_ALTERNATE(3));
 #endif
-
-    // Configuring IRQ
-    {
-        AbsoluteCriticalSectionLocker locker;
-        nvicClearPending(TIM8_CC_IRQn);
-        nvicEnableVector(TIM8_CC_IRQn, FastIRQPriority);
-    }
 }
 
 
@@ -510,16 +482,6 @@ void initADC()
     // Configuring injected channels
     ADC1->JSQR = TemperatureChannelIndex << 15;                 // Temperature
     ADC1->CR1 |= ADC_CR1_JAUTO;                                 // Perform automatic injected conversions after regular
-
-    // Configuring IRQ
-    {
-        AbsoluteCriticalSectionLocker locker;
-        nvicClearPending(ADC_IRQn);
-        nvicEnableVector(ADC_IRQn, MainIRQPriority);
-        // Once the IRQ is configured, disable it back, because not everything is ready to handle the IRQ yet.
-        // The IRQ will be normally enabled from the Fast IRQ handler.
-        NVIC_DisableIRQ(ADC_IRQn);
-    }
 
     /*
      * Configuring DMA - three channels.
@@ -672,15 +634,20 @@ void init()
 
     g_fast_irq_to_main_irq_period_ratio = unsigned(MainIRQPreferredPeriod / g_pwm_period + 0.5F);
 
-    g_main_irq_period = float(double(g_pwm_period) * double(g_fast_irq_to_main_irq_period_ratio));
-
     initADC();
 
     initSynchronizationTimer();
 
+    // Configuring IRQ
+    {
+        AbsoluteCriticalSectionLocker locker;
+        nvicEnableVector(ADC_IRQn,     FastIRQPriority);        // Triggered by hardware
+        nvicEnableVector(TIM8_CC_IRQn, MainIRQPriority);        // Triggered by software
+    }
+
     os::lowsyslog("Motor HW Driver: Fast IRQ period: %.1f us, Main IRQ period: %.1f us, ratio %u\n",
                   double(g_pwm_period) * 1e6,
-                  double(g_main_irq_period) * 1e6,
+                  double(g_pwm_period) * double(g_fast_irq_to_main_irq_period_ratio) * 1e6,
                   g_fast_irq_to_main_irq_period_ratio);
 }
 
@@ -717,7 +684,7 @@ void beginCalibration()
     __DMB();            // Preventing memory access reordering relative to the previous check
     __DSB();
 
-    const unsigned num_samples_needed = std::max(1000U, unsigned(CalibrationDuration / g_main_irq_period + 0.5F));
+    const unsigned num_samples_needed = std::max(1000U, unsigned(CalibrationDuration / g_pwm_period + 0.5F));
 
     alignas(16) static std::uint8_t storage[sizeof(Calibrator)];
 
@@ -797,25 +764,23 @@ Status getStatus()
 extern "C"
 {
 
-#ifndef NDEBUG
-/// This is used to check DMA logic in debug builds.
-/// Note that we're not checking the inverter voltage DMA channel, because it works asynchronously (see constants).
-constexpr unsigned DMATransferCompleteMask = DMA_LISR_TCIF1 | DMA_LISR_TCIF2;
-#endif
-
-
-/// MAIN IRQ (every N-th PWM period, ASAP after the ADC samples are ready)
+/// FAST IRQ (every PWM period, ASAP after ADC measurements are finished)
 CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
 {
     using namespace board::motor;
 
-    board::RAIIToggler<board::setTestPointA> tp_toggler;
+    board::RAIIToggler<board::setTestPointB> tp_toggler;
 
     /*
      * By the time we get here, the DMA controller should have completed all transfers.
      * Making sure this assumption is true.
+     * Note that we're not checking the inverter voltage DMA channel, because it works asynchronously (see constants).
      */
+#ifndef NDEBUG
+    constexpr unsigned DMATransferCompleteMask = DMA_LISR_TCIF1 | DMA_LISR_TCIF2;
     assert((DMA2->LISR & DMATransferCompleteMask) == DMATransferCompleteMask);
+    DMA2->LIFCR = DMATransferCompleteMask;  // Complete flags must be set by the time we get into the ADC handler
+#endif
 
     /*
      * Processing the samples and invoking the application handler.
@@ -840,10 +805,12 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
         g_inverter_voltage += InverterVoltageInnovationWeight * (new_inverter_voltage - g_inverter_voltage);
     }
 
-    handleMainIRQ(g_main_irq_period, phase_currents, g_inverter_voltage);
+    handleFastIRQ(g_pwm_period,
+                  phase_currents,
+                  g_inverter_voltage);
 
     /*
-     * Performing less time-critical tasks after the application's handler has been executed.
+     * Current AGC, calibration, that kind of stuff goes here because it's not very time-critical.
      */
     g_board_features.adjustCurrentGain(phase_currents);
 
@@ -863,89 +830,60 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
         }
     }
 
-    // Temperature processing (injected conversion should be finished by this time; even if not, it's also fine)
-    {
-        const std::uint16_t temperature_sample[1] = { std::uint16_t(ADC1->JDR1) };
-        const float new_temperature = convertADCSamplesToVoltage(temperature_sample);
-        g_inverter_temperature_sensor_voltage +=
-            TemperatureInnovationWeight * (new_temperature - g_inverter_temperature_sensor_voltage);
-    }
-
-    ADC1->SR = 0;               // Reset the IRQ flags
-    NVIC_DisableIRQ(ADC_IRQn);  // Disabling until the next Main IRQ
-
-    checkInvariants();
-}
-
-/// FAST IRQ (every PWM period)
-CH_FAST_IRQ_HANDLER(STM32_TIM8_CC_HANDLER)
-{
-    using namespace board::motor;
-
-    board::RAIIToggler<board::setTestPointB> tp_toggler;
-
     /*
      * Triggering the main IRQ when necessary.
      *
-     * WARNING: It is crucial that this block is executed either ALWAYS BEFORE or ALWAYS AFTER the
-     * moment when the ADC IRQ is triggered. If it's alternating, we may get an off-by-one ratio error.
-     * Consider this (not to scale) (F - fast IRQ, M - main IRQ):
+     * We want the main IRQ to begin ASAP after the fast IRQ processing is completed, for the following reasons:
      *
-     *  F       F       F       F       F       F       F...
-     *  MMMMMMMMMMMMMMMMMMMMMMMMMM              MMMMMMMMM...
+     *  - This provides the main IRQ more time before the next fast IRQ begins, which is very important if the
+     *    two IRQ processes share the same data: larger delay will guarantee that the main IRQ handler has enough
+     *    time to make a local copy of all shared data items without the need to delay the fast IRQ with critical
+     *    sections.
      *
-     *                                          ^ BUG HERE
+     *  - The earlier the main IRQ begins, the earlier it will complete, which will minimize the state estimation
+     *    latency.
      *
-     * If the synchronization point is a bit off, the fast IRQ may end up undecidedly either before or after
-     * the ADC IRQ is triggered, which will randomly add or subtract one fast period between main IRQs.
-     * This is a correct solution:
-     *
-     *  F       F       F       F       F       F       F...
-     *      MMMMMMMMMMMMMMMMMMMMMMMMMM              MMMMM...
-     *
-     *                                          ^^^^ Correct, no race condition here
-     *
-     * In this case, we have plenty of time around the fast IRQ to ensure that the ADC IRQ will not be triggered
-     * while we're updating the main trigger counter.
-     *
-     * One may have an idea to implement an alternative solution in hopes to make things simpler.
-     * The alternative solutions I could think of are the following:
-     *
-     *  - Trigger both Main and Fast IRQ using a hardware timer.
-     *    This is not a solid idea, because we'll need to guarantee that the ADC IRQ will never try to access
-     *    the DMA buffers while the conversions are in progress. Essentially, same issue as here.
-     *    Besides, this will increase the latency of the ADC measurements.
-     *
-     *  - Instead of enabling the ADC IRQ, just trigger it manually via NVIC.
-     *    This approach has the same drawbacks as the previous one.
-     *
-     * In order to further limit the chances of a race condition breaking things, we need to process the triggering
-     * logic in the first order, before dispatching to the application handler.
+     * Since the main IRQ has priority that is one lower than the fast IRQ, we can trigger it in software and
+     * then simply go on about our business with the fast IRQ. Once the fast handler is finished, the core will
+     * automatially switch context to the main IRQ, without even returning to the normal code, which is efficient.
      */
     static unsigned main_irq_trigger_counter = 0;
     main_irq_trigger_counter++;
     if (main_irq_trigger_counter >= g_fast_irq_to_main_irq_period_ratio)
     {
         main_irq_trigger_counter = 0;
-
-        // When the next conversion is finished, the IRQ will be triggered, then its handler will disable it again.
-        ADC1->SR = 0;
-        NVIC_ClearPendingIRQ(ADC_IRQn);
-        NVIC_EnableIRQ(ADC_IRQn);
-
-        // Runtime checks. See the main handler for the counterparts.
-#ifndef NDEBUG
-        DMA2->LIFCR = DMATransferCompleteMask;  // Complete flags must be set by the time we get into the ADC handler
-#endif
+        // Triggering the IRQ; it will remain pending until the fast IRQ is finished.
+        NVIC_SetPendingIRQ(TIM8_CC_IRQn);
     }
 
     /*
-     * Processing the application handler.
+     * Finalizing
      */
-    handleFastIRQ(g_pwm_period,
+    ADC1->SR = 0;               // Reset the IRQ flags
+
+    checkInvariants();
+}
+
+/// MAIN IRQ (every N-th PWM period)
+CH_FAST_IRQ_HANDLER(STM32_TIM8_CC_HANDLER)
+{
+    using namespace board::motor;
+
+    board::RAIIToggler<board::setTestPointA> tp_toggler;
+
+    handleMainIRQ(g_pwm_period * float(g_fast_irq_to_main_irq_period_ratio),
                   g_inverter_voltage);
 
-    TIM8->SR = 0;               // Reset IRQ flags
+    /*
+     * Temperature processing.
+     * Injected conversions are triggered automatically, the data register always contains the most recent value.
+     */
+    {
+        const std::uint16_t temperature_sample[1] = { std::uint16_t(ADC1->JDR1) };
+        const float new_temperature = convertADCSamplesToVoltage(temperature_sample);
+        g_inverter_temperature_sensor_voltage +=
+            TemperatureInnovationWeight * (new_temperature - g_inverter_temperature_sensor_voltage);
+    }
 }
 
 }

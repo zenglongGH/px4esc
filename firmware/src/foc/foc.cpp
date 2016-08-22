@@ -93,16 +93,17 @@ struct Context
 {
     Observer observer;
 
-    Scalar angular_velocity = 0;                ///< Radian per second
-    Scalar angular_position = 0;                ///< Radians [0, Pi*2]; extrapolated in the fast IRQ
+    Scalar angular_velocity = 0;                        ///< Radian per second
+    Scalar angular_position = 0;                        ///< Radians [0, Pi*2]; extrapolated in the fast IRQ
 
     PIController pid_Id;
     PIController pid_Iq;
 
-    Vector<2> reference_Udq = {0.0F, 0.0F};     ///< Volt
-    Scalar reference_Iq = 0;                    ///< Ampere
+    Vector<2> estimated_Idq = Vector<2>::Zero();        ///< Ampere, updated from the fast IRQ
+    Scalar reference_Iq = 0;                            ///< Ampere
 
-    std::uint_fast8_t sector_index = 0;         ///< Updated from the fast IRQ
+    Vector<3> pwm_setpoint = Vector<3>::Zero();         ///< Updated from the fast IRQ
+    std::uint_fast8_t sector_index = 0;                 ///< Updated from the fast IRQ
 
     Context(const ObserverParameters& observer_params,
             math::Const field_flux,
@@ -285,43 +286,39 @@ using namespace foc;
 
 
 void handleMainIRQ(Const period,
-                   const Vector<2>& phase_currents_ab,
                    Const inverter_voltage)
 {
     (void)period;
-    (void)phase_currents_ab;
     (void)inverter_voltage;
 }
 
 void handleFastIRQ(Const period,
+                   const math::Vector<2>& phase_currents_ab,
                    Const inverter_voltage)
 {
-    if (g_state == State::Running ||
-        g_state == State::Spinup)
+    const auto state = g_state;                 // Avoiding excessive volatile reads
+
+    (void)period;
+    (void)phase_currents_ab;
+    (void)inverter_voltage;
+
+    /*
+     * In normal operating mode, we're using this IRQ to do the following:
+     *  - Idq estimation
+     *  - computation of Udq reference using PIDs
+     *  - space vector modulation of PWM outputs
+     *  - angle extrapolation between main IRQs
+     */
+    if (state == State::Running ||
+        state == State::Spinup)
     {
         assert(g_context != nullptr);
-
-        // Computing SVM
-        const auto reference_Uab = performInverseParkTransform(g_context->reference_Udq,
-                                                               math::sin(g_context->angular_position),
-                                                               math::cos(g_context->angular_position));
-
-        const auto phase_voltages_and_sector_index = performSpaceVectorTransform(reference_Uab);
-
-        const auto pwm_setpoint = normalizePhaseVoltagesToPWMSetpoint(phase_voltages_and_sector_index.first,
-                                                                      inverter_voltage);
-
-        // TODO: Dead time compensation
-        board::motor::setPWM(pwm_setpoint);
-
-        // Updating the context
-        g_context->sector_index = phase_voltages_and_sector_index.second;
-
-        g_context->angular_position =
-            constrainAngularPosition(g_context->angular_position + g_context->angular_velocity * period);
     }
 
-    if (g_state == State::Idle)
+    /*
+     * Idle state handler.
+     */
+    if (state == State::Idle)
     {
         // TODO: beeping
     }
