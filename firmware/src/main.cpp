@@ -203,9 +203,9 @@ os::watchdog::Timer init()
     os::lowsyslog("Main: Motor driver status:\n%s\n", board::motor::getStatus().toString().c_str());
 
     foc::MotorParameters motor_params;
-    motor_params.start_current = 2.0F;
-    motor_params.max_current = 10.0F;
-    motor_params.max_voltage = 2.0F;                    // Testing...
+    motor_params.start_current = 1.0F;
+    motor_params.max_current = 2.0F;
+    motor_params.max_voltage = 2.0F;
     motor_params.field_flux = 0.001125161011F;
     motor_params.r_ab = 0.28F;
     motor_params.l_ab = 0.000083340F;

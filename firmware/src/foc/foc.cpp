@@ -91,8 +91,8 @@ struct ErrorCounter
 
 struct Context
 {
-    const math::Range<> motor_voltage_limit;
     const math::Range<> motor_current_limit;
+    const math::Range<> motor_voltage_limit;
 
     Observer observer;
 
@@ -112,12 +112,12 @@ struct Context
             math::Const stator_phase_inductance_direct,
             math::Const stator_phase_inductance_quadrature,
             math::Const stator_phase_resistance,
-            math::Const max_voltage,
             math::Const max_current,
+            math::Const max_voltage,
             const PIControllerSettings& pid_settings_Id,
             const PIControllerSettings& pid_settings_Iq) :
-        motor_voltage_limit(-max_voltage, max_voltage),
         motor_current_limit(-max_current, max_current),
+        motor_voltage_limit(-max_voltage, max_voltage),
         observer(observer_params,
                  field_flux,
                  stator_phase_inductance_direct,
@@ -129,6 +129,39 @@ struct Context
 };
 
 Context* g_context = nullptr;
+
+
+void initializeContext()
+{
+    constexpr Scalar Pi2 = math::Pi * 2.0F;
+
+    Const fast_irq_period = board::motor::getPWMPeriod();
+
+    Const Rs = g_motor_params.r_ab / 2.0F;
+    Const Ld = g_motor_params.l_ab / 2.0F;
+    Const Lq = g_motor_params.l_ab / 2.0F;
+
+    // TODO: Correct PID gain computation
+    const PIControllerSettings pid_Id_settings((Pi2 * Ld) / (20.0F * fast_irq_period),
+                                               0.1F,
+                                               g_motor_params.max_current);
+
+    const PIControllerSettings pid_Iq_settings((Pi2 * Lq) / (20.0F * fast_irq_period),
+                                               0.1F,
+                                               g_motor_params.max_current);
+
+    alignas(16) static std::uint8_t context_storage[sizeof(Context)];
+
+    g_context = new (context_storage) Context(g_observer_params,
+                                              g_motor_params.field_flux,
+                                              Ld,
+                                              Lq,
+                                              Rs,
+                                              g_motor_params.max_current,
+                                              g_motor_params.max_voltage,
+                                              pid_Id_settings,
+                                              pid_Iq_settings);
+}
 
 } // namespace
 
@@ -325,6 +358,21 @@ void handleMainIRQ(Const period)
         // Angle delay compensation
         Const angle_slip = g_context->observer.getAngularVelocity() * period;
         g_context->angular_position = constrainAngularPosition(g_context->observer.getAngularPosition() + angle_slip);
+    }
+
+    if (g_state == State::Idle)
+    {
+        const bool need_to_start = !os::float_eq::closeToZero(g_setpoint);
+        if (need_to_start)
+        {
+            initializeContext();
+
+            g_context->reference_Iq = g_motor_params.start_current;
+
+            board::motor::setActive(true);
+
+            g_state = State::Spinup;
+        }
     }
 }
 
