@@ -871,8 +871,7 @@ CH_FAST_IRQ_HANDLER(STM32_TIM8_CC_HANDLER)
 
     board::RAIIToggler<board::setTestPointA> tp_toggler;
 
-    handleMainIRQ(g_pwm_period * float(g_fast_irq_to_main_irq_period_ratio),
-                  g_inverter_voltage);
+    handleMainIRQ(g_pwm_period * float(g_fast_irq_to_main_irq_period_ratio));
 
     /*
      * Temperature processing.

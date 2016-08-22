@@ -284,11 +284,39 @@ namespace motor
 using namespace foc;
 
 
-void handleMainIRQ(Const period,
-                   Const inverter_voltage)
+void handleMainIRQ(Const period)
 {
-    (void)period;
-    (void)inverter_voltage;
+    /*
+     * It is guaranteed by the driver that the main IRQ is always invoked immediately after the fast IRQ
+     * of the same period. This guarantees that the context struct contains the most recent data.
+     */
+    if (g_state == State::Running ||
+        g_state == State::Spinup)
+    {
+        /*
+         * Making a local copy of state variables ASAP, before the next fast IRQ fires.
+         */
+        const auto Idq = g_context->estimated_Idq;
+        const auto Udq = g_context->reference_Udq;
+
+        /*
+         * Running the observer, this takes forever.
+         * By the time the observer has finished, the rotor has moved some angle forward, which we compensate.
+         */
+        g_context->observer.update(period, Idq, Udq);
+
+        /*
+         * Updating the state estimate.
+         * Critical section is required because at this point we're no longer synchronized with the fast IRQ.
+         */
+        AbsoluteCriticalSectionLocker locker;
+
+        g_context->angular_velocity = g_context->observer.getAngularVelocity();
+
+        // Angle delay compensation
+        Const angle_slip = g_context->observer.getAngularVelocity() * period;
+        g_context->angular_position = constrainAngularPosition(g_context->observer.getAngularPosition() + angle_slip);
+    }
 }
 
 void handleFastIRQ(Const period,
