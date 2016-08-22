@@ -43,6 +43,7 @@
 #include "bootloader_interface/bootloader_interface.hpp"
 #include "uavcan_node/uavcan_node.hpp"
 #include "cli/cli.hpp"
+#include "foc/foc.hpp"
 
 #if __GNUC__ < 5
 # error "GCC version 5.x or newer is required"
@@ -192,8 +193,6 @@ os::watchdog::Timer init()
         os::lowsyslog("Main: Bootloader struct is NOT present\n");
     }
 
-    os::lowsyslog("Main: Priority grouping: %02x\n", unsigned(NVIC_GetPriorityGrouping()));
-
     /*
      * Motor initialization
      */
@@ -207,6 +206,21 @@ os::watchdog::Timer init()
     }
 
     os::lowsyslog("Main: Motor driver status:\n%s\n", board::motor::getStatus().toString().c_str());
+
+    foc::init();
+
+    foc::MotorParameters motor_params;
+    motor_params.start_current = 2.0F;
+    motor_params.max_current = 10.0F;
+    motor_params.max_voltage = 15.0F;
+    motor_params.field_flux = 0.001125161011F;
+    motor_params.r_ab = 0.28F;
+    motor_params.l_ab = 0.000083340F;
+    motor_params.num_poles = 14;
+
+    foc::setMotorParameters(motor_params);
+
+    foc::setObserverParameters(foc::ObserverParameters());
 
     /*
      * CLI initialization
@@ -239,38 +253,6 @@ extern void applicationHaltHook()
     board::setLEDRGB(255, 0, 0);
 }
 
-}
-
-// This is defined here for testing only
-
-namespace board
-{
-namespace motor
-{
-
-math::Vector<2> g_phase_currents;
-
-extern void handleMainIRQ(const float period,
-                          const math::Vector<2>& phase_currents_ab,
-                          const float inverter_voltage)
-{
-    (void)period;
-    (void)inverter_voltage;
-
-    g_phase_currents = phase_currents_ab;
-
-    for (int i = 0; i < 3000; i++)
-    {
-        asm volatile ("nop");
-    }
-}
-
-extern void handleFastIRQ(const float period)
-{
-    (void)period;
-}
-
-}
 }
 
 

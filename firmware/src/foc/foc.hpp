@@ -34,6 +34,7 @@
 #pragma once
 
 #include "motor_parameters.hpp"
+#include "observer.hpp"
 #include <math/math.hpp>
 #include <cstdint>
 #include <utility>
@@ -50,10 +51,19 @@ void init();
 
 /**
  * Motor parameters must be set after initialization before the motor can be started.
+ * New parameters will take effect when the motor is restarted.
  */
 void setMotorParameters(const MotorParameters& params);
 
 MotorParameters getMotorParameters();
+
+/**
+ * Observer parameters can be set after initialization. They are initialized to reasonable values by default.
+ * New parameters will take effect when the motor is restarted.
+ */
+void setObserverParameters(const ObserverParameters& params);
+
+ObserverParameters getObserverParameters();
 
 /**
  * Greater modes (listed later) allow to identify more parameters,
@@ -73,7 +83,7 @@ enum class MotorIdentificationMode
      * In order to achieve correct results, the motor MUST NOT BE CONNECTED TO ANY MECHANICAL LOAD.
      * Estimated parameters: Rab, Lab, Phi.
      */
-    DynamicNoLoad
+    RotationWithoutMechanicalLoad
 };
 
 /**
