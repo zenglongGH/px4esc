@@ -198,16 +198,9 @@ os::watchdog::Timer init()
      */
     // This is only for testing purposes, will be removed later
     board::motor::init();
-
-    board::motor::beginCalibration();
-    while (board::motor::isCalibrationInProgress())
-    {
-        ::sleep(1);
-    }
+    foc::init();
 
     os::lowsyslog("Main: Motor driver status:\n%s\n", board::motor::getStatus().toString().c_str());
-
-    foc::init();
 
     foc::MotorParameters motor_params;
     motor_params.start_current = 2.0F;

@@ -42,6 +42,7 @@
 #include <zubax_chibios/util/shell.hpp>
 #include <zubax_chibios/util/base64.hpp>
 
+#include <foc/foc.hpp>
 #include <foc/svm.hpp>
 
 #include <cstdlib>
@@ -334,6 +335,32 @@ class SpinCommand : public os::shell::ICommandHandler
 } static cmd_spin;
 
 
+class RawSetpointCommand : public os::shell::ICommandHandler
+{
+    const char* getName() const override { return "rsp"; }
+
+    void execute(os::shell::BaseChannelWrapper& ios, int argc, char** argv) override
+    {
+        if (argc <= 1)
+        {
+            foc::stop();
+
+            ios.print("Set raw setpoint in the range [-1, 1] (negative for reverse rotation).\n");
+            ios.print("Execute without arguments to stop the motor.\n");
+            ios.print("\t%s [setpoint=0]\n", argv[0]);
+            return;
+        }
+
+        using namespace std;
+        const float sp = strtof(argv[1], nullptr);
+
+        const float ttl = 30.0F;
+
+        foc::setSetpoint(foc::ControlMode::Relative, sp, ttl);
+    }
+} static cmd_raw_setpoint;
+
+
 class CLIThread : public chibios_rt::BaseStaticThread<2048>
 {
     os::shell::Shell<> shell_;
@@ -367,6 +394,7 @@ public:
         (void) shell_.addCommandHandler(&cmd_status);
         (void) shell_.addCommandHandler(&cmd_calibrate);
         (void) shell_.addCommandHandler(&cmd_spin);
+        (void) shell_.addCommandHandler(&cmd_raw_setpoint);
     }
 
     virtual ~CLIThread() { }

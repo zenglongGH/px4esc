@@ -50,24 +50,6 @@ using math::Vector;
 using math::Matrix;
 
 
-math::Scalar Observer::constrainAngularPosition(Const x)
-{
-    constexpr Const Pi2 = math::Pi * 2.0F;
-
-    if (x >= Pi2)
-    {
-        return x - Pi2;
-    }
-    else if (x < 0)
-    {
-        return x + Pi2;
-    }
-    else
-    {
-        return x;
-    }
-}
-
 Observer::Observer(const ObserverParameters& parameters,
                    Const field_flux,
                    Const stator_phase_inductance_direct,

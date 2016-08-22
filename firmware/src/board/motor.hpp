@@ -171,7 +171,8 @@ extern void handleMainIRQ(const float period,
  *
  * @param period                        Equals @ref getPWMPeriod(), in seconds.
  */
-extern void handleFastIRQ(const float period);
+extern void handleFastIRQ(const float period,
+                          const float inverter_voltage);
 
 /**
  * This critical section disables ALL maskable IRQ, including the motor control ones.

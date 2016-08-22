@@ -93,8 +93,6 @@ class Observer
     math::Vector<4> x_;
     math::Matrix<4, 4> P_;
 
-    static math::Scalar constrainAngularPosition(math::Const x);
-
 public:
     Observer(const ObserverParameters& parameters,
              math::Const field_flux,
@@ -110,13 +108,28 @@ public:
 
     math::Scalar getAngularVelocity() const { return x_[StateIndexAngularVelocity]; }
 
-    /**
-     * This is much faster than running another Kalman time propagation step.
-     */
-    math::Scalar getInterpolatedAngularPosition(math::Const time_since_update) const
-    {
-        return constrainAngularPosition(x_[StateIndexAngularPosition] + time_since_update * getAngularVelocity());
-    }
+    math::Scalar getAngularPosition() const { return x_[StateIndexAngularPosition]; }
 };
+
+/**
+ * Constrains the angle within [0, Pi*2]
+ */
+inline math::Scalar constrainAngularPosition(math::Const x)
+{
+    constexpr math::Const Pi2 = math::Pi * 2.0F;
+
+    if (x >= Pi2)
+    {
+        return x - Pi2;
+    }
+    else if (x < 0)
+    {
+        return x + Pi2;
+    }
+    else
+    {
+        return x;
+    }
+}
 
 }

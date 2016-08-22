@@ -942,7 +942,8 @@ CH_FAST_IRQ_HANDLER(STM32_TIM8_CC_HANDLER)
     /*
      * Processing the application handler.
      */
-    handleFastIRQ(g_pwm_period);
+    handleFastIRQ(g_pwm_period,
+                  g_inverter_voltage);
 
     TIM8->SR = 0;               // Reset IRQ flags
 }

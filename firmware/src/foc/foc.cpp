@@ -123,7 +123,7 @@ struct Context
     { }
 };
 
-Context* volatile g_context = nullptr;
+Context* g_context = nullptr;
 
 } // namespace
 
@@ -295,9 +295,59 @@ void handleMainIRQ(Const period,
     (void)inverter_voltage;
 }
 
-void handleFastIRQ(Const period)
+void handleFastIRQ(Const period,
+                   Const inverter_voltage)
 {
-    (void)period;
+    // XXX TODO FIXME TESTING
+    if (g_setpoint > 0 && g_state != State::Running)
+    {
+        g_state = State::Running;
+        board::motor::setActive(true);
+
+        alignas(16) static std::uint8_t context_storage[sizeof(Context)];
+
+        g_context = new (context_storage) Context(g_observer_params,
+                                                  g_motor_params.field_flux,
+                                                  g_motor_params.l_ab / 2.0F,
+                                                  g_motor_params.l_ab / 2.0F,
+                                                  g_motor_params.r_ab / 2.0F,
+                                                  PIControllerSettings(),
+                                                  PIControllerSettings());
+    }
+
+    if (g_state == State::Running ||
+        g_state == State::Spinup)
+    {
+        assert(g_context != nullptr);
+
+        // XXX TODO FIXME TESTING
+        g_context->angular_velocity = 250.0F;
+        g_context->reference_Udq = { g_setpoint * 100.0F, 0.0F };
+
+        // Computing SVM
+        const auto reference_Uab = performInverseParkTransform(g_context->reference_Udq,
+                                                               g_context->angular_position_sine,
+                                                               g_context->angular_position_cosine);
+
+        const auto phase_voltages = performSpaceVectorTransform(reference_Uab);
+
+        // TODO: Update the current sector
+        const auto pwm_setpoint = normalizePhaseVoltagesToPWMSetpoint(phase_voltages, inverter_voltage);
+
+        // TODO: Dead time compensation
+        board::motor::setPWM(pwm_setpoint);
+
+        // Angle extrapolation for the next iteration
+        g_context->angular_position += constrainAngularPosition(g_context->angular_velocity * period);
+
+        g_context->angular_position_sine   = math::sin(g_context->angular_position);
+        g_context->angular_position_cosine = math::cos(g_context->angular_position);
+    }
+
+    if (g_state == State::Idle)
+    {
+        // TODO: beeping
+    }
 }
 
 }
