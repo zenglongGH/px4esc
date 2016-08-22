@@ -296,31 +296,10 @@ void handleMainIRQ(Const period,
 void handleFastIRQ(Const period,
                    Const inverter_voltage)
 {
-    // XXX TODO FIXME TESTING
-    if (g_setpoint > 0 && g_state != State::Running)
-    {
-        g_state = State::Running;
-        board::motor::setActive(true);
-
-        alignas(16) static std::uint8_t context_storage[sizeof(Context)];
-
-        g_context = new (context_storage) Context(g_observer_params,
-                                                  g_motor_params.field_flux,
-                                                  g_motor_params.l_ab / 2.0F,
-                                                  g_motor_params.l_ab / 2.0F,
-                                                  g_motor_params.r_ab / 2.0F,
-                                                  PIControllerSettings(),
-                                                  PIControllerSettings());
-    }
-
     if (g_state == State::Running ||
         g_state == State::Spinup)
     {
         assert(g_context != nullptr);
-
-        // XXX TODO FIXME TESTING
-        g_context->angular_velocity = 200.0F;
-        g_context->reference_Udq = { g_setpoint * 100.0F, 0.0F };
 
         // Computing SVM
         const auto reference_Uab = performInverseParkTransform(g_context->reference_Udq,
