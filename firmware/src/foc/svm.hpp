@@ -36,6 +36,7 @@
 #include <math/math.hpp>
 #include <cstdint>
 #include <cassert>
+#include <utility>
 
 
 namespace foc
@@ -67,10 +68,12 @@ namespace foc
  *       Map[normalizeSVMPhaseVoltages[performSVMTransform[#1/2], inverterVoltage] &, {refAlpha, refBeta}\[Transpose]];
  *     ListPlot[transforms\[Transpose], PlotRange -> {Automatic, {0, 1}}]
  *
- * @param reference_voltage         Reference voltages alpha and beta.
- * @return                          Phase voltages centered around zero.
+ * @param reference_voltage     Reference voltages alpha and beta.
+ * @return                      Phase voltages centered around zero and the index of the current
+ *                              electrical sector in the range [0, 5].
  */
-inline math::Vector<3> performSpaceVectorTransform(const math::Vector<2>& reference_voltage)
+inline std::pair<math::Vector<3>, std::uint_fast8_t>
+performSpaceVectorTransform(const math::Vector<2>& reference_voltage)
 {
     constexpr auto SquareRootOf3 = math::Scalar(1.7320508075688772);
 
@@ -112,7 +115,7 @@ inline math::Vector<3> performSpaceVectorTransform(const math::Vector<2>& refere
     }
     }
 
-    return {ta, ta + z, ta + y};
+    return {{ta, ta + z, ta + y}, sector_index};
 }
 
 /**

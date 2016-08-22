@@ -95,8 +95,6 @@ struct Context
 
     Scalar angular_velocity = 0;                ///< Radian per second
     Scalar angular_position = 0;                ///< Radians [0, Pi*2]; extrapolated in the fast IRQ
-    Scalar angular_position_sine = 0;           ///< Updated from fast IRQ
-    Scalar angular_position_cosine = 0;         ///< Updated from fast IRQ
 
     PIController pid_Id;
     PIController pid_Iq;
@@ -104,7 +102,7 @@ struct Context
     Vector<2> reference_Udq = {0.0F, 0.0F};     ///< Volt
     Scalar reference_Iq = 0;                    ///< Ampere
 
-    unsigned sector = 0;
+    std::uint_fast8_t sector_index = 0;         ///< Updated from the fast IRQ
 
     Context(const ObserverParameters& observer_params,
             math::Const field_flux,
@@ -321,27 +319,27 @@ void handleFastIRQ(Const period,
         assert(g_context != nullptr);
 
         // XXX TODO FIXME TESTING
-        g_context->angular_velocity = 250.0F;
+        g_context->angular_velocity = 200.0F;
         g_context->reference_Udq = { g_setpoint * 100.0F, 0.0F };
 
         // Computing SVM
         const auto reference_Uab = performInverseParkTransform(g_context->reference_Udq,
-                                                               g_context->angular_position_sine,
-                                                               g_context->angular_position_cosine);
+                                                               math::sin(g_context->angular_position),
+                                                               math::cos(g_context->angular_position));
 
-        const auto phase_voltages = performSpaceVectorTransform(reference_Uab);
+        const auto phase_voltages_and_sector_index = performSpaceVectorTransform(reference_Uab);
 
-        // TODO: Update the current sector
-        const auto pwm_setpoint = normalizePhaseVoltagesToPWMSetpoint(phase_voltages, inverter_voltage);
+        const auto pwm_setpoint = normalizePhaseVoltagesToPWMSetpoint(phase_voltages_and_sector_index.first,
+                                                                      inverter_voltage);
 
         // TODO: Dead time compensation
         board::motor::setPWM(pwm_setpoint);
 
-        // Angle extrapolation for the next iteration
-        g_context->angular_position += constrainAngularPosition(g_context->angular_velocity * period);
+        // Updating the context
+        g_context->sector_index = phase_voltages_and_sector_index.second;
 
-        g_context->angular_position_sine   = math::sin(g_context->angular_position);
-        g_context->angular_position_cosine = math::cos(g_context->angular_position);
+        g_context->angular_position =
+            constrainAngularPosition(g_context->angular_position + g_context->angular_velocity * period);
     }
 
     if (g_state == State::Idle)

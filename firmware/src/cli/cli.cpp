@@ -311,7 +311,7 @@ class SpinCommand : public os::shell::ICommandHandler
             const auto inverter_voltage = board::motor::getInverterVoltage();
 
             const auto setpoint =
-                foc::normalizePhaseVoltagesToPWMSetpoint(foc::performSpaceVectorTransform({alpha, beta}),
+                foc::normalizePhaseVoltagesToPWMSetpoint(foc::performSpaceVectorTransform({alpha, beta}).first,
                                                          inverter_voltage);
 
             board::motor::setPWM(setpoint);
