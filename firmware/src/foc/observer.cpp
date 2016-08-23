@@ -111,15 +111,15 @@ void Observer::update(Const dt,
     Const Tq = Lq / R;
 
     Matrix<4, 4> F = Matrix<4, 4>::Zero();
-    F(1, 1) = (1.0F - Ts / Td);
-    F(1, 2) = Ts * w * Lq / Ld;
-    F(1, 3) = Ts * Lq * Iq / Ld;
-    F(2, 1) = -Ts * w * Ld / Lq;
-    F(2, 2) = (1.0F - Ts * (1.0F + komp) / Tq);
-    F(2, 3) = Ts * (-Ld * Id / Lq - Fi / Lq);
+    F(0, 0) = (1.0F - Ts / Td);
+    F(0, 1) = Ts * w * Lq / Ld;
+    F(0, 2) = Ts * Lq * Iq / Ld;
+    F(1, 0) = -Ts * w * Ld / Lq;
+    F(1, 1) = (1.0F - Ts * (1.0F + komp) / Tq);
+    F(1, 2) = Ts * (-Ld * Id / Lq - Fi / Lq);
+    F(2, 2) = 1.0F;
+    F(3, 2) = Ts;
     F(3, 3) = 1.0F;
-    F(4, 3) = Ts;
-    F(4, 4) = 1.0F;
 
     Vector<4> Xout;
     Xout[0] = Id + (ud / Ld - R * Id / Ld + w * Lq * Iq / Ld) * Ts;

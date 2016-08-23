@@ -50,9 +50,9 @@ struct MotorParameters
     math::Scalar max_current = 0;
     math::Scalar max_voltage = 0;
 
-    math::Scalar field_flux = 0;    ///< Phi
-    math::Scalar r_ab = 0;
-    math::Scalar l_ab = 0;
+    math::Scalar field_flux = 0;        ///< Phi, Weber
+    math::Scalar r_ab = 0;              ///< Phase-to-phase resistance, Ohm
+    math::Scalar l_ab = 0;              ///< Phase-to-phase inductance, Henry
 
     std::uint_fast8_t num_poles = 0;
 

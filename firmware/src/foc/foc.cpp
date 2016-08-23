@@ -64,7 +64,7 @@ ObserverParameters g_observer_params;
 
 ControlMode g_control_mode;
 
-Scalar g_setpoint;
+volatile Scalar g_setpoint;
 
 volatile Scalar g_setpoint_remaining_ttl;       ///< Seconds left before the setpoint will be zeroed, unless updated
 
@@ -326,6 +326,11 @@ using namespace foc;
 
 void handleMainIRQ(Const period)
 {
+    if (board::motor::isCalibrationInProgress())
+    {
+        g_state = State::Idle;
+    }
+
     /*
      * It is guaranteed by the driver that the main IRQ is always invoked immediately after the fast IRQ
      * of the same period. This guarantees that the context struct contains the most recent data.
@@ -351,18 +356,61 @@ void handleMainIRQ(Const period)
          * Updating the state estimate.
          * Critical section is required because at this point we're no longer synchronized with the fast IRQ.
          */
-        AbsoluteCriticalSectionLocker locker;
+        {
+            AbsoluteCriticalSectionLocker locker;
 
-        g_context->angular_velocity = g_context->observer.getAngularVelocity();
+            if (g_state == State::Running)
+            {
+                g_context->angular_velocity = g_context->observer.getAngularVelocity();
 
-        // Angle delay compensation
-        Const angle_slip = g_context->observer.getAngularVelocity() * period;
-        g_context->angular_position = constrainAngularPosition(g_context->observer.getAngularPosition() + angle_slip);
+                // Angle delay compensation
+                Const angle_slip = g_context->observer.getAngularVelocity() * period;
+                g_context->angular_position =
+                    constrainAngularPosition(g_context->observer.getAngularPosition() + angle_slip);
+            }
+            else
+            {
+                // In spinup mode, we run solely by extrapolation
+                if (g_context->angular_velocity < 300.0F)
+                {
+                    g_context->angular_velocity += 50.0F * period;
+                }
+                else
+                {
+                    g_state = State::Running;
+                }
+            }
+        }
+
+        /*
+         * Updating setpoint and handling termination condition.
+         */
+        g_setpoint_remaining_ttl -= period;
+        if (g_setpoint_remaining_ttl <= 0.0F)
+        {
+            // Setpoint TTL expired, stopping
+            g_setpoint = 0.0F;
+        }
+
+        if (os::float_eq::closeToZero(Scalar(g_setpoint)))
+        {
+            // Stopping
+            {
+                AbsoluteCriticalSectionLocker locker;
+
+                g_state = State::Idle;
+
+                g_context->~Context();
+                g_context = nullptr;
+            }
+
+            board::motor::setActive(false);
+        }
     }
 
     if (g_state == State::Idle)
     {
-        const bool need_to_start = !os::float_eq::closeToZero(g_setpoint);
+        const bool need_to_start = !os::float_eq::closeToZero(Scalar(g_setpoint));
         if (need_to_start)
         {
             initializeContext();

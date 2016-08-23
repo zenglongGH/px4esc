@@ -65,7 +65,7 @@ constexpr unsigned InverterVoltageSampleBufferLength = 6 * SamplesPerADCPerIRQ;
 constexpr unsigned FastIRQPriority = 0;
 constexpr unsigned MainIRQPriority = 1;
 
-constexpr float MainIRQPreferredPeriod = 150e-6F;
+constexpr float MainIRQPreferredPeriod = 60e-6F;
 
 constexpr float InverterVoltageInnovationWeight = 0.1F;         ///< Has to account for possible aliasing effect
 constexpr float TemperatureInnovationWeight     = 0.001F;       ///< The input is noisy, high damping is necessary

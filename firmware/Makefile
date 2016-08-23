@@ -107,7 +107,7 @@ SERIAL_CLI_PORT_NUMBER = 3
 # linked with the application. This approach will require some modifications of the build system.
 # See this thread: http://www.chibios.com/forum/viewtopic.php?t=1860
 USE_OPT += -Wdouble-promotion -Wswitch-enum -Wfloat-equal -fno-strict-aliasing -fno-strict-overflow
-USE_CPPOPT += -Wconversion -Wno-error=conversion -Wsign-promo
+USE_CPPOPT += -Wconversion -Wno-error=conversion -Wsign-promo -Wframe-larger-than=1024
 
 RELEASE_OPT = -O2 -fomit-frame-pointer
 DEBUG_OPT = -O2 -g3 -DDISABLE_WATCHDOG=1
