@@ -89,6 +89,9 @@ struct ErrorCounter
 } volatile g_error_counter;
 
 
+Scalar g_debug_array[3];
+
+
 struct Context
 {
     const math::Range<> motor_current_limit;
@@ -133,22 +136,21 @@ Context* g_context = nullptr;
 
 void initializeContext()
 {
-    constexpr Scalar Pi2 = math::Pi * 2.0F;
+    //constexpr Scalar Pi2 = math::Pi * 2.0F;
 
-    Const fast_irq_period = board::motor::getPWMPeriod();
+    //Const fast_irq_period = board::motor::getPWMPeriod();
 
     Const Rs = g_motor_params.r_ab / 2.0F;
     Const Ld = g_motor_params.l_ab / 2.0F;
     Const Lq = g_motor_params.l_ab / 2.0F;
 
-    // TODO: Correct PID gain computation
-    const PIControllerSettings pid_Id_settings((Pi2 * Ld) / (20.0F * fast_irq_period),
-                                               0.1F,
-                                               g_motor_params.max_current);
+    // PID controllers accept currents at the input and produce voltage
+    Const integration_limit = g_motor_params.max_voltage;
 
-    const PIControllerSettings pid_Iq_settings((Pi2 * Lq) / (20.0F * fast_irq_period),
-                                               0.1F,
-                                               g_motor_params.max_current);
+    // TODO: Correct PID gain computation
+    const PIControllerSettings pid_Idq_settings(0.02F,
+                                                1.0F,
+                                                integration_limit);
 
     alignas(16) static std::uint8_t context_storage[sizeof(Context)];
 
@@ -159,8 +161,8 @@ void initializeContext()
                                               Rs,
                                               g_motor_params.max_current,
                                               g_motor_params.max_voltage,
-                                              pid_Id_settings,
-                                              pid_Iq_settings);
+                                              pid_Idq_settings,
+                                              pid_Idq_settings);
 }
 
 } // namespace
@@ -313,6 +315,30 @@ void printStatusInfo()
 {
 }
 
+
+void plotRealTimeValues()
+{
+    Scalar ang_pos_ctx = 0;
+    Scalar iq = 0;
+
+    {
+        AbsoluteCriticalSectionLocker locker;
+
+        if (g_context != nullptr)
+        {
+            ang_pos_ctx = g_context->angular_position;
+            iq = g_context->estimated_Idq[1];
+        }
+    }
+
+    std::printf("$%.2f,%.2f,%.2f,%.2f,%.2f\n",
+                double(ang_pos_ctx),
+                double(iq),
+                double(g_debug_array[0]),
+                double(g_debug_array[1]),
+                double(g_debug_array[2]));
+}
+
 }
 
 
@@ -370,15 +396,12 @@ void handleMainIRQ(Const period)
             }
             else
             {
-                // In spinup mode, we run solely by extrapolation
-                if (g_context->angular_velocity < 300.0F)
+                // Spinup mode, special cases everywhere
+                if (g_context->angular_velocity < 200.0F)
                 {
-                    g_context->angular_velocity += 50.0F * period;
+                    g_context->angular_velocity += 100.0F * period;
                 }
-                else
-                {
-                    g_state = State::Running;
-                }
+                // TODO: This is incomplete
             }
         }
 
@@ -480,6 +503,10 @@ void handleFastIRQ(Const period,
                                                                       inverter_voltage);
 
         board::motor::setPWM(pwm_setpoint);
+
+        g_debug_array[0] = estimated_I_alpha_beta[0];
+        g_debug_array[1] = reference_U_alpha_beta[0];
+        g_debug_array[2] = angle_sine;
 
         /*
          * Position extrapolation

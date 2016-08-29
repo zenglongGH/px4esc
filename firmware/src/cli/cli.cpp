@@ -335,9 +335,9 @@ class SpinCommand : public os::shell::ICommandHandler
 } static cmd_spin;
 
 
-class RawSetpointCommand : public os::shell::ICommandHandler
+class SetpointCommand : public os::shell::ICommandHandler
 {
-    const char* getName() const override { return "rsp"; }
+    const char* getName() const override { return "sp"; }
 
     void execute(os::shell::BaseChannelWrapper& ios, int argc, char** argv) override
     {
@@ -345,20 +345,51 @@ class RawSetpointCommand : public os::shell::ICommandHandler
         {
             foc::stop();
 
-            ios.print("Set raw setpoint in the range [-1, 1] (negative for reverse rotation).\n");
+            ios.print("Set setpoint in the range [-1, 1] (negative for reverse rotation).\n");
+            ios.print("By default, ratiometric setpoint will be used.\n");
             ios.print("Execute without arguments to stop the motor.\n");
-            ios.print("\t%s [setpoint=0]\n", argv[0]);
+            ios.print("Option -p will plot the real time values.\n");
+            ios.print("\t%s [setpoint=0] [-p]\n", argv[0]);
             return;
         }
 
+        bool do_plot = false;
+        for (int i = 1; i < argc; i++)
+        {
+            if (!std::strncmp("-p", argv[i], 2))
+            {
+                do_plot = true;
+            }
+        }
+
+        if (do_plot)
+        {
+            ios.print("Press any key to stop\n");
+        }
+
         using namespace std;
-        const float sp = strtof(argv[1], nullptr);
+        const float sp = strtof(argv[1], nullptr);      // TODO: Various types of setpoint
 
-        const float ttl = 30.0F;
+        const float ttl = 600.0F;                       // TODO: Configurable
 
-        foc::setSetpoint(foc::ControlMode::Relative, sp, ttl);
+        foc::setSetpoint(foc::ControlMode::Ratiometric, sp, ttl);
+
+        if (do_plot)
+        {
+            while (ios.getChar(1) > 0)
+            {
+                ;   // Clearing the input buffer
+            }
+
+            while (ios.getChar(1) <= 0)
+            {
+                foc::plotRealTimeValues();
+            }
+
+            foc::stop();
+        }
     }
-} static cmd_raw_setpoint;
+} static cmd_setpoint;
 
 
 class CLIThread : public chibios_rt::BaseStaticThread<2048>
@@ -394,7 +425,7 @@ public:
         (void) shell_.addCommandHandler(&cmd_status);
         (void) shell_.addCommandHandler(&cmd_calibrate);
         (void) shell_.addCommandHandler(&cmd_spin);
-        (void) shell_.addCommandHandler(&cmd_raw_setpoint);
+        (void) shell_.addCommandHandler(&cmd_setpoint);
     }
 
     virtual ~CLIThread() { }

@@ -48,14 +48,14 @@ struct ObserverParameters
 {
     math::DiagonalMatrix<4> Q  = math::makeDiagonalMatrix(100.0F,
                                                           100.0F,
-                                                          5000.0F,
-                                                          5.0F);
+                                                          1.0F,
+                                                          1.0F);
 
     math::DiagonalMatrix<2> R  = math::makeDiagonalMatrix(2.0F,
                                                           2.0F);
 
-    math::DiagonalMatrix<4> P0 = math::makeDiagonalMatrix(100.0F,
-                                                          100.0F,
+    math::DiagonalMatrix<4> P0 = math::makeDiagonalMatrix(1000.0F,
+                                                          1000.0F,
                                                           5000.0F,
                                                           5000.0F);
 

@@ -161,7 +161,7 @@ std::pair<Error, std::uint32_t> getLastErrorWithErrorCount();
  */
 enum class ControlMode
 {
-    Relative,           ///< Abstract units in [-1, 1]
+    Ratiometric,        ///< Abstract units in [-1, 1]
     Torque,             ///< Newton meters
     AngularVelocity     ///< Radian per second
 };
@@ -222,5 +222,11 @@ void beep(math::Const frequency,
  * The function makes blocking calls to printf() and may moderately disturb IRQ processing due to critical sections.
  */
 void printStatusInfo();
+
+/**
+ * This command is intended for use with CLI plotting tool.
+ * Refer to the project tools directory for more info.
+ */
+void plotRealTimeValues();
 
 }
