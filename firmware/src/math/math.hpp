@@ -56,7 +56,7 @@ template <int Size>
 using Vector = Matrix<Size, 1>;
 
 
-constexpr inline float convertKelvinToCelsius(float kelvin)
+constexpr inline Scalar convertKelvinToCelsius(Const kelvin)
 {
     return kelvin - 273.15F;
 }
@@ -65,6 +65,24 @@ constexpr inline float convertKelvinToCelsius(float kelvin)
  * Constants
  */
 constexpr auto Pi = Scalar(3.141592653589793);
+
+/**
+ * Substracts right angle from left angle, result will be in the range (-180, 180].
+ * Apply std::abs() to the result to get the absolute angular difference.
+ */
+constexpr inline Scalar subtractAngles(Const left, Const right)
+{
+    Const diff = left - right;
+    if (diff > Pi)
+    {
+        return diff - Pi * 2.0F;
+    }
+    if (diff < -Pi)
+    {
+        return diff + Pi * 2.0F;
+    }
+    return diff;
+}
 
 /**
  * Inclusive range of the form [min, max].
