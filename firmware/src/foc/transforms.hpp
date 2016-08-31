@@ -75,11 +75,6 @@ inline math::Vector<2> performClarkeTransform(const math::Vector<2>& ab)
 
 /**
  * Park transform, assming increasing Theta during direct rotation.
- * Model:
- *
- *      performParkTransform[alpha_, beta_, Theta_] := {
- *         alpha Cos[Theta] + beta Sin[Theta],
- *         -alpha Sin[Theta] + beta Cos[Theta] };
  */
 inline math::Vector<2> performParkTransform(const math::Vector<2>& alpha_beta,
                                             math::Const angle_sine,
@@ -91,11 +86,6 @@ inline math::Vector<2> performParkTransform(const math::Vector<2>& alpha_beta,
 
 /**
  * Inverse Park transform to the above defined.
- * Model:
- *
- *      performInverseParkTransform[Id_, Iq_, Theta_] := {
- *         Id Cos[Theta] - Iq Sin[Theta],
- *         Id Sin[Theta] + Iq Cos[Theta] };
  */
 inline math::Vector<2> performInverseParkTransform(const math::Vector<2>& dq,
                                                    math::Const angle_sine,
