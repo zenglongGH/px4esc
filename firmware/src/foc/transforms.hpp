@@ -78,15 +78,15 @@ inline math::Vector<2> performClarkeTransform(const math::Vector<2>& ab)
  * Model:
  *
  *      performParkTransform[alpha_, beta_, Theta_] := {
- *          alpha Sin[Theta] + beta Cos[Theta],
- *          alpha Cos[Theta] - beta Sin[Theta] };
+ *         alpha Cos[Theta] + beta Sin[Theta],
+ *         -alpha Sin[Theta] + beta Cos[Theta] };
  */
 inline math::Vector<2> performParkTransform(const math::Vector<2>& alpha_beta,
                                             math::Const angle_sine,
                                             math::Const angle_cosine)
 {
-    return { alpha_beta[0] * angle_sine   + alpha_beta[1] * angle_cosine,
-             alpha_beta[0] * angle_cosine - alpha_beta[1] * angle_sine };
+    return { alpha_beta[0] * angle_cosine + alpha_beta[1] * angle_sine,
+            -alpha_beta[0] * angle_sine   + alpha_beta[1] * angle_cosine };
 }
 
 /**
@@ -94,25 +94,25 @@ inline math::Vector<2> performParkTransform(const math::Vector<2>& alpha_beta,
  * Model:
  *
  *      performInverseParkTransform[Id_, Iq_, Theta_] := {
- *          Id Sin[Theta] + Iq Cos[Theta],
- *          Id Cos[Theta] - Iq Sin[Theta] };
+ *         Id Cos[Theta] - Iq Sin[Theta],
+ *         Id Sin[Theta] + Iq Cos[Theta] };
  */
 inline math::Vector<2> performInverseParkTransform(const math::Vector<2>& dq,
                                                    math::Const angle_sine,
                                                    math::Const angle_cosine)
 {
-    return { dq[0] * angle_sine   + dq[1] * angle_cosine,
-             dq[0] * angle_cosine - dq[1] * angle_sine };
+    return { dq[0] * angle_cosine - dq[1] * angle_sine,
+             dq[0] * angle_sine   + dq[1] * angle_cosine };
 }
 
 /* The code above was validated using the following script:
 
-Theta = Range[0, 2 Pi, .01];
+Theta = Range[0, 2 Pi, 0.017453292519943295];
 currentLag = 10 \[Degree];
 voltageAmplitude = 2;
 currentAmplitude = 0.5;
-phaseV = {Sin[Theta] voltageAmplitude, Sin[Theta + 120 \[Degree]] voltageAmplitude};
-phaseI = {Sin[Theta + currentLag] currentAmplitude, Sin[Theta + 120 \[Degree] + currentLag] currentAmplitude};
+phaseV = {Sin[Theta] voltageAmplitude, Sin[Theta - 120 \[Degree]] voltageAmplitude};
+phaseI = {Sin[Theta + currentLag] currentAmplitude, Sin[Theta - 120 \[Degree] + currentLag] currentAmplitude};
 
 IAlphaBeta = Map[performClarkeTransform[#1[[1]], #1[[2]]] &, phaseI\[Transpose]];
 Idq = Map[performParkTransform[#1[[1]][[1]], #1[[1]][[2]], #1[[2]]] &, {IAlphaBeta, Theta}\[Transpose]];
