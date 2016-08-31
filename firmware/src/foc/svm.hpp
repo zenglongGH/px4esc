@@ -63,10 +63,10 @@ namespace foc
  *     range = Range[0, 8, .01];
  *     refAlpha = Sin[#1]*inverterVoltage & /@ range;
  *     refBeta = Sin[#1 + Pi/2]*inverterVoltage & /@ range;
- *     ListPlot[{refAlpha, refBeta}]
+ *     ListLinePlot[{refAlpha, refBeta}]
  *     transforms =
  *       Map[normalizeSVMPhaseVoltages[performSVMTransform[#1/2], inverterVoltage] &, {refAlpha, refBeta}\[Transpose]];
- *     ListPlot[transforms\[Transpose], PlotRange -> {Automatic, {0, 1}}]
+ *     ListLinePlot[transforms\[Transpose], PlotRange -> {Automatic, {0, 1}}]
  *
  * @param reference_voltage     Reference voltages alpha and beta.
  * @return                      Phase voltages centered around zero and the index of the current
