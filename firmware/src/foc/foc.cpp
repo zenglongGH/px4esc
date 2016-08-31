@@ -89,7 +89,7 @@ struct ErrorCounter
 } volatile g_error_counter;
 
 
-Scalar g_debug_array[3];
+Scalar g_debug_array[4];
 
 
 struct Context
@@ -319,7 +319,6 @@ void printStatusInfo()
 void plotRealTimeValues()
 {
     Scalar ang_pos_ctx = 0;
-    Scalar iq = 0;
 
     {
         AbsoluteCriticalSectionLocker locker;
@@ -327,16 +326,15 @@ void plotRealTimeValues()
         if (g_context != nullptr)
         {
             ang_pos_ctx = g_context->angular_position;
-            iq = g_context->estimated_Idq[1];
         }
     }
 
     std::printf("$%.2f,%.2f,%.2f,%.2f,%.2f\n",
                 double(ang_pos_ctx),
-                double(iq),
                 double(g_debug_array[0]),
                 double(g_debug_array[1]),
-                double(g_debug_array[2]));
+                double(g_debug_array[2]),
+                double(g_debug_array[3]));
 }
 
 }
@@ -483,6 +481,9 @@ void handleFastIRQ(Const period,
         g_context->reference_Udq[1] = g_context->pid_Iq.update(g_context->reference_Iq,
                                                                g_context->estimated_Idq[1], period);
 
+        g_context->reference_Udq[0] = 0.0F;
+        g_context->reference_Udq[1] = 1.0F;
+
         /*
          * Transforming back to the stationary reference frame, updating the PWM outputs
          * TODO: Dead time compensation
@@ -505,8 +506,9 @@ void handleFastIRQ(Const period,
         board::motor::setPWM(pwm_setpoint);
 
         g_debug_array[0] = estimated_I_alpha_beta[0];
-        g_debug_array[1] = reference_U_alpha_beta[0];
-        g_debug_array[2] = angle_sine;
+        g_debug_array[1] = estimated_I_alpha_beta[1];
+        g_debug_array[2] = g_context->estimated_Idq[0];
+        g_debug_array[3] = g_context->estimated_Idq[1];
 
         /*
          * Position extrapolation
