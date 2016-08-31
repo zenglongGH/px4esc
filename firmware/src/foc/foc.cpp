@@ -89,7 +89,7 @@ struct ErrorCounter
 } volatile g_error_counter;
 
 
-Scalar g_debug_array[4];
+Scalar g_debug_array[5];
 
 
 struct Context
@@ -318,23 +318,12 @@ void printStatusInfo()
 
 void plotRealTimeValues()
 {
-    Scalar ang_pos_ctx = 0;
-
-    {
-        AbsoluteCriticalSectionLocker locker;
-
-        if (g_context != nullptr)
-        {
-            ang_pos_ctx = g_context->angular_position;
-        }
-    }
-
     std::printf("$%.2f,%.2f,%.2f,%.2f,%.2f\n",
-                double(ang_pos_ctx),
                 double(g_debug_array[0]),
                 double(g_debug_array[1]),
                 double(g_debug_array[2]),
-                double(g_debug_array[3]));
+                double(g_debug_array[3]),
+                double(g_debug_array[4]));
 }
 
 }
@@ -376,6 +365,10 @@ void handleMainIRQ(Const period)
          */
         g_context->observer.update(period, Idq, Udq);
 
+        g_debug_array[2] = g_context->angular_velocity;
+        g_debug_array[3] = g_context->observer.getAngularPosition();
+        g_debug_array[4] = g_context->observer.getAngularVelocity();
+
         /*
          * Updating the state estimate.
          * Critical section is required because at this point we're no longer synchronized with the fast IRQ.
@@ -395,11 +388,28 @@ void handleMainIRQ(Const period)
             else
             {
                 // Spinup mode, special cases everywhere
-                if (g_context->angular_velocity < 200.0F)
+                if (g_context->angular_velocity < 400.0F)
                 {
                     g_context->angular_velocity += 100.0F * period;
                 }
-                // TODO: This is incomplete
+
+                // Hand-off to normal mode
+                if (g_context->angular_velocity > 10.0F)
+                {
+                    constexpr Scalar AngularPositionSynchronizationPrecision = (2.0F * math::Pi) / Scalar(6 * 10);
+
+                    Const abs_ang_vel_error =
+                        std::abs(g_context->observer.getAngularVelocity() - g_context->angular_velocity);
+
+                    Const abs_ang_pos_error = std::abs(math::subtractAngles(g_context->observer.getAngularPosition(),
+                                                                            g_context->angular_position));
+
+                    if (((abs_ang_vel_error / g_context->angular_velocity) < 0.2F) &&
+                        (abs_ang_pos_error < AngularPositionSynchronizationPrecision))
+                    {
+                        g_state = State::Running;
+                    }
+                }
             }
         }
 
@@ -481,9 +491,6 @@ void handleFastIRQ(Const period,
         g_context->reference_Udq[1] = g_context->pid_Iq.update(g_context->reference_Iq,
                                                                g_context->estimated_Idq[1], period);
 
-        g_context->reference_Udq[0] = 0.0F;
-        g_context->reference_Udq[1] = 1.0F;
-
         /*
          * Transforming back to the stationary reference frame, updating the PWM outputs
          * TODO: Dead time compensation
@@ -505,10 +512,8 @@ void handleFastIRQ(Const period,
 
         board::motor::setPWM(pwm_setpoint);
 
-        g_debug_array[0] = estimated_I_alpha_beta[0];
-        g_debug_array[1] = estimated_I_alpha_beta[1];
-        g_debug_array[2] = g_context->estimated_Idq[0];
-        g_debug_array[3] = g_context->estimated_Idq[1];
+        g_debug_array[0] = g_context->estimated_Idq[0];
+        g_debug_array[1] = g_context->estimated_Idq[1];
 
         /*
          * Position extrapolation

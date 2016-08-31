@@ -48,7 +48,7 @@ struct ObserverParameters
 {
     math::DiagonalMatrix<4> Q  = math::makeDiagonalMatrix(100.0F,
                                                           100.0F,
-                                                          1.0F,
+                                                          10.0F,
                                                           1.0F);
 
     math::DiagonalMatrix<2> R  = math::makeDiagonalMatrix(2.0F,
@@ -56,10 +56,10 @@ struct ObserverParameters
 
     math::DiagonalMatrix<4> P0 = math::makeDiagonalMatrix(1000.0F,
                                                           1000.0F,
-                                                          5000.0F,
-                                                          5000.0F);
+                                                          0.1F,      // We know that initial angular velocity is zero
+                                                          5000.0F);  // We don't know initial angular position
 
-    math::Scalar cross_coupling_compensation = 0.5F;
+    math::Scalar cross_coupling_compensation = 0.8F;
 
     auto toString() const
     {
