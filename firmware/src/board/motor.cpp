@@ -219,9 +219,8 @@ public:
             inverter_voltage_gain_ = 1.0F / computeResistorDividerGain(5100 * 2, 330 * 2);
             current_shunt_resistance_ = 1 * 1e-3F;
 
-            // Note that gain is always NEGATIVE, see the shematics for details
             palWritePad(GPIOB, GPIOB_GAIN, true);
-            current_amplifier_gain_ = -1.0F / (40.0F * current_shunt_resistance_);
+            current_amplifier_gain_ = 1.0F / (40.0F * current_shunt_resistance_);
 
             temperature_transfer_function_ = &BoardFeatures::temperatureTransferFunctionMCP9700;
         }
