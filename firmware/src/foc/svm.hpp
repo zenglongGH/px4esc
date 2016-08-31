@@ -50,7 +50,7 @@ namespace foc
  * The following code was used for simulation:
  *
  *     performSVMTransform[{refAlpha_, refBeta_}] :=
- *       Module[{Ualpha = Sqrt[3] refAlpha, Ubeta = -refBeta},
+ *       Module[{Ualpha = Sqrt[3] refAlpha, Ubeta = refBeta},
  *        X = Ubeta; Y = -((Ualpha + Ubeta)/2); Z = -((Ualpha - Ubeta)/2);
  *        sector = If[Y > 0,
  *          If[X > 0, 4, If[Z > 0, 3, 2]],
@@ -78,7 +78,7 @@ performSpaceVectorTransform(const math::Vector<2>& reference_voltage)
     constexpr auto SquareRootOf3 = math::Scalar(1.7320508075688772);
 
     const auto ualpha = reference_voltage[0] * SquareRootOf3;
-    const auto ubeta = -reference_voltage[1];
+    const auto ubeta =  reference_voltage[1];
 
     const auto x = ubeta;
     const auto y = -(ualpha + ubeta) / 2.0F;
