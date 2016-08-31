@@ -102,7 +102,7 @@ currentLag = 10 \[Degree];
 voltageAmplitude = 2;
 currentAmplitude = 0.5;
 phaseV = {Sin[Theta] voltageAmplitude, Sin[Theta - 120 \[Degree]] voltageAmplitude};
-phaseI = {Sin[Theta + currentLag] currentAmplitude, Sin[Theta - 120 \[Degree] + currentLag] currentAmplitude};
+phaseI = {Sin[Theta - currentLag] currentAmplitude, Sin[Theta - 120 \[Degree] - currentLag] currentAmplitude};
 
 IAlphaBeta = Map[performClarkeTransform[#1[[1]], #1[[2]]] &, phaseI\[Transpose]];
 Idq = Map[performParkTransform[#1[[1]][[1]], #1[[1]][[2]], #1[[2]]] &, {IAlphaBeta, Theta}\[Transpose]];
