@@ -59,6 +59,9 @@ namespace foc
  *     (a + 2b) / sqrt(3)
  *
  * So the third component, if present, should be ignored.
+ * Model:
+ *
+ *      performClarkeTransform[a_, b_] := {a, (a + 2 b)/\[Sqrt]3};
  */
 inline math::Vector<2> performClarkeTransform(const math::Vector<2>& ab)
 {
@@ -71,27 +74,55 @@ inline math::Vector<2> performClarkeTransform(const math::Vector<2>& ab)
 }
 
 /**
- * Park transform.
- * Implementation derived from someplace else (well, it's quite standard).
+ * Park transform, assming increasing Theta during direct rotation.
+ * Model:
+ *
+ *      performParkTransform[alpha_, beta_, Theta_] := {
+ *          alpha Sin[Theta] + beta Cos[Theta],
+ *          alpha Cos[Theta] - beta Sin[Theta] };
  */
 inline math::Vector<2> performParkTransform(const math::Vector<2>& alpha_beta,
                                             math::Const angle_sine,
                                             math::Const angle_cosine)
 {
-    return { alpha_beta[0] * angle_cosine + alpha_beta[1] * angle_sine,
-            -alpha_beta[0] * angle_sine   + alpha_beta[1] * angle_cosine };
+    return { alpha_beta[0] * angle_sine   + alpha_beta[1] * angle_cosine,
+             alpha_beta[0] * angle_cosine - alpha_beta[1] * angle_sine };
 }
 
 /**
- * Inverse Park transform.
- * Nothing special, move along please.
+ * Inverse Park transform to the above defined.
+ * Model:
+ *
+ *      performInverseParkTransform[Id_, Iq_, Theta_] := {
+ *          Id Sin[Theta] + Iq Cos[Theta],
+ *          Id Cos[Theta] - Iq Sin[Theta] };
  */
 inline math::Vector<2> performInverseParkTransform(const math::Vector<2>& dq,
                                                    math::Const angle_sine,
                                                    math::Const angle_cosine)
 {
-    return { dq[0] * angle_cosine - dq[1] * angle_sine,
-             dq[0] * angle_sine   + dq[1] * angle_cosine};
+    return { dq[0] * angle_sine   + dq[1] * angle_cosine,
+             dq[0] * angle_cosine - dq[1] * angle_sine };
 }
+
+/* The code above was validated using the following script:
+
+Theta = Range[0, 2 Pi, .01];
+currentLag = 10 \[Degree];
+voltageAmplitude = 2;
+currentAmplitude = 0.5;
+phaseV = {Sin[Theta] voltageAmplitude, Sin[Theta + 120 \[Degree]] voltageAmplitude};
+phaseI = {Sin[Theta + currentLag] currentAmplitude, Sin[Theta + 120 \[Degree] + currentLag] currentAmplitude};
+
+IAlphaBeta = Map[performClarkeTransform[#1[[1]], #1[[2]]] &, phaseI\[Transpose]];
+Idq = Map[performParkTransform[#1[[1]][[1]], #1[[1]][[2]], #1[[2]]] &, {IAlphaBeta, Theta}\[Transpose]];
+Iinv = Map[performInverseParkTransform[#1[[1]][[1]], #1[[1]][[2]], #1[[2]]] &, {Idq, Theta}\[Transpose]];
+
+ListLinePlot[{phaseV[[1]], phaseI[[1]]}, PlotLegends -> Automatic]
+ListLinePlot[{IAlphaBeta\[Transpose][[1]], IAlphaBeta\[Transpose][[2]], Idq\[Transpose][[1]], Idq\[Transpose][[2]]},
+             PlotLegends -> Automatic]
+ListLinePlot[{Iinv\[Transpose][[1]], Iinv\[Transpose][[2]]}, PlotLegends -> Automatic]
+
+ */
 
 }
