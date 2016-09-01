@@ -84,6 +84,11 @@ constexpr inline Scalar subtractAngles(Const left, Const right)
     return diff;
 }
 
+constexpr inline Scalar convertDegreesToRadian(Const deg)
+{
+    return deg / (180.0F / Pi);
+}
+
 /**
  * Inclusive range of the form [min, max].
  */

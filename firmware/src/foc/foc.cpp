@@ -165,6 +165,22 @@ void initializeContext()
                                               pid_Idq_settings);
 }
 
+void doStop()
+{
+    {
+        AbsoluteCriticalSectionLocker locker;
+
+        g_state = State::Idle;
+        g_setpoint = 0;
+        g_setpoint_remaining_ttl = 0;
+
+        g_context->~Context();
+        g_context = nullptr;
+    }
+
+    board::motor::setActive(false);
+}
+
 } // namespace
 
 
@@ -384,28 +400,47 @@ void handleMainIRQ(Const period)
                 Const angle_slip = g_context->observer.getAngularVelocity() * period;
                 g_context->angular_position =
                     constrainAngularPosition(g_context->observer.getAngularPosition() + angle_slip);
+
+                if (g_context->angular_velocity < 10.0F)
+                {
+                    doStop();
+                    return;
+                }
             }
             else
             {
                 // Spinup mode, special cases everywhere
-                if (g_context->angular_velocity < 400.0F)
+                if (g_context->angular_velocity < 100.0F)
                 {
-                    g_context->angular_velocity += 100.0F * period;
+                    g_context->angular_velocity += 50.0F * period;
+                }
+
+                Const Iq_delta = g_context->reference_Iq * period;
+
+                if (g_context->angular_velocity > g_context->observer.getAngularVelocity())
+                {
+                    g_context->reference_Iq -= Iq_delta;
+                }
+                else
+                {
+                    g_context->reference_Iq += Iq_delta;
                 }
 
                 // Hand-off to normal mode
-                if (g_context->angular_velocity > 10.0F)
+                if (g_context->angular_velocity > 50.0F)
                 {
-                    constexpr Scalar AngularPositionSynchronizationPrecision = (2.0F * math::Pi) / Scalar(6 * 10);
+                    Const ang_pos_error = math::subtractAngles(g_context->observer.getAngularPosition(),
+                                                               g_context->angular_position);
 
-                    Const abs_ang_vel_error =
-                        std::abs(g_context->observer.getAngularVelocity() - g_context->angular_velocity);
+                    Const ang_vel_rel_error =
+                        std::abs(g_context->observer.getAngularVelocity() - g_context->angular_velocity) /
+                        g_context->angular_velocity;
 
-                    Const abs_ang_pos_error = std::abs(math::subtractAngles(g_context->observer.getAngularPosition(),
-                                                                            g_context->angular_position));
+                    const bool ang_pos_ok = std::abs(ang_pos_error) < math::convertDegreesToRadian(20.0F);
 
-                    if (((abs_ang_vel_error / g_context->angular_velocity) < 0.2F) &&
-                        (abs_ang_pos_error < AngularPositionSynchronizationPrecision))
+                    const bool ang_vel_ok = ang_vel_rel_error < 0.1F;
+
+                    if (ang_vel_ok && ang_pos_ok)
                     {
                         g_state = State::Running;
                     }
@@ -417,25 +452,12 @@ void handleMainIRQ(Const period)
          * Updating setpoint and handling termination condition.
          */
         g_setpoint_remaining_ttl -= period;
-        if (g_setpoint_remaining_ttl <= 0.0F)
+
+        if (os::float_eq::closeToZero(Scalar(g_setpoint)) ||
+            (g_setpoint_remaining_ttl <= 0.0F))
         {
-            // Setpoint TTL expired, stopping
-            g_setpoint = 0.0F;
-        }
-
-        if (os::float_eq::closeToZero(Scalar(g_setpoint)))
-        {
-            // Stopping
-            {
-                AbsoluteCriticalSectionLocker locker;
-
-                g_state = State::Idle;
-
-                g_context->~Context();
-                g_context = nullptr;
-            }
-
-            board::motor::setActive(false);
+            doStop();
+            return;
         }
     }
 
@@ -445,6 +467,7 @@ void handleMainIRQ(Const period)
         if (need_to_start)
         {
             initializeContext();
+            g_error_counter.reset();
 
             g_context->reference_Iq = g_motor_params.start_current;
 
