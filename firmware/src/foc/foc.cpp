@@ -394,6 +394,20 @@ void handleMainIRQ(Const period)
 
             if (g_state == State::Running)
             {
+                if (g_control_mode == ControlMode::Ratiometric)
+                {
+                    g_context->reference_Iq =
+                        g_context->motor_current_limit.max * math::Range<>(-1.0F, 1.0F).constrain(g_setpoint);
+                }
+                else if (g_control_mode == ControlMode::Current)
+                {
+                    g_context->reference_Iq = g_context->motor_current_limit.constrain(g_setpoint);
+                }
+                else
+                {
+                    g_context->reference_Iq = 0;        // This is actually an error.
+                }
+
                 g_context->angular_velocity = g_context->observer.getAngularVelocity();
 
                 // Angle delay compensation
@@ -403,8 +417,7 @@ void handleMainIRQ(Const period)
 
                 if (g_context->angular_velocity < 10.0F)
                 {
-                    doStop();
-                    return;
+                    g_setpoint = 0;     // Stopping
                 }
             }
             else

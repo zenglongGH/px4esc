@@ -162,8 +162,7 @@ std::pair<Error, std::uint32_t> getLastErrorWithErrorCount();
 enum class ControlMode
 {
     Ratiometric,        ///< Abstract units in [-1, 1]
-    Torque,             ///< Newton meters
-    AngularVelocity     ///< Radian per second
+    Current             ///< Ampere
 };
 
 /**
