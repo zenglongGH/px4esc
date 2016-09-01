@@ -346,36 +346,46 @@ class SetpointCommand : public os::shell::ICommandHandler
             foc::stop();
 
             ios.print("Set setpoint in the range [-1, 1] (negative for reverse rotation).\n");
-            ios.print("By default, ratiometric setpoint will be used.\n");
+            ios.print("By default, ratiometric setpoint will be used; option A/a enables current setpoint.\n");
             ios.print("Execute without arguments to stop the motor.\n");
             ios.print("Option -p will plot the real time values.\n");
-            ios.print("\t%s [setpoint=0] [-p]\n", argv[0]);
+            ios.print("\t%s [setpoint=0 [A|a] [-p]]\n", argv[0]);
             return;
         }
 
+        // Parsing optional stuff
+        auto control_mode = foc::ControlMode::Ratiometric;      // This is the default
         bool do_plot = false;
+
         for (int i = 1; i < argc; i++)
         {
-            if (!std::strncmp("-p", argv[i], 2))
+            const os::heapless::String<> arg(argv[i]);
+
+            if (arg == "-p")
             {
                 do_plot = true;
             }
+
+            if (arg == "a" ||
+                arg == "A")
+            {
+                control_mode = foc::ControlMode::Current;
+            }
         }
+
+        using namespace std;
+        const float sp = strtof(argv[1], nullptr);
+
+        const float ttl = 600.0F;                       // TODO: Configurable
+
+        ios.print("Setpoint %.3f mode %d TTL %.1f s\n", double(sp), int(control_mode), double(ttl));
+
+        foc::setSetpoint(control_mode, sp, ttl);
 
         if (do_plot)
         {
             ios.print("Press any key to stop\n");
-        }
 
-        using namespace std;
-        const float sp = strtof(argv[1], nullptr);      // TODO: Various types of setpoint
-
-        const float ttl = 600.0F;                       // TODO: Configurable
-
-        foc::setSetpoint(foc::ControlMode::Ratiometric, sp, ttl);
-
-        if (do_plot)
-        {
             while (ios.getChar(1) > 0)
             {
                 ;   // Clearing the input buffer
