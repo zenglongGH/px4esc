@@ -89,7 +89,39 @@ struct ErrorCounter
 } volatile g_error_counter;
 
 
-Scalar g_debug_array[5];
+class DebugVariableTracer
+{
+    static constexpr unsigned NumVariables = 5;
+
+#if DEBUG_BUILD
+    Scalar vars_[NumVariables] = {};
+#endif
+
+public:
+    template <unsigned Index, typename Value>
+    void set(const Value x)
+    {
+        static_assert(Index < NumVariables, "Debug variable index out of range");
+#if DEBUG_BUILD
+        vars_[Index] = Scalar(x);
+#else
+        (void) x;
+#endif
+    }
+
+    void print() const
+    {
+#if DEBUG_BUILD
+        // We have a race condition on read, but it's alright
+        std::printf("$%.2f,%.2f,%.2f,%.2f,%.2f\n",
+                    double(vars_[0]),
+                    double(vars_[1]),
+                    double(vars_[2]),
+                    double(vars_[3]),
+                    double(vars_[4]));
+#endif
+    }
+} g_debug_tracer;
 
 
 struct Context
@@ -334,12 +366,7 @@ void printStatusInfo()
 
 void plotRealTimeValues()
 {
-    std::printf("$%.2f,%.2f,%.2f,%.2f,%.2f\n",
-                double(g_debug_array[0]),
-                double(g_debug_array[1]),
-                double(g_debug_array[2]),
-                double(g_debug_array[3]),
-                double(g_debug_array[4]));
+    g_debug_tracer.print();
 }
 
 }
@@ -381,9 +408,9 @@ void handleMainIRQ(Const period)
          */
         g_context->observer.update(period, Idq, Udq);
 
-        g_debug_array[2] = g_context->angular_velocity;
-        g_debug_array[3] = g_context->observer.getAngularPosition();
-        g_debug_array[4] = g_context->observer.getAngularVelocity();
+        g_debug_tracer.set<2>(g_context->angular_velocity);
+        g_debug_tracer.set<3>(g_context->observer.getAngularPosition());
+        g_debug_tracer.set<4>(g_context->observer.getAngularVelocity());
 
         /*
          * Updating the state estimate.
@@ -548,8 +575,8 @@ void handleFastIRQ(Const period,
 
         board::motor::setPWM(pwm_setpoint);
 
-        g_debug_array[0] = g_context->estimated_Idq[0];
-        g_debug_array[1] = g_context->estimated_Idq[1];
+        g_debug_tracer.set<0>(g_context->estimated_Idq[0]);
+        g_debug_tracer.set<1>(g_context->estimated_Idq[1]);
 
         /*
          * Position extrapolation
