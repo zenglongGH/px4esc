@@ -725,8 +725,6 @@ void setPWM(const math::Vector<3>& abc)
 
 void emergency()
 {
-    AbsoluteCriticalSectionLocker mighty_locker;
-
     // Generating software break, this will reset the PWM outputs to zero immediately
     TIM1->EGR = TIM_EGR_BG;
 
