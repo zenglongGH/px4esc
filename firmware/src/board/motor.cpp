@@ -725,6 +725,9 @@ void setPWM(const math::Vector<3>& abc)
 
 void emergency()
 {
+    // Absolute critical section must not be used here, because this function can be invoked from ANY context.
+    // And we don't need it here anyway.
+
     // Generating software break, this will reset the PWM outputs to zero immediately
     TIM1->EGR = TIM_EGR_BG;
 

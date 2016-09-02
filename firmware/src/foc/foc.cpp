@@ -654,7 +654,8 @@ void handleFastIRQ(Const period,
             }
             else                                                // Beeping is currently in progress
             {
-                if (current_cycle >= next_excitation_at)
+                if ((current_cycle >= next_excitation_at) &&
+                    board::motor::isActive())
                 {
                     next_excitation_at += excitation_period;
 
@@ -668,13 +669,15 @@ void handleFastIRQ(Const period,
                 }
                 else
                 {
-                    board::motor::setPWM(math::Vector<3>::Zero());
-
                     if ((next_excitation_at >= beeping_deadline) ||     // Finished
                         ((current_cycle + 1U) >= beeping_deadline))
                     {
                         // TODO: Properly release activation. Use activation locks?
                         board::motor::setActive(false);
+                    }
+                    else
+                    {
+                        board::motor::setPWM(math::Vector<3>::Zero());
                     }
                 }
             }
