@@ -52,24 +52,54 @@ namespace motor
 void init();
 
 /**
- * Activates/deactivates the power stage hardware.
- * Must be activated before the motor can be started.
- * Must be deactivated after the motor is stopped.
+ * This lock should be used by the application to request activation of the driver.
+ * The lock will be automatically released as soon as the object is destroyed.
+ *
+ * The driver must be activated before the motor can be started.
+ * The driver should be deactivated after the motor is stopped.
  * In inactive mode, all current measurements will be reported as zero.
- * The default state is deactivated.
+ *
+ * The driver will be kept active only as long as the number of held activation locks exceeds zero.
+ * By default, no locks are held, and the driver will be inactive.
+ * The driver may create its own activation locks, e.g. during calibration.
+ * This semantics is very similar of that of the Android Wake Lock.
  */
-void setActive(bool active);
+class ActivationLock
+{
+    static unsigned total_number_of_held_locks_;
 
-/**
- * @ref setActive().
- */
-bool isActive();
+    bool held_ = false;
+
+public:
+    ~ActivationLock() { release(); }
+
+    /**
+     * Activates the current lock, activates the driver if not active yet.
+     * Does nothing if the lock is already held.
+     */
+    void acquire();
+
+    /**
+     * Deactivates the current lock, deactivates the driver if it was the last held lock.
+     * Does nothing if the lock is not held.
+     */
+    void release();
+
+    /**
+     * Returns true if the current lock is the only one holding the driver active,
+     * or if the driver is not active (and therefore the current lock can be unique, if acquired).
+     */
+    bool isUnique() const;
+
+    bool isHeld() const { return held_; }
+
+    static unsigned getTotalNumberOfHeldLocks() { return total_number_of_held_locks_; }
+};
 
 /**
  * This function can be invoked to perform zero offset calibration.
  * It must be guaranteed that during such calibration the motor is NOT spinning,
  * and that no other component will be using the driver while the calibration is in progress.
- * The driver activity state will be restored upon completion of the calibration process.
  * See also @ref isCalibrationInProgress().
  */
 void beginCalibration();

@@ -147,19 +147,23 @@ class PWMCommand : public os::shell::ICommandHandler
             return;
         }
 
+        static board::motor::ActivationLock act_lock;
+
         if (0 == std::strncmp("on", argv[1], 2))
         {
-            board::motor::setActive(true);
-            ios.print("Activated\n");
+            act_lock.acquire();
+            ios.print("Activation lock acquired (total: %u)\n",
+                      board::motor::ActivationLock::getTotalNumberOfHeldLocks());
         }
         else if (0 == std::strncmp("off", argv[1], 3))
         {
-            board::motor::setActive(false);
-            ios.print("Deactivated\n");
+            act_lock.release();
+            ios.print("Activation lock released (total: %u)\n",
+                      board::motor::ActivationLock::getTotalNumberOfHeldLocks());
         }
         else
         {
-            if (board::motor::isActive())
+            if (board::motor::ActivationLock::getTotalNumberOfHeldLocks() > 0)
             {
                 constexpr math::Range<> range(0, 1);
                 math::Vector<3> abc = math::Vector<3>::Zero();
@@ -193,8 +197,10 @@ class StatusCommand : public os::shell::ICommandHandler
         ios.print("%s---\n", board::motor::getStatus().toString().c_str());
 
         ios.print("PWM:\n"
-                  "Frequency: %.6f kHz\n"
-                  "DeadTime : %.1f nsec\n",
+                  "Activation locks: %u\n"
+                  "Frequency       : %.6f kHz\n"
+                  "DeadTime        : %.1f nsec\n",
+                  board::motor::ActivationLock::getTotalNumberOfHeldLocks(),
                   1e-3 / double(board::motor::getPWMPeriod()),
                   double(board::motor::getPWMDeadTime()) * 1e9);
     }
@@ -265,12 +271,8 @@ class SpinCommand : public os::shell::ICommandHandler
         /*
          * Spinning until keyhit
          */
-        struct Activator
-        {
-            const bool original_state = board::motor::isActive();
-            Activator()  { board::motor::setActive(true); }
-            ~Activator() { board::motor::setActive(original_state); }
-        } const volatile raii_activator;
+        board::motor::ActivationLock act_lock;
+        act_lock.acquire();
 
         ios.print("Spinning at %.1f rad/s, %.1f V. Type any character to stop.\n",
                   double(angular_velocity), double(voltage));
