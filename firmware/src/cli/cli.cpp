@@ -140,14 +140,22 @@ class PWMCommand : public os::shell::ICommandHandler
 
     void execute(os::shell::BaseChannelWrapper& ios, int argc, char** argv) override
     {
+        static board::motor::PWMHandle pwm_handle;
+
         if (argc < 2)
         {
+            pwm_handle.release();
             ios.print("Usage: %s { off | <A> [B [C]] }\n", argv[0]);
             ios.print("Where A, B, C are phase values in [0, 1]\n");
             return;
         }
 
-        static board::motor::PWMHandle pwm_handle;
+        if (!pwm_handle.isUnique())
+        {
+            pwm_handle.release();
+            ios.print("ERROR: Driver is already in use\n");
+            return;
+        }
 
         if (0 == std::strncmp("off", argv[1], 3))
         {
@@ -240,7 +248,7 @@ class SpinCommand : public os::shell::ICommandHandler
         const float angular_velocity = strtof(argv[1], nullptr);
         if (os::float_eq::closeToZero(angular_velocity))
         {
-            ios.print("Invalid angular velocity\n");
+            ios.print("ERROR: Invalid angular velocity\n");
             return;
         }
 
@@ -250,16 +258,25 @@ class SpinCommand : public os::shell::ICommandHandler
             voltage = strtof(argv[2], nullptr);
             if (voltage <= 0)
             {
-                ios.print("Invalid voltage\n");
+                ios.print("ERROR: Invalid voltage\n");
                 return;
             }
         }
 
         /*
-         * Spinning until keyhit
+         * Gaining access to the driver
          */
         board::motor::PWMHandle pwm_handle;
 
+        if (!pwm_handle.isUnique())
+        {
+            ios.print("ERROR: Driver is already in use\n");
+            return;
+        }
+
+        /*
+         * Spinning until keyhit
+         */
         ios.print("Spinning at %.1f rad/s, %.1f V. Type any character to stop.\n",
                   double(angular_velocity), double(voltage));
 
@@ -314,7 +331,7 @@ class SpinCommand : public os::shell::ICommandHandler
             //ios.print("$%.3f,%.3f,%.3f\n", double(setpoint[0]), double(setpoint[1]), double(setpoint[2]));
         }
 
-        pwm_handle.release();
+        pwm_handle.setPWM(math::Vector<3>::Zero());
 
         ios.print("Stopped; min/max PWM setpoints: %.3f/%.3f; min/max inverter voltage: %.1f/%.1f\n",
                   double(min_setpoint), double(max_setpoint),
