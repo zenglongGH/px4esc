@@ -257,6 +257,8 @@ int main()
 
     uavcan_node::notifyNodeInitializationComplete();
 
+    foc::beep(10000.0F, 0.1F);
+
     while (!os::isRebootRequested())
     {
         watchdog.reset();
