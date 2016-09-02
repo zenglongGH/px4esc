@@ -402,9 +402,35 @@ class SetpointCommand : public os::shell::ICommandHandler
 } static cmd_setpoint;
 
 
+class BeepCommand : public os::shell::ICommandHandler
+{
+    const char* getName() const override { return "beep"; }
+
+    void execute(os::shell::BaseChannelWrapper& ios, int argc, char** argv) override
+    {
+        constexpr float DefaultDuration = 0.1F;
+
+        if (argc <= 1)
+        {
+            ios.print("Make noise of the specified frequency [Hz] and duration [sec].\n");
+            ios.print("\t%s <frequency> [duration=%.1f]\n", argv[0], double(DefaultDuration));
+            return;
+        }
+
+        using namespace std;
+
+        const float frequency = strtof(argv[1], nullptr);
+
+        float duration = (argc > 2) ? strtof(argv[2], nullptr) : DefaultDuration;
+
+        foc::beep(frequency, duration);
+    }
+} static cmd_beep;
+
+
 class CLIThread : public chibios_rt::BaseStaticThread<2048>
 {
-    os::shell::Shell<> shell_;
+    os::shell::Shell<20> shell_;
 
     void main() override
     {
@@ -436,6 +462,7 @@ public:
         (void) shell_.addCommandHandler(&cmd_calibrate);
         (void) shell_.addCommandHandler(&cmd_spin);
         (void) shell_.addCommandHandler(&cmd_setpoint);
+        (void) shell_.addCommandHandler(&cmd_beep);
     }
 
     virtual ~CLIThread() { }

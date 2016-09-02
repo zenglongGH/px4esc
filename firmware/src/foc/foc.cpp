@@ -124,6 +124,32 @@ public:
 } g_debug_tracer;
 
 
+struct BeepCommand
+{
+    Scalar frequency = 0;
+    Scalar duration  = 0;
+} * g_beep_command = nullptr;
+
+
+class CycleCounter
+{
+    std::uint64_t cnt_ = 0;
+
+public:
+    void increment()
+    {
+        cnt_++;
+    }
+
+    std::uint64_t get() const
+    {
+        return cnt_;
+    }
+};
+
+CycleCounter g_fast_irq_cycle_counter;
+
+
 struct Context
 {
     const math::Range<> motor_current_limit;
@@ -354,8 +380,18 @@ void beep(Const frequency,
           Const duration)
 {
     AbsoluteCriticalSectionLocker locker;
-    (void)frequency;
-    (void)duration;
+
+    if ((g_state == State::Idle) &&
+        (frequency > 0) &&
+        (duration > 0))
+    {
+        static BeepCommand beep_command;
+
+        beep_command.frequency = frequency;
+        beep_command.duration  = duration;
+
+        g_beep_command = &beep_command;
+    }
 }
 
 
@@ -523,6 +559,8 @@ void handleFastIRQ(Const period,
                    const math::Vector<2>& phase_currents_ab,
                    Const inverter_voltage)
 {
+    g_fast_irq_cycle_counter.increment();
+
     const auto state = g_state;                 // Avoiding excessive volatile reads
 
     /*
@@ -590,7 +628,57 @@ void handleFastIRQ(Const period,
      */
     if (state == State::Idle)
     {
-        // TODO: beeping
+        if (!board::motor::isCalibrationInProgress())           // Beeping
+        {
+            static std::uint64_t beeping_deadline;
+            static std::uint64_t next_excitation_at;
+            static std::uint32_t excitation_period;
+
+            const auto current_cycle = g_fast_irq_cycle_counter.get();
+
+            if (current_cycle >= beeping_deadline)              // Beeping is not in progress, commencing if needed
+            {
+                if (g_beep_command != nullptr)
+                {
+                    Const frequency = math::Range<>(100.0F, 15000.0F).constrain(g_beep_command->frequency);
+                    Const duration  = math::Range<>(0, 3.0F).constrain(g_beep_command->duration);
+
+                    excitation_period = std::uint32_t((1.0F / frequency) / period + 0.5F);
+                    next_excitation_at = current_cycle;
+                    beeping_deadline = current_cycle + std::uint64_t(duration / period + 0.5F);
+
+                    g_beep_command = nullptr;
+
+                    board::motor::setActive(true);              // Beginning now
+                }
+            }
+            else                                                // Beeping is currently in progress
+            {
+                if (current_cycle >= next_excitation_at)
+                {
+                    next_excitation_at += excitation_period;
+
+                    static unsigned phase_selector;
+                    phase_selector = (phase_selector + 1U) % 3U;
+
+                    math::Vector<3> pwm_vector = math::Vector<3>::Zero();
+                    pwm_vector[phase_selector] = 1.0F;
+
+                    board::motor::setPWM(pwm_vector);
+                }
+                else
+                {
+                    board::motor::setPWM(math::Vector<3>::Zero());
+
+                    if ((next_excitation_at >= beeping_deadline) ||     // Finished
+                        ((current_cycle + 1U) >= beeping_deadline))
+                    {
+                        // TODO: Properly release activation. Use activation locks?
+                        board::motor::setActive(false);
+                    }
+                }
+            }
+        }
     }
 }
 
