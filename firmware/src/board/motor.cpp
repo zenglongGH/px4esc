@@ -125,27 +125,6 @@ float g_inverter_temperature_sensor_voltage;
 /// True ADC zero offset on the current channels.
 math::Vector<2> g_phase_current_zero_offset = math::Vector<2>::Ones() * (ADCReferenceVoltage / 2.0F);
 
-/// True if PWM outputs are active and the driver outputs are enabled
-volatile bool g_is_active = false;
-
-
-inline void setRawPWM(const std::uint16_t a, const std::uint16_t b, const std::uint16_t c)
-{
-    assert((a <= TIM1->ARR) &&
-           (b <= TIM1->ARR) &&
-           (c <= TIM1->ARR));
-    /*
-     * If CNT reaches zero between writes to CCR1 and CCR3, PWM will break, because the PWM signals will not
-     * be in agreement with each other (CCR1 and possibly CCR2 will be using the new values, CCR3 and possibly
-     * CCR2 will keep old values until the next update event).
-     * Therefore we need to ensure that this function is NOT invoked when CNT is close to zero. Luckily, during
-     * normal operation this requirement should be met automatically, because this function will be invoked
-     * (very indirectly) from the ADC interrupt handler, which in turn is synchronized with timer update event.
-     */
-    TIM1->CCR1 = a;
-    TIM1->CCR2 = b;
-    TIM1->CCR3 = c;
-}
 
 /**
  * This is used for current zero offset calibration.
@@ -159,14 +138,13 @@ class Calibrator
 
     const unsigned num_samples_needed_;
 
-    ActivationLock activation_lock_;
+    PWMHandle pwm_handle_;
 
 public:
     Calibrator(unsigned num_samples_required) :
         num_samples_needed_(num_samples_required)
     {
-        activation_lock_.acquire();
-        setRawPWM(0, 0, 0);
+        pwm_handle_.setPWM(math::Vector<3>::Zero());
     }
 
     void addSample(const math::Vector<2>& phase_current_adc_voltages)
@@ -563,6 +541,25 @@ void initADC()
 }
 
 
+inline void setRawPWM(const std::uint16_t a, const std::uint16_t b, const std::uint16_t c)
+{
+    assert((a <= TIM1->ARR) &&
+           (b <= TIM1->ARR) &&
+           (c <= TIM1->ARR));
+    /*
+     * If CNT reaches zero between writes to CCR1 and CCR3, PWM will break, because the PWM signals will not
+     * be in agreement with each other (CCR1 and possibly CCR2 will be using the new values, CCR3 and possibly
+     * CCR2 will keep old values until the next update event).
+     * Therefore we need to ensure that this function is NOT invoked when CNT is close to zero. Luckily, during
+     * normal operation this requirement should be met automatically, because this function will be invoked
+     * (very indirectly) from the ADC interrupt handler, which in turn is synchronized with timer update event.
+     */
+    TIM1->CCR1 = a;
+    TIM1->CCR2 = b;
+    TIM1->CCR3 = c;
+}
+
+
 template <unsigned NumSamples>
 inline float convertADCSamplesToVoltage(const std::uint16_t (&x)[NumSamples])
 {
@@ -602,8 +599,6 @@ inline void setActive(bool active)
     palWritePad(GPIOA, GPIOA_EN_GATE, active);
 
     setRawPWM(0, 0, 0);
-
-    g_is_active = active;
 }
 
 } // namespace
@@ -659,55 +654,64 @@ void init()
 }
 
 /*
- * ActivationLock
+ * PWMHandle
  */
-unsigned ActivationLock::total_number_of_held_locks_ = 0;
+unsigned PWMHandle::total_number_of_active_handles_ = 0;
 
-void ActivationLock::acquire()
+void PWMHandle::setPWM(const math::Vector<3>& abc)
 {
-    AbsoluteCriticalSectionLocker locker;
-
-    if (!held_)
+    if (!active_)
     {
-        if (total_number_of_held_locks_ == 0U)
+        AbsoluteCriticalSectionLocker locker;
+
+        if (total_number_of_active_handles_ == 0U)
         {
             setActive(true);
         }
 
-        held_ = true;
-        total_number_of_held_locks_++;
+        active_ = true;
+        total_number_of_active_handles_++;
     }
+
+    assert(g_calibrator == nullptr);
+    assert((abc.array() >= 0).all() && (abc.array() <= 1).all());
+
+    const auto arr = float(TIM1->ARR);
+
+    setRawPWM(std::uint16_t(abc[0] * arr + 0.4F),
+              std::uint16_t(abc[1] * arr + 0.4F),
+              std::uint16_t(abc[2] * arr + 0.4F));
 }
 
-void ActivationLock::release()
+void PWMHandle::release()
 {
     AbsoluteCriticalSectionLocker locker;
 
-    if (held_)
+    if (active_)
     {
-        assert(total_number_of_held_locks_ > 0);
+        assert(total_number_of_active_handles_ > 0);
 
-        held_ = false;
-        total_number_of_held_locks_--;
+        active_ = false;
+        total_number_of_active_handles_--;
 
-        if (total_number_of_held_locks_ == 0U)
+        if (total_number_of_active_handles_ == 0U)
         {
             setActive(false);
         }
     }
 }
 
-bool ActivationLock::isUnique() const
+bool PWMHandle::isUnique() const
 {
     AbsoluteCriticalSectionLocker locker;
 
-    if (held_)
+    if (active_)
     {
-        return total_number_of_held_locks_ == 1;
+        return total_number_of_active_handles_ == 1;
     }
     else
     {
-        return total_number_of_held_locks_ == 0;
+        return total_number_of_active_handles_ == 0;
     }
 }
 
@@ -752,19 +756,6 @@ float getPWMDeadTime()
 float getInverterVoltage()
 {
     return g_inverter_voltage;          // Atomic read, no need to lock
-}
-
-void setPWM(const math::Vector<3>& abc)
-{
-    assert(g_is_active);
-    assert(g_calibrator == nullptr);
-    assert((abc.array() >= 0).all() && (abc.array() <= 1).all());
-
-    const auto arr = float(TIM1->ARR);
-
-    setRawPWM(std::uint16_t(abc[0] * arr + 0.4F),
-              std::uint16_t(abc[1] * arr + 0.4F),
-              std::uint16_t(abc[2] * arr + 0.4F));
 }
 
 void emergency()
@@ -839,7 +830,7 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
 
     // While EN_GATE is low, the current amplifiers are shut down, so we're measuring garbage
     const auto phase_currents =
-        g_is_active ?
+        (PWMHandle::getTotalNumberOfActiveHandles() > 0) ?
         g_board_features.convertADCVoltagesToPhaseCurrents(phase_currents_adc_voltages - g_phase_current_zero_offset) :
         math::Vector<2>::Zero();
 

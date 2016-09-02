@@ -52,48 +52,44 @@ namespace motor
 void init();
 
 /**
- * This lock should be used by the application to request activation of the driver.
- * The lock will be automatically released as soon as the object is destroyed.
- *
- * The driver must be activated before the motor can be started.
- * The driver should be deactivated after the motor is stopped.
+ * This handle allows the application to command PWM values.
+ * The handle will be automatically released as soon as the object is destroyed.
+ * When no handle is active, the driver hardware will be automatically deactivated.
  * In inactive mode, all current measurements will be reported as zero.
- *
- * The driver will be kept active only as long as the number of held activation locks exceeds zero.
- * By default, no locks are held, and the driver will be inactive.
- * The driver may create its own activation locks, e.g. during calibration.
+ * The driver may create its own handles, e.g. during calibration.
  * This semantics is very similar of that of the Android Wake Lock.
  */
-class ActivationLock
+class PWMHandle
 {
-    static unsigned total_number_of_held_locks_;
+    static unsigned total_number_of_active_handles_;
 
-    bool held_ = false;
+    bool active_ = false;
 
 public:
-    ~ActivationLock() { release(); }
+    ~PWMHandle() { release(); }
 
     /**
-     * Activates the current lock, activates the driver if not active yet.
-     * Does nothing if the lock is already held.
+     * Activates the current handle, activates the driver if not active yet, and sets the PWM outputs.
+     * @param abc           PWM values per channel in the range [0, 1].
      */
-    void acquire();
+    void setPWM(const math::Vector<3>& abc);
 
     /**
-     * Deactivates the current lock, deactivates the driver if it was the last held lock.
-     * Does nothing if the lock is not held.
+     * Deactivates the current handle, deactivates the driver if it was the last active handle,
+     * clears PWM outputs to zero.
+     * Does nothing if the handle is not active.
      */
     void release();
 
     /**
-     * Returns true if the current lock is the only one holding the driver active,
-     * or if the driver is not active (and therefore the current lock can be unique, if acquired).
+     * Returns true if the current handle is the only one active,
+     * or if the driver is not active (and therefore the current handle will be unique once activated).
      */
     bool isUnique() const;
 
-    bool isHeld() const { return held_; }
+    bool isActive() const { return active_; }
 
-    static unsigned getTotalNumberOfHeldLocks() { return total_number_of_held_locks_; }
+    static unsigned getTotalNumberOfActiveHandles() { return total_number_of_active_handles_; }
 };
 
 /**
@@ -125,12 +121,6 @@ float getPWMDeadTime();
  * Returns the power stage voltage, aka VBAT, in volts.
  */
 float getInverterVoltage();
-
-/**
- * This function must not be called if the driver is not active; see @ref setActive().
- * @param abc           PWM values per channel in the range [0, 1].
- */
-void setPWM(const math::Vector<3>& abc);
 
 /**
  * Immediately deactivates the PWM outputs (shuts down the carrier).

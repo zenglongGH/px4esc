@@ -68,7 +68,7 @@ volatile Scalar g_setpoint;
 
 volatile Scalar g_setpoint_remaining_ttl;       ///< Seconds left before the setpoint will be zeroed, unless updated
 
-board::motor::ActivationLock g_activation_lock; ///< Released automatically from IRQ when not needed
+board::motor::PWMHandle g_pwm_handle;
 
 
 struct ErrorCounter
@@ -542,8 +542,6 @@ void handleMainIRQ(Const period)
 
             g_context->reference_Iq = g_motor_params.start_current;
 
-            g_activation_lock.acquire();
-
             g_state = State::Spinup;
         }
     }
@@ -606,7 +604,7 @@ void handleFastIRQ(Const period,
         const auto pwm_setpoint = normalizePhaseVoltagesToPWMSetpoint(phase_voltages_and_sector_number.first,
                                                                       inverter_voltage);
 
-        board::motor::setPWM(pwm_setpoint);
+        g_pwm_handle.setPWM(pwm_setpoint);
 
         g_debug_tracer.set<0>(g_context->estimated_Idq[0]);
         g_debug_tracer.set<1>(g_context->estimated_Idq[1]);
@@ -623,9 +621,7 @@ void handleFastIRQ(Const period,
      */
     if (state == State::Idle)
     {
-        const bool beeping_allowed = !board::motor::isCalibrationInProgress() && g_activation_lock.isUnique();
-
-        if (beeping_allowed)
+        if (!board::motor::isCalibrationInProgress() && g_pwm_handle.isUnique())
         {
             static std::uint64_t beeping_deadline;
             static std::uint64_t next_excitation_at;
@@ -633,9 +629,9 @@ void handleFastIRQ(Const period,
 
             const auto current_cycle = g_fast_irq_cycle_counter.get();
 
-            if (g_activation_lock.isHeld() && (current_cycle < beeping_deadline))    // Beeping in progress
+            if (current_cycle < beeping_deadline)               // Beeping in progress
             {
-                board::motor::setPWM(math::Vector<3>::Zero());
+                g_pwm_handle.setPWM(math::Vector<3>::Zero());
 
                 if (current_cycle >= next_excitation_at)
                 {
@@ -647,12 +643,12 @@ void handleFastIRQ(Const period,
                     math::Vector<3> pwm_vector = math::Vector<3>::Zero();
                     pwm_vector[phase_selector] = 1.0F;
 
-                    board::motor::setPWM(pwm_vector);
+                    g_pwm_handle.setPWM(pwm_vector);
                 }
             }
             else                                                // Beeping is not in progress, commencing if needed
             {
-                g_activation_lock.release();
+                g_pwm_handle.release();
 
                 if (g_beep_command != nullptr)
                 {
@@ -664,15 +660,13 @@ void handleFastIRQ(Const period,
                     beeping_deadline = current_cycle + std::uint64_t(duration / period + 0.5F);
 
                     g_beep_command = nullptr;
-
-                    g_activation_lock.acquire();
                 }
             }
         }
         else
         {
             g_beep_command = nullptr;
-            g_activation_lock.release();
+            g_pwm_handle.release();     // Even if the phase was excited, the driver will handle everything properly.
         }
     }
 }

@@ -142,46 +142,33 @@ class PWMCommand : public os::shell::ICommandHandler
     {
         if (argc < 2)
         {
-            ios.print("Usage: %s { on | off | <A> <B> <C> }\n", argv[0]);
+            ios.print("Usage: %s { off | <A> [B [C]] }\n", argv[0]);
             ios.print("Where A, B, C are phase values in [0, 1]\n");
             return;
         }
 
-        static board::motor::ActivationLock act_lock;
+        static board::motor::PWMHandle pwm_handle;
 
-        if (0 == std::strncmp("on", argv[1], 2))
+        if (0 == std::strncmp("off", argv[1], 3))
         {
-            act_lock.acquire();
-            ios.print("Activation lock acquired (total: %u)\n",
-                      board::motor::ActivationLock::getTotalNumberOfHeldLocks());
-        }
-        else if (0 == std::strncmp("off", argv[1], 3))
-        {
-            act_lock.release();
-            ios.print("Activation lock released (total: %u)\n",
-                      board::motor::ActivationLock::getTotalNumberOfHeldLocks());
+            pwm_handle.release();
+            ios.print("PWM handle released (remaining: %u)\n",
+                      board::motor::PWMHandle::getTotalNumberOfActiveHandles());
         }
         else
         {
-            if (board::motor::ActivationLock::getTotalNumberOfHeldLocks() > 0)
-            {
-                constexpr math::Range<> range(0, 1);
-                math::Vector<3> abc = math::Vector<3>::Zero();
+            constexpr math::Range<> range(0, 1);
+            math::Vector<3> abc = math::Vector<3>::Zero();
 
-                for (int i = 0; i < std::min(3, argc); i++)
-                {
-                    // strtof() returns 0 on failure, which is just what we need
-                    using namespace std;
-                    abc[i] = range.constrain(strtof(argv[i + 1], nullptr));
-                }
-
-                board::motor::setPWM(abc);
-                ios.print("PWM set to  %.3f  %.3f  %.3f\n", double(abc[0]), double(abc[1]), double(abc[2]));
-            }
-            else
+            for (int i = 0; i < std::min(3, argc); i++)
             {
-                ios.print("Driver is not active, command ignored\n");
+                // strtof() returns 0 on failure, which is just what we need
+                using namespace std;
+                abc[i] = range.constrain(strtof(argv[i + 1], nullptr));
             }
+
+            pwm_handle.setPWM(abc);
+            ios.print("PWM set to  %.3f  %.3f  %.3f\n", double(abc[0]), double(abc[1]), double(abc[2]));
         }
     }
 } static cmd_pwm;
@@ -197,10 +184,10 @@ class StatusCommand : public os::shell::ICommandHandler
         ios.print("%s---\n", board::motor::getStatus().toString().c_str());
 
         ios.print("PWM:\n"
-                  "Activation locks: %u\n"
-                  "Frequency       : %.6f kHz\n"
-                  "DeadTime        : %.1f nsec\n",
-                  board::motor::ActivationLock::getTotalNumberOfHeldLocks(),
+                  "Active handles: %u\n"
+                  "Frequency     : %.6f kHz\n"
+                  "DeadTime      : %.1f nsec\n",
+                  board::motor::PWMHandle::getTotalNumberOfActiveHandles(),
                   1e-3 / double(board::motor::getPWMPeriod()),
                   double(board::motor::getPWMDeadTime()) * 1e9);
     }
@@ -271,8 +258,7 @@ class SpinCommand : public os::shell::ICommandHandler
         /*
          * Spinning until keyhit
          */
-        board::motor::ActivationLock act_lock;
-        act_lock.acquire();
+        board::motor::PWMHandle pwm_handle;
 
         ios.print("Spinning at %.1f rad/s, %.1f V. Type any character to stop.\n",
                   double(angular_velocity), double(voltage));
@@ -316,7 +302,7 @@ class SpinCommand : public os::shell::ICommandHandler
                 foc::normalizePhaseVoltagesToPWMSetpoint(foc::performSpaceVectorTransform({alpha, beta}).first,
                                                          inverter_voltage);
 
-            board::motor::setPWM(setpoint);
+            pwm_handle.setPWM(setpoint);
 
             // Collecting statistics
             min_setpoint = std::min(min_setpoint, setpoint[0]);
@@ -328,7 +314,7 @@ class SpinCommand : public os::shell::ICommandHandler
             //ios.print("$%.3f,%.3f,%.3f\n", double(setpoint[0]), double(setpoint[1]), double(setpoint[2]));
         }
 
-        board::motor::setPWM(math::Vector<3>::Zero());
+        pwm_handle.release();
 
         ios.print("Stopped; min/max PWM setpoints: %.3f/%.3f; min/max inverter voltage: %.1f/%.1f\n",
                   double(min_setpoint), double(max_setpoint),

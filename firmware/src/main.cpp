@@ -213,6 +213,11 @@ os::watchdog::Timer init()
 
     foc::setObserverParameters(foc::ObserverParameters());
 
+    while (board::motor::isCalibrationInProgress())
+    {
+        ::sleep(1);
+    }
+
     /*
      * CLI initialization
      */
@@ -251,13 +256,21 @@ int main()
 {
     auto watchdog = app::init();
 
+    /*
+     * Confirming initialization
+     */
     chibios_rt::BaseThread::setPriority(LOWPRIO);
 
-    std::uint8_t counter = 0;
+    foc::beep(5000.0F, 0.1F);
+    ::usleep(100000);
+    foc::beep(6000.0F, 0.1F);
 
     uavcan_node::notifyNodeInitializationComplete();
 
-    foc::beep(10000.0F, 0.1F);
+    /*
+     * Main loop
+     */
+    std::uint8_t counter = 0;
 
     while (!os::isRebootRequested())
     {
