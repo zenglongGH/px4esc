@@ -451,19 +451,19 @@ void handleMainIRQ(Const period)
 
         g_debug_tracer.set<5>(g_context->observer.getAngularVelocity());
 
-        g_context->angular_velocity = g_context->observer.getAngularVelocity();
-
-        // Angle delay compensation
-        Const angle_slip = g_context->observer.getAngularVelocity() * period;
-        g_context->angular_position =
-            constrainAngularPosition(g_context->observer.getAngularPosition() + angle_slip);
-
         /*
          * Updating the state estimate.
          * Critical section is required because at this point we're no longer synchronized with the fast IRQ.
          */
         {
             AbsoluteCriticalSectionLocker locker;
+
+            g_context->angular_velocity = g_context->observer.getAngularVelocity();
+
+            // Angle delay compensation
+            Const angle_slip = g_context->observer.getAngularVelocity() * period;
+            g_context->angular_position =
+                constrainAngularPosition(g_context->observer.getAngularPosition() + angle_slip);
 
             if (g_state == State::Running)
             {
@@ -494,6 +494,11 @@ void handleMainIRQ(Const period)
                     g_context->reference_Iq > g_motor_params.min_current)
                 {
                     g_state = State::Running;
+                }
+
+                if (std::abs(g_context->reference_Iq) >= g_motor_params.max_current)
+                {
+                    g_setpoint = 0;     // Stopping
                 }
             }
         }
