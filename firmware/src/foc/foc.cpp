@@ -104,7 +104,7 @@ struct ErrorCounter
 
 class DebugVariableTracer
 {
-    static constexpr unsigned NumVariables = 5;
+    static constexpr unsigned NumVariables = 6;
 
 #if DEBUG_BUILD
     Scalar vars_[NumVariables] = {};
@@ -126,12 +126,13 @@ public:
     {
 #if DEBUG_BUILD
         // We have a race condition on read, but it's alright
-        std::printf("$%.2f,%.2f,%.2f,%.2f,%.2f\n",
+        std::printf("$%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
                     double(vars_[0]),
                     double(vars_[1]),
                     double(vars_[2]),
                     double(vars_[3]),
-                    double(vars_[4]));
+                    double(vars_[4]),
+                    double(vars_[5]));
 #endif
     }
 } g_debug_tracer;
@@ -448,8 +449,7 @@ void handleMainIRQ(Const period)
          */
         g_context->observer.update(period, Idq, Udq);
 
-        g_debug_tracer.set<2>(g_context->angular_velocity);
-        g_debug_tracer.set<3>(g_context->observer.getAngularVelocity());
+        g_debug_tracer.set<5>(g_context->observer.getAngularVelocity());
 
         g_context->angular_velocity = g_context->observer.getAngularVelocity();
 
@@ -596,9 +596,11 @@ void handleFastIRQ(Const period,
 
         g_pwm_handle.setPWM(pwm_setpoint);
 
-        g_debug_tracer.set<0>(g_context->estimated_Idq[0] * 1e3F);
-        g_debug_tracer.set<1>(g_context->estimated_Idq[1] * 1e3F);
-        g_debug_tracer.set<4>(g_context->reference_Udq[1] * 1e3F);
+        g_debug_tracer.set<0>(g_context->reference_Udq[0] * 1e3F);
+        g_debug_tracer.set<1>(g_context->reference_Udq[1] * 1e3F);
+        g_debug_tracer.set<2>(g_context->estimated_Idq[0] * 1e3F);
+        g_debug_tracer.set<3>(g_context->estimated_Idq[1] * 1e3F);
+        g_debug_tracer.set<4>(g_context->reference_Iq     * 1e3F);
 
         /*
          * Position extrapolation
