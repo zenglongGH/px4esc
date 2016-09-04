@@ -71,6 +71,17 @@ volatile Scalar g_setpoint_remaining_ttl;       ///< Seconds left before the set
 board::motor::PWMHandle g_pwm_handle;
 
 
+enum class MotorIdentificationState
+{
+    ResistanceMeasurement
+} g_motor_identification_state = MotorIdentificationState::ResistanceMeasurement;
+
+
+MotorIdentificationMode g_motor_identification_mode = MotorIdentificationMode::Static;
+
+Scalar g_motor_identification_duration = 0;
+
+
 struct ErrorCounter
 {
     Error last_error = Error::None;
@@ -280,7 +291,16 @@ ObserverParameters getObserverParameters()
 void beginMotorIdentification(MotorIdentificationMode mode)
 {
     AbsoluteCriticalSectionLocker locker;
-    (void)mode;
+
+    if (g_state != State::Idle)
+    {
+        return;
+    }
+
+    g_state = State::MotorIdentification;
+    g_motor_identification_mode = mode;
+    g_motor_identification_state = MotorIdentificationState::ResistanceMeasurement;
+    g_motor_identification_duration = 0;
 }
 
 
@@ -476,7 +496,7 @@ void handleMainIRQ(Const period)
             }
             else
             {
-                g_context->reference_Iq += 0.5F * period;
+                g_context->reference_Iq += 2.0F * period;
 
                 if (g_context->angular_velocity > 800.0F &&
                     g_context->reference_Iq > g_motor_params.min_current)
@@ -575,6 +595,26 @@ void handleFastIRQ(Const period,
          */
         g_context->angular_position =
             constrainAngularPosition(g_context->angular_position + g_context->angular_velocity * period);
+    }
+
+    if (g_state == State::MotorIdentification)
+    {
+        constexpr Scalar TargetVoltage = 0.7F;
+
+        Const pwm_setting = TargetVoltage / inverter_voltage;
+        assert(pwm_setting > 0.0F && pwm_setting < 1.0F);
+
+        g_pwm_handle.setPWM({ pwm_setting, 0, 0 });
+
+        g_motor_identification_duration += period;
+
+        if (g_motor_identification_duration > 1.0F)
+        {
+            Const resistance = (TargetVoltage / phase_currents_ab[0]) * Scalar(2.0 / 3.0);
+            g_motor_params.r_ab = resistance * 2.0F;
+            g_pwm_handle.release();
+            g_state = State::Idle;
+        }
     }
 
     /*
