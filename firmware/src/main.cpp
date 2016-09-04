@@ -66,9 +66,8 @@ constexpr unsigned WatchdogTimeoutMSec = 1500;
  * If not, automatic identification can be used (see below).
  * Note that most of the parameters are by default assigned invalid values.
  */
-os::config::Param<float> g_config_motor_start_current   ("mot.start_curr",      2.0F,    0.1F,    50.0F);  // Ampere
+os::config::Param<float> g_config_motor_start_current   ("mot.min_curr",        2.0F,    0.1F,    50.0F);  // Ampere
 os::config::Param<float> g_config_motor_max_current     ("mot.max_curr",      100.0F,   10.0F,   200.0F);  // Ampere
-os::config::Param<float> g_config_motor_max_voltage     ("mot.max_volt",      100.0F,   10.0F,   200.0F);  // Volt
 os::config::Param<float> g_config_motor_field_flux      ("mot.phi",             0.0F,    0.0F,    10.0F);  // Weber
 os::config::Param<float> g_config_motor_resistance_ab   ("mot.r_ab",            0.0F,    0.0F,   100.0F);  // Ohm
 os::config::Param<float> g_config_motor_inductance_ab   ("mot.l_ab",            0.0F,    0.0F,     1.0F);  // Henry
@@ -201,9 +200,8 @@ os::watchdog::Timer init()
     foc::init();
 
     foc::MotorParameters motor_params;
-    motor_params.start_current = 2.0F;
+    motor_params.min_current = 0.2F;
     motor_params.max_current = 20.0F;
-    motor_params.max_voltage = 4.0F;
     motor_params.field_flux = 0.001125161011F;
     motor_params.r_ab = 0.372F * 2.0F;
     motor_params.l_ab = 0.000025F * 2.0F;

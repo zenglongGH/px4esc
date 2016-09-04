@@ -155,7 +155,6 @@ CycleCounter g_fast_irq_cycle_counter;
 struct Context
 {
     const math::Range<> motor_current_limit;
-    const math::Range<> motor_voltage_limit;
 
     Observer observer;
 
@@ -176,11 +175,9 @@ struct Context
             math::Const stator_phase_inductance_quadrature,
             math::Const stator_phase_resistance,
             math::Const max_current,
-            math::Const max_voltage,
             const PIControllerSettings& pid_settings_Id,
             const PIControllerSettings& pid_settings_Iq) :
         motor_current_limit(-max_current, max_current),
-        motor_voltage_limit(-max_voltage, max_voltage),
         observer(observer_params,
                  field_flux,
                  stator_phase_inductance_direct,
@@ -205,7 +202,7 @@ void initializeContext()
     Const Lq = g_motor_params.l_ab / 2.0F;
 
     // PID controllers accept currents at the input and produce voltage
-    Const integration_limit = g_motor_params.max_voltage;
+    Const integration_limit = 10.0F;
 
     // TODO: Correct PID gain computation
     const PIControllerSettings pid_Idq_settings(0.02F,
@@ -220,7 +217,6 @@ void initializeContext()
                                               Lq,
                                               Rs,
                                               g_motor_params.max_current,
-                                              g_motor_params.max_voltage,
                                               pid_Idq_settings,
                                               pid_Idq_settings);
 }
@@ -443,6 +439,13 @@ void handleMainIRQ(Const period)
         g_debug_tracer.set<3>(g_context->observer.getAngularPosition());
         g_debug_tracer.set<4>(g_context->observer.getAngularVelocity());
 
+        g_context->angular_velocity = g_context->observer.getAngularVelocity();
+
+        // Angle delay compensation
+        Const angle_slip = g_context->observer.getAngularVelocity() * period;
+        g_context->angular_position =
+            constrainAngularPosition(g_context->observer.getAngularPosition() + angle_slip);
+
         /*
          * Updating the state estimate.
          * Critical section is required because at this point we're no longer synchronized with the fast IRQ.
@@ -466,13 +469,6 @@ void handleMainIRQ(Const period)
                     g_context->reference_Iq = 0;        // This is actually an error.
                 }
 
-                g_context->angular_velocity = g_context->observer.getAngularVelocity();
-
-                // Angle delay compensation
-                Const angle_slip = g_context->observer.getAngularVelocity() * period;
-                g_context->angular_position =
-                    constrainAngularPosition(g_context->observer.getAngularPosition() + angle_slip);
-
                 if (g_context->angular_velocity < 10.0F)
                 {
                     g_setpoint = 0;     // Stopping
@@ -480,41 +476,12 @@ void handleMainIRQ(Const period)
             }
             else
             {
-                // Spinup mode, special cases everywhere
-                if (g_context->angular_velocity < 100.0F)
+                g_context->reference_Iq += 0.5F * period;
+
+                if (g_context->angular_velocity > 800.0F &&
+                    g_context->reference_Iq > g_motor_params.min_current)
                 {
-                    g_context->angular_velocity += 50.0F * period;
-                }
-
-                Const Iq_delta = g_context->reference_Iq * period;
-
-                if (g_context->angular_velocity > g_context->observer.getAngularVelocity())
-                {
-                    g_context->reference_Iq -= Iq_delta;
-                }
-                else
-                {
-                    g_context->reference_Iq += Iq_delta;
-                }
-
-                // Hand-off to normal mode
-                if (g_context->angular_velocity > 50.0F)
-                {
-                    Const ang_pos_error = math::subtractAngles(g_context->observer.getAngularPosition(),
-                                                               g_context->angular_position);
-
-                    Const ang_vel_rel_error =
-                        std::abs(g_context->observer.getAngularVelocity() - g_context->angular_velocity) /
-                        g_context->angular_velocity;
-
-                    const bool ang_pos_ok = std::abs(ang_pos_error) < math::convertDegreesToRadian(20.0F);
-
-                    const bool ang_vel_ok = ang_vel_rel_error < 0.1F;
-
-                    if (ang_vel_ok && ang_pos_ok)
-                    {
-                        g_state = State::Running;
-                    }
+                    g_state = State::Running;
                 }
             }
         }
@@ -540,7 +507,7 @@ void handleMainIRQ(Const period)
             initializeContext();
             g_error_counter.reset();
 
-            g_context->reference_Iq = g_motor_params.start_current;
+            g_context->reference_Iq = 0;
 
             g_state = State::Spinup;
         }
@@ -592,12 +559,6 @@ void handleFastIRQ(Const period,
         auto reference_U_alpha_beta = performInverseParkTransform(g_context->reference_Udq,
                                                                   angle_sine, angle_cosine);
 
-        // Voltage limiting
-        for (int i = 0; i <= 1; i++)
-        {
-            reference_U_alpha_beta[i] = g_context->motor_voltage_limit.constrain(reference_U_alpha_beta[i]);
-        }
-
         const auto phase_voltages_and_sector_number = performSpaceVectorTransform(reference_U_alpha_beta);
         // Sector number is not used
 
@@ -606,8 +567,8 @@ void handleFastIRQ(Const period,
 
         g_pwm_handle.setPWM(pwm_setpoint);
 
-        g_debug_tracer.set<0>(g_context->estimated_Idq[0]);
-        g_debug_tracer.set<1>(g_context->estimated_Idq[1]);
+        g_debug_tracer.set<0>(g_context->estimated_Idq[0] * 1e3f);
+        g_debug_tracer.set<1>(g_context->estimated_Idq[1] * 1e3f);
 
         /*
          * Position extrapolation

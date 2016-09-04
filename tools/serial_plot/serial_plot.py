@@ -25,7 +25,7 @@ except ImportError:
 
 
 SER_PORT = sys.argv[1]
-SER_BAUDRATE = 115200
+SER_BAUDRATE = 921600
 
 
 class RealtimePlotWidget(QWidget):
