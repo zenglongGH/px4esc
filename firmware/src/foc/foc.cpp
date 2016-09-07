@@ -212,7 +212,7 @@ void initializeContext()
 
     // PID controllers accept currents at the input and produce voltage
     Const pid_kp = (math::Pi * 2.0F * Ls) / (20.0F * fast_irq_period);
-    Const pid_ki = fast_irq_period * Rs / Ls;
+    Const pid_ki = 1.0F;        // TODO: DMITRY IS THINKING ABOUT FIXING THIS. THINK DMITRY, THINK!
 
     alignas(16) static std::uint8_t context_storage[sizeof(Context)];
 
