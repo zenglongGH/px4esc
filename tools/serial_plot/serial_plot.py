@@ -12,6 +12,7 @@ import sys
 import threading
 import time
 import serial
+import glob
 
 from PyQt5.QtWidgets import QVBoxLayout, QWidget, QApplication
 from PyQt5.QtCore import Qt
@@ -24,7 +25,12 @@ except ImportError:
     from pyqtgraph import PlotWidget, mkPen
 
 
-SER_PORT = sys.argv[1]
+if len(sys.argv) > 1:
+    SER_PORT = sys.argv[1]
+else:
+    SER_PORT = glob.glob('/dev/serial/by-id/usb-*Black_Magic_Probe*-if02')[0]
+    print('Selected port', SER_PORT)
+
 SER_BAUDRATE = 921600
 
 
