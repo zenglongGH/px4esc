@@ -128,6 +128,7 @@ performSpaceVectorTransform(const math::Vector<2>& reference_voltage)
 inline math::Vector<3> normalizePhaseVoltagesToPWMSetpoint(const math::Vector<3>& phase_voltages,
                                                            math::Const inverter_voltage)
 {
+    constexpr auto SquareRootOf3 = math::Scalar(1.7320508075688772);
     return (phase_voltages * 2.0F / (inverter_voltage * SquareRootOf3)).array() + 0.5F;
 }
 

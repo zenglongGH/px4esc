@@ -56,9 +56,11 @@ using board::motor::AbsoluteCriticalSectionLocker;
 namespace
 {
 /*
- * Configuration constants
+ * Constants
  */
 constexpr unsigned IdqMovingAverageLength = 5;
+
+constexpr Scalar SquareRootOf3 = math::Scalar(1.7320508075688772);
 
 /*
  * State variables
@@ -171,6 +173,48 @@ public:
 CycleCounter g_fast_irq_cycle_counter;
 
 
+class CurrentPIController
+{
+    Const max_current_;
+    Const kp_;
+    Const ki_;
+
+    Scalar ui_ = 0;
+
+public:
+    CurrentPIController(Const Ls,
+                        Const Rs,
+                        Const max_current,
+                        Const dt) :
+        max_current_(max_current),
+        kp_((math::Pi * 2.0F * Ls) / (20.0F * dt)),
+        ki_(dt * Rs / Ls)
+    {
+        assert(Ls > 0);
+        assert(Rs > 0);
+        assert(max_current > 0);
+        assert(dt > 0);
+    }
+
+    Scalar computeVoltage(Const target_current,
+                          Const real_current,
+                          Const inverter_voltage)
+    {
+        Const voltage_limit = inverter_voltage * (SquareRootOf3 / 2.0F);
+        const math::Range<> voltage_limits(-voltage_limit, voltage_limit);
+
+        static constexpr math::Range<> UnityLimits(-1.0F, 1.0F);
+        Const error = UnityLimits.constrain((target_current - real_current) / max_current_);
+
+        ui_ += voltage_limits.constrain(ki_ * error);
+
+        Const output = kp_ * (error + ui_);
+
+        return output;
+    }
+};
+
+
 struct Context
 {
     const math::Range<> motor_current_limit;
@@ -180,8 +224,8 @@ struct Context
     Scalar angular_velocity = 0;                        ///< Radian per second, read in the fast IRQ
     Scalar angular_position = 0;                        ///< Radians [0, Pi*2]; extrapolated in the fast IRQ
 
-    SerialPIController pid_Id;                          ///< Used only in the fast IRQ
-    SerialPIController pid_Iq;                          ///< Used only in the fast IRQ
+    CurrentPIController pid_Id;                         ///< Used only in the fast IRQ
+    CurrentPIController pid_Iq;                         ///< Used only in the fast IRQ
 
     Vector<2> estimated_Idq = Vector<2>::Zero();        ///< Ampere, updated from the fast IRQ
     Vector<2> reference_Udq = Vector<2>::Zero();        ///< Volt, updated from the fast IRQ
@@ -191,21 +235,19 @@ struct Context
     math::SimpleMovingAverageFilter<IdqMovingAverageLength, Vector<2>> estimated_Idq_filter;
 
     Context(const ObserverParameters& observer_params,
-            math::Const field_flux,
-            math::Const stator_phase_inductance_direct,
-            math::Const stator_phase_inductance_quadrature,
-            math::Const stator_phase_resistance,
-            math::Const max_current,
-            math::Const pid_kp,
-            math::Const pid_ki) :
+            Const field_flux,
+            Const stator_phase_inductance,
+            Const stator_phase_resistance,
+            Const max_current,
+            Const pid_dt) :
         motor_current_limit(-max_current, max_current),
         observer(observer_params,
                  field_flux,
-                 stator_phase_inductance_direct,
-                 stator_phase_inductance_quadrature,
+                 stator_phase_inductance,
+                 stator_phase_inductance,
                  stator_phase_resistance),
-        pid_Id(pid_kp, pid_ki),
-        pid_Iq(pid_kp, pid_ki),
+        pid_Id(stator_phase_inductance, stator_phase_resistance, max_current, pid_dt),
+        pid_Iq(stator_phase_inductance, stator_phase_resistance, max_current, pid_dt),
         estimated_Idq_filter(Vector<2>::Zero())
     { }
 };
@@ -215,25 +257,20 @@ Context* g_context = nullptr;
 
 void initializeContext()
 {
-    Const fast_irq_period = board::motor::getPWMPeriod();
+    Const pid_dt = board::motor::getPWMPeriod();
 
     Const Ls = g_motor_params.l_ab / 2.0F;
     Const Rs = g_motor_params.r_ab / 2.0F;
 
-    // PID controllers accept currents at the input and produce voltage
-    Const pid_kp = (math::Pi * 2.0F * Ls) / (20.0F * fast_irq_period);
-    Const pid_ki = 1.0F;        // TODO: DMITRY IS THINKING ABOUT FIXING THIS. THINK DMITRY, THINK!
-
     alignas(16) static std::uint8_t context_storage[sizeof(Context)];
+    std::fill(std::begin(context_storage), std::end(context_storage), 0);
 
     g_context = new (context_storage) Context(g_observer_params,
                                               g_motor_params.field_flux,
                                               Ls,
-                                              Ls,
                                               Rs,
                                               g_motor_params.max_current,
-                                              pid_kp,
-                                              pid_ki);
+                                              pid_dt);
 }
 
 void doStop()
@@ -575,21 +612,13 @@ void handleFastIRQ(Const period,
         /*
          * Running PIDs, estimating reference voltage in the rotating reference frame
          */
-        constexpr auto HalfOfSquareRootOf3 = math::Scalar(1.7320508075688772 / 2.0);
+        g_context->reference_Udq[0] = g_context->pid_Id.computeVoltage(0.0F,
+                                                                       g_context->estimated_Idq[0],
+                                                                       inverter_voltage);
 
-        Const abs_voltage_limit = inverter_voltage * HalfOfSquareRootOf3;
-
-        const math::Range<> pid_limits(-abs_voltage_limit, abs_voltage_limit);
-
-        g_context->reference_Udq[0] = g_context->pid_Id.update(0.0F,
-                                                               g_context->estimated_Idq[0],
-                                                               period,
-                                                               pid_limits);
-
-        g_context->reference_Udq[1] = g_context->pid_Iq.update(g_context->reference_Iq,
-                                                               g_context->estimated_Idq[1],
-                                                               period,
-                                                               pid_limits);
+        g_context->reference_Udq[1] = g_context->pid_Iq.computeVoltage(g_context->reference_Iq,
+                                                                       g_context->estimated_Idq[1],
+                                                                       inverter_voltage);
 
         Const Udq_magnitude_limit = inverter_voltage * 0.9F;
 

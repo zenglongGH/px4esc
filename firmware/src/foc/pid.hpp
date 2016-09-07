@@ -122,41 +122,6 @@ public:
 };
 
 /**
- * PI controller implemented from scratch because removal of the D term simplifies the algorithm substantially.
- */
-class SerialPIController
-{
-    math::Const kp_;
-    math::Const ki_;
-
-    math::Scalar integral_ = math::Scalar(0);
-
-public:
-    SerialPIController(math::Const p, math::Const i) :
-        kp_(p),
-        ki_(i)
-    { }
-
-    math::Scalar update(math::Const setpoint,
-                        math::Const process_variable,
-                        math::Const time_delta,
-                        const math::Range<>& output_limits)
-    {
-        assert(time_delta > 0);
-
-        math::Const error = setpoint - process_variable;
-
-        math::Const p = error * kp_;
-
-        // The I gain defines the speed of change of the integrated error, not its weight.
-        // This enables us to change the I term at any moment without upsetting the output.
-        integral_ = output_limits.constrain(integral_ + p * time_delta * ki_);
-
-        return output_limits.constrain(p + integral_);
-    }
-};
-
-/**
  * Trivial PID controller.
  * Simulation:
  *
