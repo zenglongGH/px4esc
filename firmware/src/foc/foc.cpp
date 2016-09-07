@@ -55,7 +55,14 @@ using board::motor::AbsoluteCriticalSectionLocker;
 
 namespace
 {
+/*
+ * Configuration constants
+ */
+constexpr unsigned IdqMovingAverageLength = 5;
 
+/*
+ * State variables
+ */
 volatile State g_state = State::Idle;
 
 MotorParameters g_motor_params;
@@ -181,6 +188,8 @@ struct Context
 
     Scalar reference_Iq = 0;                            ///< Ampere, read in the fast IRQ
 
+    math::SimpleMovingAverageFilter<IdqMovingAverageLength, Vector<2>> estimated_Idq_filter;
+
     Context(const ObserverParameters& observer_params,
             math::Const field_flux,
             math::Const stator_phase_inductance_direct,
@@ -196,7 +205,8 @@ struct Context
                  stator_phase_inductance_quadrature,
                  stator_phase_resistance),
         pid_Id(pid_kp, pid_ki),
-        pid_Iq(pid_kp, pid_ki)
+        pid_Iq(pid_kp, pid_ki),
+        estimated_Idq_filter(Vector<2>::Zero())
     { }
 };
 
@@ -558,7 +568,9 @@ void handleFastIRQ(Const period,
 
         const auto estimated_I_alpha_beta = performClarkeTransform(phase_currents_ab);
 
-        g_context->estimated_Idq = performParkTransform(estimated_I_alpha_beta, angle_sine, angle_cosine);
+        const Vector<2> new_Idq = performParkTransform(estimated_I_alpha_beta, angle_sine, angle_cosine);
+        g_context->estimated_Idq_filter.update(new_Idq);
+        g_context->estimated_Idq = g_context->estimated_Idq_filter.getValue();
 
         /*
          * Running PIDs, estimating reference voltage in the rotating reference frame

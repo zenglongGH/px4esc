@@ -119,6 +119,44 @@ struct Range
 };
 
 /**
+ * Simple moving average of arbitrary depth.
+ */
+template <unsigned Depth, typename T>
+class SimpleMovingAverageFilter
+{
+    T history_[Depth] = {};
+    T sum_;
+    unsigned next_index_ = 0;
+
+public:
+    SimpleMovingAverageFilter() :
+        sum_(T())
+    { }
+
+    explicit SimpleMovingAverageFilter(const T& initial_value) :
+        sum_(initial_value)
+    { }
+
+    void update(const T& value)
+    {
+        sum_ -= history_[next_index_];
+        history_[next_index_] = value;
+        sum_ += history_[next_index_];
+
+        next_index_++;
+        if (next_index_ >= Depth)
+        {
+            next_index_ = 0;
+        }
+    }
+
+    T getValue() const
+    {
+        return sum_ / Depth;
+    }
+};
+
+/**
  * Wrappers over the CMSIS DSP library.
  * Note that the CMSIS math headers MUST NOT be included, because they dump a pile of garbage into the global scope.
  * @{
