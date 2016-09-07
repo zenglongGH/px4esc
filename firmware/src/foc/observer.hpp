@@ -90,7 +90,7 @@ class Observer
     const math::Matrix<2, 4> C_;
 
     // Filter states
-    math::Vector<4> x_;
+    math::Vector<4> x_ = math::Vector<4>::Zero();
     math::Matrix<4, 4> P_;
 
 public:

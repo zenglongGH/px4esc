@@ -69,7 +69,6 @@ Observer::Observer(const ObserverParameters& parameters,
                   makeRow(0, 1, 0, 0))),
 
     // Filter state
-    x_(decltype(x_)::Zero()),
     P_(parameters.P0)
 {
     assert(std::isfinite(phi_));

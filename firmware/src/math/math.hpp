@@ -130,12 +130,16 @@ class SimpleMovingAverageFilter
 
 public:
     SimpleMovingAverageFilter() :
-        sum_(T())
-    { }
+        sum_(T() * Depth)
+    {
+        std::fill_n(std::begin(history_), Depth, T());
+    }
 
     explicit SimpleMovingAverageFilter(const T& initial_value) :
-        sum_(initial_value)
-    { }
+        sum_(initial_value * Depth)
+    {
+        std::fill_n(std::begin(history_), Depth, initial_value);
+    }
 
     void update(const T& value)
     {
