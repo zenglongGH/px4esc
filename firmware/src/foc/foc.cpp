@@ -206,7 +206,7 @@ public:
         static constexpr math::Range<> UnityLimits(-1.0F, 1.0F);
         Const error = UnityLimits.constrain((target_current - real_current) / max_current_);
 
-        ui_ += voltage_limits.constrain(ki_ * error);
+        ui_ = voltage_limits.constrain(ui_ + ki_ * error);
 
         Const output = kp_ * (error + ui_);
 
