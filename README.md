@@ -34,7 +34,7 @@ This directory has a dedicated README file.
 * `tools` - a set of tools that may be useful for developers. They may have no relevance to the end users.
 Each tool may have a dedicated README file.
 
-## Development tools
+## Development Tools
 
 ### Software
 
