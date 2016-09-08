@@ -40,89 +40,7 @@
 namespace foc
 {
 /**
- * See @ref PIController.
- */
-struct PIControllerSettings
-{
-    math::Scalar p = math::Scalar(0);
-    math::Scalar i = math::Scalar(0);
-
-    math::Range<math::Scalar> integration_limits;
-
-    PIControllerSettings() { }
-
-    PIControllerSettings(math::Const p,
-                         math::Const i,
-                         const math::Range<math::Scalar>& integration_limits) :
-        p(p),
-        i(i),
-        integration_limits(integration_limits)
-    {
-        assert(std::isfinite(p) && std::isfinite(i));
-        assert(integration_limits.contains(math::Scalar(0)));
-    }
-
-    PIControllerSettings(math::Const p,
-                         math::Const i,
-                         math::Const integration_limit) :
-        PIControllerSettings(p, i,
-                             {-std::abs(integration_limit),
-                               std::abs(integration_limit)})
-    { }
-};
-
-/**
- * See @ref PIDController.
- */
-struct PIDControllerSettings : public PIControllerSettings
-{
-    math::Scalar d = math::Scalar(0);
-
-    PIDControllerSettings() { }
-
-    PIDControllerSettings(math::Const p,
-                          math::Const i,
-                          math::Const d,
-                          const math::Range<math::Scalar>& integration_limits) :
-        PIControllerSettings(p, i, integration_limits),
-        d(d)
-    {
-        assert(std::isfinite(d));
-    }
-
-    PIDControllerSettings(math::Const p,
-                          math::Const i,
-                          math::Const d,
-                          math::Const integration_limit) :
-        PIDControllerSettings(p, i, d,
-                              {-std::abs(integration_limit),
-                                std::abs(integration_limit)})
-    { }
-};
-
-/**
- * Non-polymorphic base for PI and PID controllers.
- */
-template <typename Settings>
-class PIControllerBase
-{
-protected:
-    Settings cfg_;
-
-    math::Scalar integral_ = math::Scalar(0);
-
-    PIControllerBase() { }
-
-    PIControllerBase(const Settings& settings) : cfg_(settings) { }
-
-public:
-    const Settings& getSettings() const { return cfg_; }
-
-    void setSettings(const Settings& settings) { cfg_ = settings; }
-};
-
-/**
- * Trivial PID controller.
+ * Trivial PI controller.
  * Simulation:
  *
  *     p = 0.1;
@@ -143,18 +61,27 @@ public:
  *     outputs = update[#1, #2, 0.1] & @@@ ({setpoints, procvar}\[Transpose]);
  *     ListLinePlot[{setpoints, procvar, outputs}, PlotLegends -> Automatic]
  */
-class PIDController : public PIControllerBase<PIDControllerSettings>
+class ParallelPIController
 {
-    math::Scalar prev_error_ = math::Scalar(0);
+    math::Const kp_;
+    math::Const ki_;
 
-    bool initialized_ = false;
+    const math::Range<math::Scalar> integral_limits_;
+
+    math::Scalar integral_ = 0;
 
 public:
-    PIDController() { }
-
-    explicit PIDController(const PIDControllerSettings& settings) :
-        PIControllerBase<PIDControllerSettings>(settings)
-    { }
+    ParallelPIController(math::Const p,
+                         math::Const i,
+                         const math::Range<math::Scalar>& integration_limits) :
+        kp_(p),
+        ki_(i),
+        integral_limits_(integration_limits)
+    {
+        assert(p > 0);
+        assert(i > 0);
+        assert(integral_limits_.contains(0));
+    }
 
     math::Scalar update(math::Const setpoint,
                         math::Const process_variable,
@@ -164,22 +91,13 @@ public:
 
         math::Const error = setpoint - process_variable;
 
-        if (!initialized_)
-        {
-            initialized_ = true;
-            prev_error_ = error;
-        }
-
-        math::Const p = error * cfg_.p;
-        math::Const d = (error - prev_error_) * cfg_.d / time_delta;
+        math::Const p = error * kp_;
 
         // The I gain defines the speed of change of the integrated error, not its weight.
         // This enables us to change the I term at any moment without upsetting the output.
-        integral_ = cfg_.integration_limits.constrain(integral_ + error * time_delta * cfg_.i);
+        integral_ = integral_limits_.constrain(integral_ + error * time_delta * ki_);
 
-        prev_error_ = error;
-
-        return p + integral_ + d;
+        return p + integral_;
     }
 };
 
