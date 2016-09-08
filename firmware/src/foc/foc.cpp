@@ -620,7 +620,8 @@ void handleFastIRQ(Const period,
                                                                        g_context->estimated_Idq[1],
                                                                        inverter_voltage);
 
-        Const Udq_magnitude_limit = inverter_voltage * 0.9F;
+        // In SVM we multiply the 3-phase voltage vector to 2/sqrt(3), therefore here we need to adjust for that
+        Const Udq_magnitude_limit = inverter_voltage * (SquareRootOf3 / 2.0F) * 0.9F;
 
         if (g_context->reference_Udq.norm() > Udq_magnitude_limit)
         {
