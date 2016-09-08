@@ -30,7 +30,7 @@ Feel free to send pull requests extending this list.
 The repository contains the following directories:
 
 * `firmware` - the firmware, all its dependencies and main documentation are located here.
-This directory has a [dedicated README](firmware/README.md).
+This directory has a dedicated README file.
 * `tools` - a set of tools that may be useful for developers. They may have no relevance to the end users.
 Each tool may have a dedicated README file.
 
@@ -43,13 +43,15 @@ The major software tools used in the development process are listed below:
 * GNU ARM Toolchain version 5.4 or newer (C++14 support is required)
 * Eagle CAD version 7.2 or newer
 
+We recommend Eclipse Neon or newer as an IDE.
+
 ### Hardware
 
 The following tools may be needed for development work:
 
-* A JTAG/SWD debugger compatible with STM32 and supported by the toolchain.
-* A high-speed USB-UART adapter.
-* A USB-CAN adapter with DroneCode-compatible connectors.
+* JTAG/SWD debugger compatible with STM32 and supported by the toolchain.
+* High speed USB-UART adapter.
+* USB-CAN adapter with DroneCode-compatible connectors.
 
 The listed tools are available from Zubax Robotics:
 
@@ -62,19 +64,21 @@ The listed tools are available from Zubax Robotics:
 
 The firmware is distributed under the terms of the three-clause BSD license, which is provided below.
 
-> Copyright (c) 2016, Zubax Robotics OU
+> Copyright (c) 2016, Zubax Robotics OU <info@zubax.com>
+>
 > All rights reserved.
 >
 > Redistribution and use in source and binary forms, with or without
 > modification, are permitted provided that the following conditions are met:
->     * Redistributions of source code must retain the above copyright
->       notice, this list of conditions and the following disclaimer.
->     * Redistributions in binary form must reproduce the above copyright
->       notice, this list of conditions and the following disclaimer in the
->       documentation and/or other materials provided with the distribution.
->     * Neither the name of the <organization> nor the
->       names of its contributors may be used to endorse or promote products
->       derived from this software without specific prior written permission.
+>
+> * Redistributions of source code must retain the above copyright
+>   notice, this list of conditions and the following disclaimer.
+> * Redistributions in binary form must reproduce the above copyright
+>   notice, this list of conditions and the following disclaimer in the
+>   documentation and/or other materials provided with the distribution.
+> * Neither the name of the <organization> nor the
+>   names of its contributors may be used to endorse or promote products
+>   derived from this software without specific prior written permission.
 >
 > THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 > ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
