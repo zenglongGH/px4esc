@@ -543,6 +543,9 @@ void initADC()
 
 inline void setRawPWM(const std::uint16_t a, const std::uint16_t b, const std::uint16_t c)
 {
+    /*
+     * We don't need to actively clamp the values if they exceed ARR, because the hardware would behave the same way.
+     */
     assert((a <= TIM1->ARR) &&
            (b <= TIM1->ARR) &&
            (c <= TIM1->ARR));
@@ -674,13 +677,18 @@ void PWMHandle::setPWM(const math::Vector<3>& abc)
     }
 
     assert(g_calibrator == nullptr);
-    assert((abc.array() >= 0).all() && (abc.array() <= 1).all());
+
+    static constexpr math::Range<> Lim(0, 1);
+
+    assert(Lim.contains(abc[0]) &&
+           Lim.contains(abc[1]) &&
+           Lim.contains(abc[2]));
 
     const auto arr = float(TIM1->ARR);
 
-    setRawPWM(std::uint16_t(abc[0] * arr + 0.4F),
-              std::uint16_t(abc[1] * arr + 0.4F),
-              std::uint16_t(abc[2] * arr + 0.4F));
+    setRawPWM(std::uint16_t(Lim.constrain(abc[0]) * arr + 0.4F),
+              std::uint16_t(Lim.constrain(abc[1]) * arr + 0.4F),
+              std::uint16_t(Lim.constrain(abc[2]) * arr + 0.4F));
 }
 
 void PWMHandle::release()
