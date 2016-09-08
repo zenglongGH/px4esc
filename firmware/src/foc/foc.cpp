@@ -634,13 +634,11 @@ void handleFastIRQ(Const period,
         auto reference_U_alpha_beta = performInverseParkTransform(g_context->reference_Udq,
                                                                   angle_sine, angle_cosine);
 
-        const auto phase_voltages_and_sector_number = performSpaceVectorTransform(reference_U_alpha_beta);
+        const auto pwm_setpoint_and_sector_number = performSpaceVectorTransform(reference_U_alpha_beta,
+                                                                                inverter_voltage);
         // Sector number is not used
 
-        const auto pwm_setpoint = normalizePhaseVoltagesToPWMSetpoint(phase_voltages_and_sector_number.first,
-                                                                      inverter_voltage);
-
-        g_pwm_handle.setPWM(pwm_setpoint);
+        g_pwm_handle.setPWM(pwm_setpoint_and_sector_number.first);
 
         g_debug_tracer.set<0>(g_context->reference_Udq[0] * 1e3F);
         g_debug_tracer.set<1>(g_context->reference_Udq[1] * 1e3F);

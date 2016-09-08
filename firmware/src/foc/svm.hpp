@@ -68,17 +68,19 @@ namespace foc
  *       Map[normalizeSVMPhaseVoltages[performSVMTransform[#1/2], inverterVoltage] &, {refAlpha, refBeta}\[Transpose]];
  *     ListLinePlot[transforms\[Transpose], PlotRange -> {Automatic, {0, 1}}]
  *
- * @param reference_voltage     Reference voltages alpha and beta.
- * @return                      Phase voltages centered around zero and the index of the current
+ * @param alpha_beta_voltage    Reference voltages alpha and beta.
+ * @param inverter_voltage      Power stage supply voltage.
+ * @return                      PWM setpoint vector (each component is in [0, 1]) and the index of the current
  *                              electrical sector in the range [0, 5].
  */
 inline std::pair<math::Vector<3>, std::uint_fast8_t>
-performSpaceVectorTransform(const math::Vector<2>& reference_voltage)
+performSpaceVectorTransform(const math::Vector<2>& alpha_beta_voltage,
+                            math::Const inverter_voltage)
 {
     constexpr auto SquareRootOf3 = math::Scalar(1.7320508075688772);
 
-    const auto ualpha = reference_voltage[0] * SquareRootOf3;
-    const auto ubeta =  reference_voltage[1];
+    const auto ualpha = alpha_beta_voltage[0] * SquareRootOf3;
+    const auto ubeta =  alpha_beta_voltage[1];
 
     const auto x = ubeta;
     const auto y = -(ualpha + ubeta) / 2.0F;
@@ -115,21 +117,11 @@ performSpaceVectorTransform(const math::Vector<2>& reference_voltage)
     }
     }
 
-    return {{ta, ta + z, ta + y}, sector_index};
-}
+    const math::Vector<3> raw_voltages { ta, ta + z, ta + y };
 
-/**
- * Converts the output of @ref performSpaceVectorTransform() to a vector that can be fed into the PWM driver.
- *
- * @param phase_voltages                Zero centered phase voltages.
- * @param inverter_voltage              Power stage supply voltage.
- * @return                              PWM setpoint vector; each component is in [0, 1].
- */
-inline math::Vector<3> normalizePhaseVoltagesToPWMSetpoint(const math::Vector<3>& phase_voltages,
-                                                           math::Const inverter_voltage)
-{
-    constexpr auto SquareRootOf3 = math::Scalar(1.7320508075688772);
-    return (phase_voltages * 2.0F / (inverter_voltage * SquareRootOf3)).array() + 0.5F;
+    const math::Vector<3> output = (raw_voltages * 2.0F / (inverter_voltage * SquareRootOf3)).array() + 0.5F;
+
+    return {output, sector_index};
 }
 
 }
