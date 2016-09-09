@@ -175,7 +175,7 @@ CycleCounter g_fast_irq_cycle_counter;
 
 class CurrentPIController
 {
-    Const max_current_;
+    Const max_phase_current_;
     Const kp_;
     Const ki_;
 
@@ -184,15 +184,15 @@ class CurrentPIController
 public:
     CurrentPIController(Const Ls,
                         Const Rs,
-                        Const max_current,
+                        Const max_phase_current,
                         Const dt) :
-        max_current_(max_current),
+        max_phase_current_(max_phase_current),
         kp_((math::Pi * 2.0F * Ls) / (20.0F * dt)),
         ki_(dt * Rs / Ls)
     {
         assert(Ls > 0);
         assert(Rs > 0);
-        assert(max_current > 0);
+        assert(max_phase_current > 0);
         assert(dt > 0);
     }
 
@@ -204,11 +204,11 @@ public:
         const math::Range<> voltage_limits(-voltage_limit, voltage_limit);
 
         static constexpr math::Range<> UnityLimits(-1.0F, 1.0F);
-        Const error = UnityLimits.constrain((target_current - real_current) / max_current_);
+        Const error = UnityLimits.constrain((target_current - real_current) / max_phase_current_);
 
-        ui_ = voltage_limits.constrain(ui_ + ki_ * error);
+        ui_ = voltage_limits.constrain(ui_ + ki_ * error);      // Sdelat' hotel grozu,
 
-        Const output = kp_ * (error + ui_);
+        Const output = kp_ * (error + ui_);                     // a poluchil kozu
 
         return output;
     }
@@ -217,7 +217,7 @@ public:
 
 struct Context
 {
-    const math::Range<> motor_current_limit;
+    const math::Range<> phase_current_limit;
 
     Observer observer;
 
@@ -238,16 +238,16 @@ struct Context
             Const field_flux,
             Const stator_phase_inductance,
             Const stator_phase_resistance,
-            Const max_current,
+            Const max_phase_current,
             Const pid_dt) :
-        motor_current_limit(-max_current, max_current),
+        phase_current_limit(-max_phase_current, max_phase_current),
         observer(observer_params,
                  field_flux,
                  stator_phase_inductance,
                  stator_phase_inductance,
                  stator_phase_resistance),
-        pid_Id(stator_phase_inductance, stator_phase_resistance, max_current, pid_dt),
-        pid_Iq(stator_phase_inductance, stator_phase_resistance, max_current, pid_dt),
+        pid_Id(stator_phase_inductance, stator_phase_resistance, max_phase_current, pid_dt),
+        pid_Iq(stator_phase_inductance, stator_phase_resistance, max_phase_current, pid_dt),
         estimated_Idq_filter(Vector<2>::Zero())
     { }
 };
@@ -262,14 +262,19 @@ void initializeContext()
     Const Ls = g_motor_params.l_ab / 2.0F;
     Const Rs = g_motor_params.r_ab / 2.0F;
 
+    /*
+     * TODO: Dmitry should review this and describe a correct way of computing phase current limits.
+     */
+    Const max_phase_current = g_motor_params.max_current * 5.0F;
+
     alignas(16) static std::uint8_t context_storage[sizeof(Context)];
-    std::fill(std::begin(context_storage), std::end(context_storage), 0);
+    std::fill(std::begin(context_storage), std::end(context_storage), 0);       // Paranoia time
 
     g_context = new (context_storage) Context(g_observer_params,
                                               g_motor_params.field_flux,
                                               Ls,
                                               Rs,
-                                              g_motor_params.max_current,
+                                              max_phase_current,
                                               pid_dt);
 }
 
@@ -517,11 +522,11 @@ void handleMainIRQ(Const period)
                 if (g_control_mode == ControlMode::Ratiometric)
                 {
                     g_context->reference_Iq =
-                        g_context->motor_current_limit.max * math::Range<>(-1.0F, 1.0F).constrain(g_setpoint);
+                        g_context->phase_current_limit.max * math::Range<>(-1.0F, 1.0F).constrain(g_setpoint);
                 }
                 else if (g_control_mode == ControlMode::Current)
                 {
-                    g_context->reference_Iq = g_context->motor_current_limit.constrain(g_setpoint);
+                    g_context->reference_Iq = g_context->phase_current_limit.constrain(g_setpoint);
                 }
                 else
                 {
@@ -535,7 +540,7 @@ void handleMainIRQ(Const period)
             }
             else
             {
-                g_context->reference_Iq += 2.0F * period;
+                g_context->reference_Iq += 10.0F * period;
 
                 if (g_context->angular_velocity > 800.0F &&
                     g_context->reference_Iq > g_motor_params.min_current)
@@ -543,7 +548,9 @@ void handleMainIRQ(Const period)
                     g_state = State::Running;
                 }
 
-                if (std::abs(g_context->reference_Iq) >= g_motor_params.max_current)
+                // TODO: Should we use the average current instead of phase current for limiting,
+                //       since we don't know if the rotor is rotating or not?
+                if (!g_context->phase_current_limit.contains(g_context->reference_Iq))
                 {
                     g_setpoint = 0;     // Stopping
                 }
