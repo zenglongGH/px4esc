@@ -521,8 +521,9 @@ void handleMainIRQ(Const period)
             {
                 if (g_control_mode == ControlMode::Ratiometric)
                 {
-                    g_context->reference_Iq =
-                        g_context->phase_current_limit.max * math::Range<>(-1.0F, 1.0F).constrain(g_setpoint);
+                    static constexpr math::Range<> UnityLimits(-1.0F, 1.0F);
+
+                    g_context->reference_Iq = g_context->phase_current_limit.max * UnityLimits.constrain(g_setpoint);
                 }
                 else if (g_control_mode == ControlMode::Current)
                 {
