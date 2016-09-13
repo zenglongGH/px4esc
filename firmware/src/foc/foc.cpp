@@ -102,6 +102,21 @@ struct ErrorCounter
 } g_error_counter;
 
 
+class EventCounter
+{
+    std::uint64_t cnt_ = 0;
+
+public:
+    void increment() { cnt_++; }
+
+    std::uint64_t get() const { return cnt_; }
+
+    auto toString() const { return os::heapless::intToString(cnt_); }
+};
+
+EventCounter g_fast_irq_cycle_counter;
+
+
 class DebugVariableTracer
 {
     static constexpr unsigned NumVariables = 6;
@@ -125,14 +140,23 @@ public:
     void print() const
     {
 #if DEBUG_BUILD
-        // We have a race condition on read, but it's alright
-        std::printf("$%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
-                    double(vars_[0]),
-                    double(vars_[1]),
-                    double(vars_[2]),
-                    double(vars_[3]),
-                    double(vars_[4]),
-                    double(vars_[5]));
+        std::uint64_t pwm_cycles = 0;
+        Scalar vars_copy[NumVariables] = {};
+
+        {
+            AbsoluteCriticalSectionLocker locker;
+            pwm_cycles = g_fast_irq_cycle_counter.get();
+            std::copy(std::begin(vars_), std::end(vars_), std::begin(vars_copy));
+        }
+
+        std::printf("$%.4f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
+                    double(pwm_cycles) * double(board::motor::getPWMPeriod()),
+                    double(vars_copy[0]),
+                    double(vars_copy[1]),
+                    double(vars_copy[2]),
+                    double(vars_copy[3]),
+                    double(vars_copy[4]),
+                    double(vars_copy[5]));
 #endif
     }
 } g_debug_tracer;
@@ -185,21 +209,6 @@ public:
         return output;
     }
 };
-
-
-class EventCounter
-{
-    std::uint64_t cnt_ = 0;
-
-public:
-    void increment() { cnt_++; }
-
-    std::uint64_t get() const { return cnt_; }
-
-    auto toString() const { return os::heapless::intToString(cnt_); }
-};
-
-EventCounter g_fast_irq_cycle_counter;
 
 
 struct Context

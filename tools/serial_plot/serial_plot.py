@@ -14,15 +14,17 @@ import time
 import serial
 import glob
 
-from PyQt5.QtWidgets import QVBoxLayout, QWidget, QApplication
+from PyQt5.QtWidgets import QVBoxLayout, QWidget, QApplication, QMainWindow, QAction
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QColor
+from PyQt5.QtGui import QColor, QKeySequence
 
 try:
-    from pyqtgraph import PlotWidget, mkPen
+    import pyqtgraph
 except ImportError:
     os.system('git clone --recursive https://github.com/pyqtgraph/pyqtgraph-core pyqtgraph')
-    from pyqtgraph import PlotWidget, mkPen
+    import pyqtgraph
+
+from pyqtgraph import PlotWidget, mkPen, InfiniteLine
 
 
 if len(sys.argv) > 1:
@@ -34,24 +36,74 @@ else:
 SER_BAUDRATE = 921600
 
 
+# Borrowed from the UAVCAN GUI Tool
+def add_crosshair(plot, render_measurements, color=Qt.gray):
+    pen = mkPen(color=QColor(color), width=1)
+    vline = InfiniteLine(angle=90, movable=False, pen=pen)
+    hline = InfiniteLine(angle=0, movable=False, pen=pen)
+
+    plot.addItem(vline, ignoreBounds=True)
+    plot.addItem(hline, ignoreBounds=True)
+
+    current_coordinates = None
+    reference_coordinates = None
+
+    def do_render():
+        render_measurements(current_coordinates, reference_coordinates)
+
+    def update(pos):
+        nonlocal current_coordinates
+        if plot.sceneBoundingRect().contains(pos):
+            mouse_point = plot.getViewBox().mapSceneToView(pos)
+            current_coordinates = mouse_point.x(), mouse_point.y()
+            vline.setPos(mouse_point.x())
+            hline.setPos(mouse_point.y())
+            do_render()
+
+    def set_reference(ev):
+        nonlocal reference_coordinates
+        if ev.button() == Qt.LeftButton and current_coordinates is not None:
+            reference_coordinates = current_coordinates
+            do_render()
+
+    plot.scene().sigMouseMoved.connect(update)
+    plot.scene().sigMouseClicked.connect(set_reference)
+
+
 class RealtimePlotWidget(QWidget):
     COLORS = [Qt.red, Qt.blue, Qt.green, Qt.magenta, Qt.cyan,
               Qt.darkRed, Qt.darkBlue, Qt.darkGreen, Qt.darkYellow, Qt.gray]
 
-    def __init__(self, parent=None):
+    def __init__(self, display_measurements, parent):
         super(RealtimePlotWidget, self).__init__(parent)
         self._plot_widget = PlotWidget()
         self._plot_widget.setBackground((0, 0, 0))
-        self._plot_widget.addLegend()
+        self._legend = self._plot_widget.addLegend()
         self._plot_widget.showButtons()
         self._plot_widget.enableAutoRange()
-        self._plot_widget.showGrid(x=True, y=True, alpha=0.2)
+        self._plot_widget.showGrid(x=True, y=True, alpha=0.3)
         vbox = QVBoxLayout(self)
         vbox.addWidget(self._plot_widget)
         self.setLayout(vbox)
 
         self._color_index = 0
         self._curves = {}
+
+        # Crosshair
+        def _render_measurements(cur, ref):
+            text = 'time %.6f sec,  y %.6f' % cur
+            if ref is None:
+                return text
+            dt = cur[0] - ref[0]
+            dy = cur[1] - ref[1]
+            if abs(dt) > 1e-12:
+                freq = '%.6f' % abs(1 / dt)
+            else:
+                freq = 'inf'
+            display_measurements(text + ';' + ' ' * 4 + 'dt %.6f sec,  freq %s Hz,  dy %.6f' % (dt, freq, dy))
+
+        display_measurements('Hover to sample Time/Y, click to set new reference')
+        add_crosshair(self._plot_widget, _render_measurements)
 
     def add_curve(self, curve_id, curve_name, data_x=[], data_y=[]):
         color = QColor(self.COLORS[self._color_index % len(self.COLORS)])
@@ -62,24 +114,22 @@ class RealtimePlotWidget(QWidget):
         data_y = numpy.array(data_y)
         self._curves[curve_id] = {'x': data_x, 'y': data_y, 'plot': plot}
 
-    def remove_curve(self, curve_id):
-        curve_id = str(curve_id)
-        if curve_id in self._curves:
-            self._plot_widget.removeItem(self._curves[curve_id]['plot'])
-            del self._curves[curve_id]
+    def reset(self):
+        for curve in self._curves.keys():
+            self._plot_widget.removeItem(self._curves[curve]['plot'])
 
-    def set_x_range(self, left, right):
-        self._plot_widget.setRange(xRange=(left, right))
+        self._curves = {}
+        self._color_index = 0
+
+        self._plot_widget.enableAutoRange()
+
+        self._legend.scene().removeItem(self._legend)
+        self._legend = self._plot_widget.addLegend()
 
     def update_values(self, curve_id, x, y):
         curve = self._curves[curve_id]
         curve['x'] = numpy.append(curve['x'], x)
         curve['y'] = numpy.append(curve['y'], y)
-
-    def redraw(self):
-        for curve in self._curves.values():
-            if len(curve['x']):
-                curve['plot'].setData(curve['x'], curve['y'])
 
     def lazy_redraw(self, period):
         timestamp = time.time()
@@ -87,24 +137,50 @@ class RealtimePlotWidget(QWidget):
             self._prev_lazy_redraw = 0.0
         if timestamp - self._prev_lazy_redraw > period:
             self._prev_lazy_redraw = timestamp
-            self.redraw()
+            for curve in self._curves.values():
+                if len(curve['x']):
+                    curve['plot'].setData(curve['x'], curve['y'])
+
+
+class Window(QMainWindow):
+    def __init__(self):
+        super(Window, self).__init__()
+        self.setWindowTitle('Serial Plot')
+
+        self.statusBar().show()
+
+        self._plot = RealtimePlotWidget(self.statusBar().showMessage, self)
+
+        # Actions menu
+        clear_action = QAction('&Clear', self)
+        clear_action.setShortcut(QKeySequence('Ctrl+Shift+C'))
+        clear_action.triggered.connect(self._plot.reset)
+
+        actions_menu = self.menuBar().addMenu('&Actions')
+        actions_menu.addAction(clear_action)
+
+        # Layout
+        self.setCentralWidget(self._plot)
+
+    @property
+    def plot(self):
+        return self._plot
 
 
 class SerialReader:
     def __init__(self, port, baudrate, timeout=None, value_prefix='$'):
         self._value_prefix = value_prefix
         self._port = serial.Serial(port=port, baudrate=baudrate, timeout=timeout, writeTimeout=timeout)
-        self._x = 0
 
     def poll(self, value_handler, raw_handler):
         line = self._port.readline().decode()
         if not line.startswith(self._value_prefix):
             raw_handler(line)
         else:
-            self._x += 1
             items = eval(line[len(self._value_prefix):])
-            if items:
-                value_handler(self._x, map(float, items))
+            if items and len(items) > 1:
+                timestamp, items = items[0], items[1:]
+                value_handler(timestamp, map(float, items))
 
     def run(self, value_handler, raw_handler):
         while True:
@@ -132,17 +208,17 @@ class CLIInputReader(threading.Thread):
 def value_handler(x, values):
     for i, val in enumerate(values):
         try:
-            plot.update_values(i, [x], [val])
+            window.plot.update_values(i, [x], [val])
         except KeyError:
-            plot.add_curve(i, str(i), [x], [val])
-    plot.lazy_redraw(0.2)
+            window.plot.add_curve(i, str(i), [x], [val])
+    window.plot.lazy_redraw(0.2)
 
 
 app = QApplication(sys.argv)
 
 initial_timestamp = time.time()
 
-plot = RealtimePlotWidget()
+window = Window()
 
 reader = SerialReader(SER_PORT, SER_BAUDRATE)
 
@@ -150,6 +226,5 @@ cli = CLIInputReader(lambda line: reader._port.write((line + '\r\n').encode()))
 
 threading.Thread(target=reader.run, args=(value_handler, lambda s: print(s.rstrip())), daemon=True).start()
 
-plot.redraw()
-plot.show()
+window.show()
 exit(app.exec_())
