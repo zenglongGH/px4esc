@@ -175,20 +175,25 @@ class PWMCommand : public os::shell::ICommandHandler
 
 class StatusCommand : public os::shell::ICommandHandler
 {
-    const char* getName() const override { return "status"; }
+    const char* getName() const override { return "s"; }
 
-    void execute(os::shell::BaseChannelWrapper& ios, int, char**) override
+    void execute(os::shell::BaseChannelWrapper&, int, char**) override
     {
-        ios.print("Motor control HW:\n");
-        ios.print("%s---\n", board::motor::getStatus().toString().c_str());
+        foc::printStatusInfo();
 
-        ios.print("PWM:\n"
-                  "Active handles: %u\n"
-                  "Frequency     : %.6f kHz\n"
-                  "DeadTime      : %.1f nsec\n",
-                  board::motor::PWMHandle::getTotalNumberOfActiveHandles(),
-                  1e-3 / double(board::motor::getPWMPeriod()),
-                  double(board::motor::getPWMDeadTime()) * 1e9);
+        std::printf("\nMotor:\n%s\n", foc::getMotorParameters().toString().c_str());
+
+        std::printf("\nObserver:\n%s\n", foc::getObserverParameters().toString().c_str());
+
+        std::printf("\nMotor control HW:\n%s\n", board::motor::getStatus().toString().c_str());
+
+        std::printf("\nPWM:\n"
+                    "Active handles: %u\n"
+                    "Frequency     : %.6f kHz\n"
+                    "DeadTime      : %.1f nsec\n",
+                    board::motor::PWMHandle::getTotalNumberOfActiveHandles(),
+                    1e-3 / double(board::motor::getPWMPeriod()),
+                    double(board::motor::getPWMDeadTime()) * 1e9);
     }
 } static cmd_status;
 

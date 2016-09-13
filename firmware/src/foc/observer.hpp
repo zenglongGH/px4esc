@@ -26,6 +26,7 @@
 
 #include <math/math.hpp>
 #include <cassert>
+#include <zubax_chibios/util/heapless.hpp>
 
 
 namespace foc
@@ -54,7 +55,14 @@ struct ObserverParameters
 
     auto toString() const
     {
-        return "<NOT IMPLEMENTED>";
+        return os::heapless::format("Q diag : %s\n"
+                                    "R diag : %s\n"
+                                    "P0 diag: %s\n"
+                                    "CC Comp: %.3f\n",
+                                    math::toString(Q.diagonal()).c_str(),
+                                    math::toString(R.diagonal()).c_str(),
+                                    math::toString(P0.diagonal()).c_str(),
+                                    double(cross_coupling_compensation));
     }
 };
 

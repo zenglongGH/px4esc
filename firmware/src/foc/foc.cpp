@@ -87,19 +87,19 @@ struct ErrorCounter
     Error last_error = Error::None;
     std::uint32_t error_count = 0;
 
-    void reset() volatile
+    void reset()
     {
         last_error = Error::None;
         error_count = 0;
     }
 
-    void registerError(Error e) volatile
+    void registerError(Error e)
     {
         AbsoluteCriticalSectionLocker locker;
         last_error = e;
         error_count++;
     }
-} volatile g_error_counter;
+} g_error_counter;
 
 
 class DebugVariableTracer
@@ -145,25 +145,6 @@ struct BeepCommand
 } * g_beep_command = nullptr;
 
 
-class CycleCounter
-{
-    std::uint64_t cnt_ = 0;
-
-public:
-    void increment()
-    {
-        cnt_++;
-    }
-
-    std::uint64_t get() const
-    {
-        return cnt_;
-    }
-};
-
-CycleCounter g_fast_irq_cycle_counter;
-
-
 class CurrentPIController
 {
     Const max_phase_current_;
@@ -206,6 +187,21 @@ public:
 };
 
 
+class EventCounter
+{
+    std::uint64_t cnt_ = 0;
+
+public:
+    void increment() { cnt_++; }
+
+    std::uint64_t get() const { return cnt_; }
+
+    auto toString() const { return os::heapless::intToString(cnt_); }
+};
+
+EventCounter g_fast_irq_cycle_counter;
+
+
 struct Context
 {
     const math::Range<> phase_current_limit;
@@ -224,6 +220,13 @@ struct Context
     Scalar reference_Iq = 0;                            ///< Ampere, read in the fast IRQ
 
     math::SimpleMovingAverageFilter<IdqMovingAverageLength, Vector<2>> estimated_Idq_filter;
+
+    struct PerfCounters
+    {
+        EventCounter main_irq_count;
+        EventCounter fast_irq_count;
+        EventCounter Udq_normalizations;
+    } perf_counters;
 
     Context(const ObserverParameters& observer_params,
             Const field_flux,
@@ -445,6 +448,57 @@ void beep(Const frequency,
 
 void printStatusInfo()
 {
+    State state = State();
+    ControlMode control_mode = ControlMode();
+    Scalar setpoint = 0;
+    ErrorCounter error_counter;
+
+    Context::PerfCounters perf_counters;
+    Scalar angular_velocity = 0;
+    Vector<2> estimated_Idq = Vector<2>::Zero();
+    Vector<2> reference_Udq = Vector<2>::Zero();
+    Scalar reference_Iq = 0;
+
+    {
+        AbsoluteCriticalSectionLocker locker;
+
+        if (g_context != nullptr)
+        {
+            state           = g_state;
+            control_mode    = g_control_mode;
+            setpoint        = g_setpoint;
+            error_counter   = g_error_counter;
+
+            perf_counters       = g_context->perf_counters;
+            angular_velocity    = g_context->angular_velocity;
+            estimated_Idq       = g_context->estimated_Idq;
+            reference_Udq       = g_context->reference_Udq;
+            reference_Iq        = g_context->reference_Iq;
+        }
+    }
+
+    std::printf("State        : %d\n"
+                "Control Mode : %d\n"
+                "Setpoint     : %.3f\n",
+                int(state), int(control_mode), double(setpoint));
+
+    std::printf("Last Error   : %d\n"
+                "Error Count  : %lu\n",
+                int(error_counter.last_error), error_counter.error_count);
+
+    std::printf("Perf Counters: MainIRQ: %s, FastIRQ: %s, UdqNorm: %s\n",
+                perf_counters.main_irq_count.toString().c_str(),
+                perf_counters.fast_irq_count.toString().c_str(),
+                perf_counters.Udq_normalizations.toString().c_str());
+
+    std::printf("Ang. Velocity: %.1f rad/s\n"
+                "Estimated Idq: %s\n"
+                "Reference Udq: %s\n"
+                "Reference Iq : %.1f\n",
+                double(angular_velocity),
+                math::toString(estimated_Idq).c_str(),
+                math::toString(reference_Udq).c_str(),
+                double(reference_Iq));
 }
 
 
@@ -504,6 +558,8 @@ void handleMainIRQ(Const period)
         g_context->observer.update(period, Idq, Udq);
 
         g_debug_tracer.set<5>(g_context->observer.getAngularVelocity());
+
+        g_context->perf_counters.main_irq_count.increment();
 
         /*
          * Updating the state estimate.
@@ -607,6 +663,8 @@ void handleFastIRQ(Const period,
     if (state == State::Running ||
         state == State::Spinup)
     {
+        g_context->perf_counters.fast_irq_count.increment();
+
         /*
          * Computing Idq, Udq
          */
@@ -636,6 +694,8 @@ void handleFastIRQ(Const period,
         if (g_context->reference_Udq.norm() > Udq_magnitude_limit)
         {
             g_context->reference_Udq = g_context->reference_Udq.normalized() * Udq_magnitude_limit;
+
+            g_context->perf_counters.Udq_normalizations.increment();
         }
 
         /*

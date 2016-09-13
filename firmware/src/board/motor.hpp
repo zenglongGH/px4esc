@@ -144,13 +144,13 @@ struct Status
     {
         return os::heapless::format("Inverter Temperature: %.0f C\n"
                                     "Inverter Voltage    : %.1f\n"
-                                    "Current ADC Z-Offset: %.3f, %.3f\n"
+                                    "Current ADC Z-Offset: %s\n"
                                     "Power OK            : %u\n"
                                     "Overload            : %u\n"
                                     "Fault               : %u\n",
                                     double(math::convertKelvinToCelsius(inverter_temperature)),
                                     double(inverter_voltage),
-                                    double(phase_current_zero_offset[0]), double(phase_current_zero_offset[1]),
+                                    math::toString(phase_current_zero_offset).c_str(),
                                     power_ok,
                                     overload,
                                     fault);
