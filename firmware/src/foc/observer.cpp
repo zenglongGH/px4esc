@@ -125,6 +125,18 @@ void Observer::update(Const dt,
     x_[StateIndexAngularPosition] = constrainAngularPosition(x_[StateIndexAngularPosition]);
 
     P_ = (Matrix<4, 4>::Identity() - K * C_) * Pout;
+
+    /*
+     * Constraint check
+     */
+    if (direction_constraint_ != DirectionConstraint::None)
+    {
+        if (((direction_constraint_ == DirectionConstraint::Forward) && (x_[StateIndexAngularVelocity] < 0)) ||
+            ((direction_constraint_ == DirectionConstraint::Reverse) && (x_[StateIndexAngularVelocity] > 0)))
+        {
+            x_[StateIndexAngularVelocity] = 0.0F;
+        }
+    }
 }
 
 }

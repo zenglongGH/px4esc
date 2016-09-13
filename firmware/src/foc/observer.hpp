@@ -65,6 +65,15 @@ struct ObserverParameters
  */
 class Observer
 {
+public:
+    enum class DirectionConstraint
+    {
+        None,
+        Forward,
+        Reverse
+    };
+
+private:
     math::Const phi_;
     math::Const ld_;
     math::Const lq_;
@@ -80,6 +89,8 @@ class Observer
 
     const math::Matrix<2, 4> C_;
 
+    DirectionConstraint direction_constraint_ = DirectionConstraint::None;
+
     // Filter states
     math::Vector<4> x_ = math::Vector<4>::Zero();
     math::Matrix<4, 4> P_;
@@ -94,6 +105,8 @@ public:
     void update(math::Const dt,
                 const math::Vector<2>& idq,
                 const math::Vector<2>& udq);
+
+    void setDirectionConstraint(DirectionConstraint dc) { direction_constraint_ = dc; }
 
     math::Vector<2> getIdq() const { return x_.block<2, 1>(0, 0); }
 

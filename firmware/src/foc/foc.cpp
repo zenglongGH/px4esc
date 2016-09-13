@@ -490,6 +490,17 @@ void handleMainIRQ(Const period)
          * Running the observer, this takes forever.
          * By the time the observer has finished, the rotor has moved some angle forward, which we compensate.
          */
+        if (g_state == State::Spinup)
+        {
+            g_context->observer.setDirectionConstraint((g_setpoint > 0) ?
+                                                       Observer::DirectionConstraint::Forward :
+                                                       Observer::DirectionConstraint::Reverse);
+        }
+        else
+        {
+            g_context->observer.setDirectionConstraint(Observer::DirectionConstraint::None);
+        }
+
         g_context->observer.update(period, Idq, Udq);
 
         g_debug_tracer.set<5>(g_context->observer.getAngularVelocity());
