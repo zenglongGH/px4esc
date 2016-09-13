@@ -340,7 +340,7 @@ class SetpointCommand : public os::shell::ICommandHandler
             foc::stop();
 
             ios.print("Set setpoint in the range [-1, 1] (negative for reverse rotation).\n");
-            ios.print("By default, ratiometric setpoint will be used; option A/a enables current setpoint.\n");
+            ios.print("By default, ratiometric setpoint will be used; option A/a selects current setpoint.\n");
             ios.print("Execute without arguments to stop the motor.\n");
             ios.print("Option -p will plot the real time values.\n");
             ios.print("\t%s [setpoint=0 [A|a] [-p]]\n", argv[0]);
