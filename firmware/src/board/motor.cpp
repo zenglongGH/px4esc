@@ -50,7 +50,10 @@ constexpr unsigned InverterVoltageSampleBufferLength = 2 * SamplesPerADCPerIRQ;
 constexpr unsigned FastIRQPriority = 0;
 constexpr unsigned MainIRQPriority = 1;
 
-constexpr float MainIRQPreferredPeriod = 45e-6F;
+/**
+ * The true period of the main IRQ will be as close as possible to this value, but never less than it.
+ */
+constexpr float MainIRQMinPeriod = 40e-6F;
 
 constexpr float InverterVoltageInnovationWeight = 0.1F;         ///< Has to account for possible aliasing effect
 constexpr float TemperatureInnovationWeight     = 0.001F;       ///< The input is noisy, high damping is necessary
@@ -622,7 +625,7 @@ void init()
 
     g_dead_time = float(double(TIM1->BDTR & 0xFFU) / double(TIM1ClockFrequency));
 
-    g_fast_irq_to_main_irq_period_ratio = unsigned(MainIRQPreferredPeriod / g_pwm_period + 0.5F);
+    g_fast_irq_to_main_irq_period_ratio = unsigned(std::ceil(MainIRQMinPeriod / g_pwm_period) + 0.4F);
 
     initADC();
 
