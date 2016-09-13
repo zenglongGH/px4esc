@@ -43,15 +43,9 @@ namespace
 constexpr unsigned SamplesPerADCPerIRQ = 2;
 
 /**
- * If this constant is less than (g_fast_irq_to_main_irq_period_ratio * SamplesPerADCPerIRQ),
- * we'll be overwriting some values in the buffer before having a chance to use them.
- * If this constant is greater than (g_fast_irq_to_main_irq_period_ratio * SamplesPerADCPerIRQ),
- * we'll be using some samples from the previous period of the main IRQ.
- * Both of the above can be avoided by using the runtime computed value of (g_fast_irq_to_main_irq_period_ratio * 2)
- * instead of this constant; however, that increases complexity and harms performance. Neither of the above described
- * scenarios are errors, so I chose to use a fixed constant for simplicity and performance reasons.
+ * Some voltage samples will be re-used from the previous period of the fast IRQ.
  */
-constexpr unsigned InverterVoltageSampleBufferLength = 6 * SamplesPerADCPerIRQ;
+constexpr unsigned InverterVoltageSampleBufferLength = 2 * SamplesPerADCPerIRQ;
 
 constexpr unsigned FastIRQPriority = 0;
 constexpr unsigned MainIRQPriority = 1;
