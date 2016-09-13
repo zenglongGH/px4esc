@@ -29,6 +29,7 @@
 #include <utility>
 #include <cassert>
 #include <cmath>
+#include <zubax_chibios/util/heapless.hpp>
 
 
 namespace math
@@ -294,5 +295,43 @@ makeDiagonalMatrix(Diagonal... diag)
     impl_::fillDiagonalMatrix<Scalar, sizeof...(Diagonal)>(matrix, 0, diag...);
     return matrix;
 }
+
+/**
+ * Printing helpers
+ * @{
+ */
+enum class StringRepresentation
+{
+    SingleLine,
+    MultiLine
+};
+
+template <typename Scalar, int Rows, int Columns>
+inline auto toString(const Eigen::Matrix<Scalar, Rows, Columns>& matrix,
+                     const StringRepresentation representation = StringRepresentation::SingleLine)
+{
+    os::heapless::String<Rows * Columns * 20> s;
+
+    for (int row = 0; row < Rows; row++)
+    {
+        if (row > 0)
+        {
+            s.append((representation == StringRepresentation::MultiLine) ? "\n" : "; ");
+        }
+        for (int column = 0; column < Columns; column++)
+        {
+            if (column > 0)
+            {
+                s.append(", ");
+            }
+            s.append(matrix(row, column));
+        }
+    }
+
+    return s;
+}
+/**
+ * @}
+ */
 
 }
