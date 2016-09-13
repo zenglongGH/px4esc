@@ -59,14 +59,20 @@ struct MotorParameters
 
     auto toString() const
     {
-        return os::heapless::format(
-            "Imin=%.1fA, Imax=%.1fA, Phi=%.6fWb, Rab=%.6fOhm, Lab=%.6fH, Npoles=%u [%s]",
-            double(min_current),
-            double(max_current),
-            double(field_flux),
-            double(r_ab), double(l_ab),
-            unsigned(num_poles),
-            isValid() ? "VALID" : "INVALID");
+        return os::heapless::format("Imin  : %-7.1f A\n"
+                                    "Imax  : %-7.1f A\n"
+                                    "Phi   : %-7.3f mWb\n"
+                                    "Rab   : %-7.3f Ohm\n"
+                                    "Lab   : %-7.3f uH\n"
+                                    "Npoles: %u\n"
+                                    "Valid : %s\n",
+                                    double(min_current),
+                                    double(max_current),
+                                    double(field_flux) * 1e3,
+                                    double(r_ab),
+                                    double(l_ab) * 1e6,
+                                    unsigned(num_poles),
+                                    isValid() ? "YES" : "NO");
     }
 };
 

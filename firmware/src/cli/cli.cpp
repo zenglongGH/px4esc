@@ -181,11 +181,11 @@ class StatusCommand : public os::shell::ICommandHandler
     {
         foc::printStatusInfo();
 
-        std::printf("\nMotor:\n%s\n", foc::getMotorParameters().toString().c_str());
+        std::printf("\nMotor:\n%s", foc::getMotorParameters().toString().c_str());
 
-        std::printf("\nObserver:\n%s\n", foc::getObserverParameters().toString().c_str());
+        std::printf("\nObserver:\n%s", foc::getObserverParameters().toString().c_str());
 
-        std::printf("\nMotor control HW:\n%s\n", board::motor::getStatus().toString().c_str());
+        std::printf("\nMotor control HW:\n%s", board::motor::getStatus().toString().c_str());
 
         std::printf("\nPWM:\n"
                     "Active handles: %u\n"

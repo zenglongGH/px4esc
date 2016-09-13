@@ -214,7 +214,7 @@ os::watchdog::Timer init()
         ::sleep(1);
     }
 
-    os::lowsyslog("Motor params: %s\n", foc::getMotorParameters().toString().c_str());
+    os::lowsyslog("Motor params:\n%s\n", foc::getMotorParameters().toString().c_str());
 
     /*
      * CLI initialization
