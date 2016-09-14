@@ -79,7 +79,8 @@ enum class MotorIdentificationState
     RsMeasurement,
     PreRoverLMeasurement,
     RoverLMeasurement,
-    PhiMeasurement
+    PhiMeasurement,
+    Finalization
 } g_motor_identification_state = MotorIdentificationState::Initialization;
 
 MotorIdentificationMode g_motor_identification_mode = MotorIdentificationMode::Static;
@@ -287,8 +288,11 @@ void doStop()
     g_setpoint = 0;
     g_setpoint_remaining_ttl = 0;
 
-    g_context->~Context();
-    g_context = nullptr;
+    if (g_context != nullptr)
+    {
+        g_context->~Context();
+        g_context = nullptr;
+    }
 }
 
 } // namespace
@@ -839,7 +843,7 @@ void handleFastIRQ(Const period,
                     else
                     {
                         g_motor_params.r_ab = 0;        // Failed
-                        g_state = State::Idle;
+                        g_motor_identification_state = MotorIdentificationState::Finalization;
                     }
 
                     g_motor_identification_state = MotorIdentificationState::PreRoverLMeasurement;
@@ -853,13 +857,19 @@ void handleFastIRQ(Const period,
         case MotorIdentificationState::PreRoverLMeasurement:
         case MotorIdentificationState::RoverLMeasurement:
         {
-            g_state = State::Idle;      // TODO
+            g_motor_identification_state = MotorIdentificationState::Finalization;
             break;
         }
 
         case MotorIdentificationState::PhiMeasurement:
         {
-            g_state = State::Idle;      // TODO
+            g_motor_identification_state = MotorIdentificationState::Finalization;
+            break;
+        }
+
+        case MotorIdentificationState::Finalization:
+        {
+            doStop();           // This will destroy the context
             break;
         }
 
