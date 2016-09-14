@@ -790,9 +790,7 @@ void handleFastIRQ(Const period,
             {
                 // Switching to the next stage if it is time
                 g_pwm_handle.release();
-                g_motor_identification_state = MotorIdentificationState::RsMeasurement;
-                next_state_switch_at =
-                    g_fast_irq_cycle_counter.get() + std::uint64_t(RsMeasurementDurationSec / period + 0.5F);
+                g_motor_identification_state = MotorIdentificationState::PreRsMeasurement;
             }
             break;
         }
@@ -819,6 +817,8 @@ void handleFastIRQ(Const period,
                 g_motor_identification_state = MotorIdentificationState::RsMeasurement;
                 accumulator = 0;
                 num_samples = 0;
+                next_state_switch_at =
+                    g_fast_irq_cycle_counter.get() + std::uint64_t(RsMeasurementDurationSec / period + 0.5F);
             }
             else
             {
