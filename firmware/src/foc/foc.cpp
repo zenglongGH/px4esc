@@ -73,13 +73,16 @@ board::motor::PWMHandle g_pwm_handle;
 
 enum class MotorIdentificationState
 {
-    ResistanceMeasurement
-} g_motor_identification_state = MotorIdentificationState::ResistanceMeasurement;
-
+    Initialization,
+    PreHeating,
+    PreRsMeasurement,
+    RsMeasurement,
+    PreRoverLMeasurement,
+    RoverLMeasurement,
+    PhiMeasurement
+} g_motor_identification_state = MotorIdentificationState::Initialization;
 
 MotorIdentificationMode g_motor_identification_mode = MotorIdentificationMode::Static;
-
-Scalar g_motor_identification_duration = 0;
 
 
 struct ErrorCounter
@@ -339,15 +342,12 @@ void beginMotorIdentification(MotorIdentificationMode mode)
 {
     AbsoluteCriticalSectionLocker locker;
 
-    if (g_state != State::Idle)
+    if (g_state == State::Idle)
     {
-        return;
+        g_state = State::MotorIdentification;
+        g_motor_identification_mode = mode;
+        g_motor_identification_state = MotorIdentificationState::Initialization;
     }
-
-    g_state = State::MotorIdentification;
-    g_motor_identification_mode = mode;
-    g_motor_identification_state = MotorIdentificationState::ResistanceMeasurement;
-    g_motor_identification_duration = 0;
 }
 
 
@@ -749,21 +749,123 @@ void handleFastIRQ(Const period,
 
     if (g_state == State::MotorIdentification)
     {
-        constexpr Scalar TargetVoltage = 0.7F;
+        constexpr Scalar PreHeatingDurationSec = 10.0F;
+        constexpr Scalar RsMeasurementDurationSec = 5.0F;
+        constexpr Scalar RoverLMeasurementDurationSec = 1.0F;
 
-        Const pwm_setting = TargetVoltage / inverter_voltage;
-        assert(pwm_setting > 0.0F && pwm_setting < 1.0F);
+        static std::uint64_t started_at;
+        static std::uint64_t next_state_switch_at;
 
-        g_pwm_handle.setPWM({ pwm_setting, 0, 0 });
-
-        g_motor_identification_duration += period;
-
-        if (g_motor_identification_duration > 1.0F)
+        switch (g_motor_identification_state)
         {
-            Const resistance = (TargetVoltage / phase_currents_ab[0]) * Scalar(2.0 / 3.0);
-            g_motor_params.r_ab = resistance * 2.0F;
-            g_pwm_handle.release();
-            g_state = State::Idle;
+        case MotorIdentificationState::Initialization:
+        {
+            started_at = g_fast_irq_cycle_counter.get();
+            next_state_switch_at = started_at + std::uint64_t(PreHeatingDurationSec / period + 0.5F);
+
+            g_motor_identification_state = MotorIdentificationState::PreHeating;
+            break;
+        }
+
+        case MotorIdentificationState::PreHeating:
+        {
+            if (g_fast_irq_cycle_counter.get() < next_state_switch_at)
+            {
+                // We don't compensate dead time because we don't really care about precision
+                constexpr Scalar TargetVoltage = 2.0F;
+                constexpr Scalar RotationRateHz = 1.0F;
+
+                static Scalar angle;
+                angle = constrainAngularPosition(angle + RotationRateHz * period);
+
+                const math::Vector<2> alpha_beta(math::cos(angle),
+                                                 math::sin(angle));
+
+                const auto pwm_setting =
+                    performSpaceVectorTransform(alpha_beta * TargetVoltage, inverter_voltage).first;
+
+                g_pwm_handle.setPWM(pwm_setting);
+            }
+            else
+            {
+                // Switching to the next stage if it is time
+                g_pwm_handle.release();
+                g_motor_identification_state = MotorIdentificationState::RsMeasurement;
+                next_state_switch_at =
+                    g_fast_irq_cycle_counter.get() + std::uint64_t(RsMeasurementDurationSec / period + 0.5F);
+            }
+            break;
+        }
+
+        case MotorIdentificationState::PreRsMeasurement:
+        case MotorIdentificationState::RsMeasurement:
+        {
+            constexpr Scalar TargetVoltage = 1.0F;
+
+            Const voltage_drop_due_to_dead_time =
+                (board::motor::getPWMDeadTime() / board::motor::getPWMPeriod()) * inverter_voltage;
+
+            Const target_voltage_pwm_setting = std::min(TargetVoltage / inverter_voltage, 0.4F);
+
+            g_pwm_handle.setPWM({0.5F + target_voltage_pwm_setting, 0.5F, 0.5F});
+
+            static double accumulator;
+            static std::uint32_t num_samples;
+
+            if (g_motor_identification_state == MotorIdentificationState::PreRsMeasurement)
+            {
+                g_motor_identification_state = MotorIdentificationState::RsMeasurement;
+                accumulator = 0;
+                num_samples = 0;
+            }
+            else
+            {
+                if (phase_currents_ab[0] > 0.01F)
+                {
+                    num_samples++;
+                    accumulator +=
+                        double((TargetVoltage - voltage_drop_due_to_dead_time) / phase_currents_ab[0]) * (2.0 / 3.0);
+                }
+
+                if (g_fast_irq_cycle_counter.get() >= next_state_switch_at)
+                {
+                    g_pwm_handle.release();
+
+                    if (num_samples > 100)
+                    {
+                        g_motor_params.r_ab = Scalar((accumulator / double(num_samples)) * 2.0);
+                    }
+                    else
+                    {
+                        g_motor_params.r_ab = 0;        // Failed
+                        g_state = State::Idle;
+                    }
+
+                    g_motor_identification_state = MotorIdentificationState::PreRoverLMeasurement;
+                    next_state_switch_at =
+                        g_fast_irq_cycle_counter.get() + std::uint64_t(RoverLMeasurementDurationSec / period + 0.5F);
+                }
+            }
+            break;
+        }
+
+        case MotorIdentificationState::PreRoverLMeasurement:
+        case MotorIdentificationState::RoverLMeasurement:
+        {
+            g_state = State::Idle;      // TODO
+            break;
+        }
+
+        case MotorIdentificationState::PhiMeasurement:
+        {
+            g_state = State::Idle;      // TODO
+            break;
+        }
+
+        default:
+        {
+            assert(false);
+        }
         }
     }
 
