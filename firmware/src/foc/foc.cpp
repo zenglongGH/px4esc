@@ -600,17 +600,29 @@ void handleMainIRQ(Const period)
                 }
 
                 // Stopping if the angular velocity is too low
-                if (g_context->angular_velocity < (g_motor_params.min_electrical_ang_vel / 2.0F))
+                if (std::abs(g_context->angular_velocity) < (g_motor_params.min_electrical_ang_vel / 2.0F))
                 {
-                    g_setpoint = 0;
+                    g_state = State::Spinup;    // Dropping into the spinup mode to change direction if necessary
                 }
             }
             else
             {
-                g_context->reference_Iq += g_motor_params.spinup_current_slope * period;
+                if ((g_setpoint > 0) != (g_context->reference_Iq > 0))
+                {
+                    g_context->reference_Iq = 0;        // Direction changed, reset
+                }
 
-                if (g_context->angular_velocity > g_motor_params.min_electrical_ang_vel &&
-                    g_context->reference_Iq > g_motor_params.min_current)
+                if (g_setpoint > 0)
+                {
+                    g_context->reference_Iq += g_motor_params.spinup_current_slope * period;
+                }
+                else
+                {
+                    g_context->reference_Iq -= g_motor_params.spinup_current_slope * period;
+                }
+
+                if (std::abs(g_context->angular_velocity) > g_motor_params.min_electrical_ang_vel &&
+                    std::abs(g_context->reference_Iq) > g_motor_params.min_current)
                 {
                     g_state = State::Running;
                 }
