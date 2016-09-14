@@ -373,9 +373,40 @@ class SetpointCommand : public os::shell::ICommandHandler
         }
 
         using namespace std;
-        const float sp = strtof(argv[1], nullptr);
+        float sp = strtof(argv[1], nullptr);
 
-        const float ttl = 600.0F;                       // TODO: Configurable
+        switch (control_mode)
+        {
+        case foc::ControlMode::RatiometricCurrent:
+        {
+            static constexpr math::Range<> UnityLimits(-1.0F, 1.0F);
+
+            if (!UnityLimits.contains(sp))
+            {
+                sp = 0;
+                ios.print("Setpoint out of range [%g, %g]\n", double(UnityLimits.min), double(UnityLimits.max));
+            }
+            break;
+        }
+        case foc::ControlMode::Current:
+        {
+            const auto Imax = foc::getMotorParameters().max_current;
+            const math::Range<> CurrentLimits(-Imax, Imax);
+
+            if (!CurrentLimits.contains(sp))
+            {
+                sp = 0;
+                ios.print("Current out of range [%g, %g]\n", double(CurrentLimits.min), double(CurrentLimits.max));
+            }
+            break;
+        }
+        default:
+        {
+            assert(false);
+        }
+        }
+
+        const float ttl = 60.0F;                        // TODO: Configurable
 
         ios.print("Setpoint %.3f mode %d TTL %.1f s\n", double(sp), int(control_mode), double(ttl));
 
