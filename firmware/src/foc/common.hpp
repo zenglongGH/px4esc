@@ -26,6 +26,7 @@
 
 #include <math/math.hpp>
 #include <board/motor.hpp>
+#include <zubax_chibios/util/heapless.hpp>
 
 
 namespace foc
