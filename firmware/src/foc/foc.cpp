@@ -171,7 +171,7 @@ struct BeepCommand
 
 class CurrentPIController
 {
-    Const max_phase_current_;
+    Const full_scale_current_;
     Const kp_;
     Const ki_;
 
@@ -180,15 +180,15 @@ class CurrentPIController
 public:
     CurrentPIController(Const Ls,
                         Const Rs,
-                        Const max_phase_current,
+                        Const max_current,
                         Const dt) :
-        max_phase_current_(max_phase_current),
+        full_scale_current_(max_current * 3.0F),
         kp_((math::Pi * 2.0F * Ls) / (20.0F * dt)),
         ki_(dt * Rs / Ls)
     {
         assert(Ls > 0);
         assert(Rs > 0);
-        assert(max_phase_current > 0);
+        assert(max_current > 0);
         assert(dt > 0);
     }
 
@@ -200,7 +200,7 @@ public:
         const math::Range<> voltage_limits(-voltage_limit, voltage_limit);
 
         static constexpr math::Range<> UnityLimits(-1.0F, 1.0F);
-        Const error = UnityLimits.constrain((target_current - real_current) / max_phase_current_);
+        Const error = UnityLimits.constrain((target_current - real_current) / full_scale_current_);
 
         ui_ = voltage_limits.constrain(ui_ + ki_ * error);      // Sdelat' hotel grozu,
 
@@ -213,7 +213,7 @@ public:
 
 struct Context
 {
-    const math::Range<> phase_current_limit;
+    const math::Range<> current_limit;
 
     Observer observer;
 
@@ -241,16 +241,16 @@ struct Context
             Const field_flux,
             Const stator_phase_inductance,
             Const stator_phase_resistance,
-            Const max_phase_current,
+            Const max_current,
             Const pid_dt) :
-        phase_current_limit(-max_phase_current, max_phase_current),
+        current_limit(-max_current, max_current),
         observer(observer_params,
                  field_flux,
                  stator_phase_inductance,
                  stator_phase_inductance,
                  stator_phase_resistance),
-        pid_Id(stator_phase_inductance, stator_phase_resistance, max_phase_current, pid_dt),
-        pid_Iq(stator_phase_inductance, stator_phase_resistance, max_phase_current, pid_dt),
+        pid_Id(stator_phase_inductance, stator_phase_resistance, max_current, pid_dt),
+        pid_Iq(stator_phase_inductance, stator_phase_resistance, max_current, pid_dt),
         estimated_Idq_filter(Vector<2>::Zero())
     { }
 };
@@ -265,11 +265,6 @@ void initializeContext()
     Const Ls = g_motor_params.l_ab / 2.0F;
     Const Rs = g_motor_params.r_ab / 2.0F;
 
-    /*
-     * TODO: Dmitry should review this and describe a correct way of computing phase current limits.
-     */
-    Const max_phase_current = g_motor_params.max_current * 5.0F;
-
     alignas(16) static std::uint8_t context_storage[sizeof(Context)];
     std::fill(std::begin(context_storage), std::end(context_storage), 0);       // Paranoia time
 
@@ -277,7 +272,7 @@ void initializeContext()
                                               g_motor_params.field_flux,
                                               Ls,
                                               Rs,
-                                              max_phase_current,
+                                              g_motor_params.max_current,
                                               pid_dt);
 }
 
@@ -316,6 +311,9 @@ void setMotorParameters(const MotorParameters& params)
 {
     AbsoluteCriticalSectionLocker locker;
     g_motor_params = params;
+    // Making sure the motor restarts if already running
+    g_setpoint = 0;
+    g_setpoint_remaining_ttl = 0;
 }
 
 MotorParameters getMotorParameters()
@@ -586,39 +584,38 @@ void handleMainIRQ(Const period)
 
             if (g_state == State::Running)
             {
-                if (g_control_mode == ControlMode::Ratiometric)
+                if (g_control_mode == ControlMode::RatiometricCurrent)
                 {
                     static constexpr math::Range<> UnityLimits(-1.0F, 1.0F);
 
-                    g_context->reference_Iq = g_context->phase_current_limit.max * UnityLimits.constrain(g_setpoint);
+                    g_context->reference_Iq = g_context->current_limit.max * UnityLimits.constrain(g_setpoint);
                 }
                 else if (g_control_mode == ControlMode::Current)
                 {
-                    g_context->reference_Iq = g_context->phase_current_limit.constrain(g_setpoint);
+                    g_context->reference_Iq = g_context->current_limit.constrain(g_setpoint);
                 }
                 else
                 {
                     g_context->reference_Iq = 0;        // This is actually an error.
                 }
 
-                if (g_context->angular_velocity < 10.0F)
+                // Stopping if the angular velocity is too low
+                if (g_context->angular_velocity < (g_motor_params.min_electrical_ang_vel / 2.0F))
                 {
-                    g_setpoint = 0;     // Stopping
+                    g_setpoint = 0;
                 }
             }
             else
             {
-                g_context->reference_Iq += 10.0F * period;
+                g_context->reference_Iq += g_motor_params.spinup_current_slope * period;
 
-                if (g_context->angular_velocity > 800.0F &&
+                if (g_context->angular_velocity > g_motor_params.min_electrical_ang_vel &&
                     g_context->reference_Iq > g_motor_params.min_current)
                 {
                     g_state = State::Running;
                 }
 
-                // TODO: Should we use the average current instead of phase current for limiting,
-                //       since we don't know if the rotor is rotating or not?
-                if (!g_context->phase_current_limit.contains(g_context->reference_Iq))
+                if (!g_context->current_limit.contains(g_context->reference_Iq))
                 {
                     g_setpoint = 0;     // Stopping
                 }
@@ -640,6 +637,11 @@ void handleMainIRQ(Const period)
 
     if (g_state == State::Idle)
     {
+        if (!g_motor_params.isValid())
+        {
+            g_setpoint = 0;             // No way
+        }
+
         const bool need_to_start = !os::float_eq::closeToZero(Scalar(g_setpoint));
         if (need_to_start)
         {

@@ -37,23 +37,29 @@ namespace foc
  */
 struct MotorParameters
 {
-    math::Scalar min_current = 0;
-    math::Scalar max_current = 0;
+    math::Scalar min_current = 0;               ///< Min phase current for stable observer operation, Ampere
+    math::Scalar max_current = 0;               ///< Max phase current, Ampere
 
-    math::Scalar field_flux = 0;        ///< Phi, Weber
-    math::Scalar r_ab = 0;              ///< Phase-to-phase resistance, Ohm
-    math::Scalar l_ab = 0;              ///< Phase-to-phase inductance, Henry
+    math::Scalar spinup_current_slope = 0;      ///< Current increase rate during spinup, Ampere/second
+
+    math::Scalar min_electrical_ang_vel = 0;    ///< Min electric angular velocity for stable operation, radian/second
+
+    math::Scalar field_flux = 0;                ///< Phi, Weber
+    math::Scalar r_ab = 0;                      ///< Phase-to-phase resistance, Ohm
+    math::Scalar l_ab = 0;                      ///< Phase-to-phase inductance, Henry
 
     std::uint_fast8_t num_poles = 0;
 
     bool isValid() const
     {
-        return min_current      > 0 &&
-               max_current      > 0 &&
-               field_flux       > 0 &&
-               r_ab             > 0 &&
-               l_ab             > 0 &&
-               num_poles       >= 2 &&
+        return min_current              > 0 &&
+               spinup_current_slope     > 0 &&
+               min_electrical_ang_vel   > 0 &&
+               field_flux               > 0 &&
+               r_ab                     > 0 &&
+               l_ab                     > 0 &&
+               num_poles               >= 2 &&
+               max_current > min_current &&
                (num_poles % 2 == 0);
     }
 
@@ -61,6 +67,8 @@ struct MotorParameters
     {
         return os::heapless::format("Imin  : %-7.1f A\n"
                                     "Imax  : %-7.1f A\n"
+                                    "SCS   : %-7.1f A/s\n"
+                                    "Wmin  : %-7.1f Rad/s, %.1f Hz\n"
                                     "Phi   : %-7.3f mWb\n"
                                     "Rab   : %-7.3f Ohm\n"
                                     "Lab   : %-7.3f uH\n"
@@ -68,6 +76,8 @@ struct MotorParameters
                                     "Valid : %s\n",
                                     double(min_current),
                                     double(max_current),
+                                    double(spinup_current_slope),
+                                    double(min_electrical_ang_vel), double(min_electrical_ang_vel / (math::Pi * 2.0F)),
                                     double(field_flux) * 1e3,
                                     double(r_ab),
                                     double(l_ab) * 1e6,

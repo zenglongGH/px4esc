@@ -152,8 +152,8 @@ std::pair<Error, std::uint32_t> getLastErrorWithErrorCount();
  */
 enum class ControlMode
 {
-    Ratiometric,        ///< Abstract units in [-1, 1]
-    Current             ///< Ampere
+    RatiometricCurrent,         ///< Abstract units in [-1, 1]
+    Current                     ///< Ampere
 };
 
 /**

@@ -353,7 +353,7 @@ class SetpointCommand : public os::shell::ICommandHandler
         }
 
         // Parsing optional stuff
-        auto control_mode = foc::ControlMode::Ratiometric;      // This is the default
+        auto control_mode = foc::ControlMode::RatiometricCurrent;      // This is the default
         bool do_plot = false;
 
         for (int i = 1; i < argc; i++)
