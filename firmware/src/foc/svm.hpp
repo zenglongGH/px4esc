@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "common.hpp"
 #include <math/math.hpp>
 #include <cstdint>
 #include <cassert>
@@ -64,12 +65,10 @@ namespace foc
  * @return                      PWM setpoint vector (each component is in [0, 1]) and the index of the current
  *                              electrical sector in the range [0, 5].
  */
-inline std::pair<math::Vector<3>, std::uint_fast8_t>
-performSpaceVectorTransform(const math::Vector<2>& alpha_beta_voltage,
-                            math::Const inverter_voltage)
+inline std::pair<Vector<3>, std::uint_fast8_t>
+performSpaceVectorTransform(const Vector<2>& alpha_beta_voltage,
+                            Const inverter_voltage)
 {
-    constexpr auto SquareRootOf3 = math::Scalar(1.7320508075688772);
-
     const auto ualpha = alpha_beta_voltage[0] * SquareRootOf3;
     const auto ubeta =  alpha_beta_voltage[1];
 
@@ -80,7 +79,7 @@ performSpaceVectorTransform(const math::Vector<2>& alpha_beta_voltage,
     const std::uint_fast8_t sector_index =
         (y > 0) ? ((x > 0) ? 3 : ((z > 0) ? 2 : 1)) : ((x <= 0) ? 0 : ((z > 0) ? 4 : 5));
 
-    math::Scalar ta = 0;
+    Scalar ta = 0;
 
     switch (sector_index)
     {
@@ -108,9 +107,9 @@ performSpaceVectorTransform(const math::Vector<2>& alpha_beta_voltage,
     }
     }
 
-    const math::Vector<3> raw_voltages { ta, ta + z, ta + y };
+    const Vector<3> raw_voltages { ta, ta + z, ta + y };
 
-    const math::Vector<3> output = ((raw_voltages * 2.0F) / (inverter_voltage * SquareRootOf3)).array() + 0.5F;
+    const Vector<3> output = ((raw_voltages * 2.0F) / (inverter_voltage * SquareRootOf3)).array() + 0.5F;
 
     return {output, sector_index};
 }

@@ -26,9 +26,9 @@
 #include "svm.hpp"
 #include "pid.hpp"
 #include "transforms.hpp"
+#include "voltage_modulator.hpp"
+#include "common.hpp"
 
-#include <board/board.hpp>
-#include <board/motor.hpp>
 #include <zubax_chibios/config/config.hpp>
 
 
@@ -39,19 +39,12 @@
 namespace foc
 {
 
-using math::Scalar;
-using math::Const;
-using math::Vector;
-using board::motor::AbsoluteCriticalSectionLocker;
-
 namespace
 {
 /*
  * Constants
  */
 constexpr unsigned IdqMovingAverageLength = 5;
-
-constexpr Scalar SquareRootOf3 = math::Scalar(1.7320508075688772);
 
 /*
  * State variables
@@ -105,18 +98,6 @@ struct ErrorCounter
     }
 } g_error_counter;
 
-
-class EventCounter
-{
-    std::uint64_t cnt_ = 0;
-
-public:
-    void increment() { cnt_++; }
-
-    std::uint64_t get() const { return cnt_; }
-
-    auto toString() const { return os::heapless::intToString(cnt_); }
-};
 
 EventCounter g_fast_irq_cycle_counter;
 
@@ -173,89 +154,38 @@ struct BeepCommand
 } * g_beep_command = nullptr;
 
 
-class CurrentPIController
-{
-    Const full_scale_current_;
-    Const kp_;
-    Const ki_;
-
-    Scalar ui_ = 0;
-
-public:
-    CurrentPIController(Const Ls,
-                        Const Rs,
-                        Const max_current,
-                        Const dt) :
-        full_scale_current_(max_current * 3.0F),
-        kp_((math::Pi * 2.0F * Ls) / (20.0F * dt)),
-        ki_(dt * Rs / Ls)
-    {
-        assert(Ls > 0);
-        assert(Rs > 0);
-        assert(max_current > 0);
-        assert(dt > 0);
-    }
-
-    Scalar computeVoltage(Const target_current,
-                          Const real_current,
-                          Const inverter_voltage)
-    {
-        Const voltage_limit = inverter_voltage * (SquareRootOf3 / 2.0F);
-        const math::Range<> voltage_limits(-voltage_limit, voltage_limit);
-
-        static constexpr math::Range<> UnityLimits(-1.0F, 1.0F);
-        Const error = UnityLimits.constrain((target_current - real_current) / full_scale_current_);
-
-        ui_ = voltage_limits.constrain(ui_ + ki_ * error);      // Sdelat' hotel grozu,
-
-        Const output = kp_ * (error + ui_);                     // a poluchil kozu
-
-        return output;
-    }
-};
-
-
 struct Context
 {
     const math::Range<> current_limit;
 
     Observer observer;
 
-    Scalar angular_velocity = 0;                        ///< Radian per second, read in the fast IRQ
-    Scalar angular_position = 0;                        ///< Radians [0, Pi*2]; extrapolated in the fast IRQ
+    ThreePhaseVoltageModulator<IdqMovingAverageLength> modulator;
 
-    CurrentPIController pid_Id;                         ///< Used only in the fast IRQ
-    CurrentPIController pid_Iq;                         ///< Used only in the fast IRQ
+    Scalar angular_velocity = 0;                                ///< Radian per second, read in the fast IRQ
+    Scalar angular_position = 0;                                ///< Radians [0, Pi*2]; extrapolated in the fast IRQ
 
-    Vector<2> estimated_Idq = Vector<2>::Zero();        ///< Ampere, updated from the fast IRQ
-    Vector<2> reference_Udq = Vector<2>::Zero();        ///< Volt, updated from the fast IRQ
+    math::Vector<2> estimated_Idq = math::Vector<2>::Zero();    ///< Ampere, updated from the fast IRQ
+    math::Vector<2> reference_Udq = math::Vector<2>::Zero();    ///< Volt, updated from the fast IRQ
 
-    Scalar reference_Iq = 0;                            ///< Ampere, read in the fast IRQ
-
-    math::SimpleMovingAverageFilter<IdqMovingAverageLength, Vector<2>> estimated_Idq_filter;
-
-    struct PerfCounters
-    {
-        EventCounter main_irq_count;
-        EventCounter fast_irq_count;
-        EventCounter Udq_normalizations;
-    } perf_counters;
+    Scalar reference_Iq = 0;                                    ///< Ampere, read in the fast IRQ
 
     Context(const ObserverParameters& observer_params,
             Const field_flux,
             Const stator_phase_inductance,
             Const stator_phase_resistance,
             Const max_current,
-            Const pid_dt) :
+            Const fast_irq_period) :
         current_limit(-max_current, max_current),
         observer(observer_params,
                  field_flux,
                  stator_phase_inductance,
                  stator_phase_inductance,
                  stator_phase_resistance),
-        pid_Id(stator_phase_inductance, stator_phase_resistance, max_current, pid_dt),
-        pid_Iq(stator_phase_inductance, stator_phase_resistance, max_current, pid_dt),
-        estimated_Idq_filter(Vector<2>::Zero())
+        modulator(stator_phase_inductance,
+                  stator_phase_resistance,
+                  max_current,
+                  fast_irq_period)
     { }
 };
 
@@ -264,8 +194,6 @@ Context* g_context = nullptr;
 
 void initializeContext()
 {
-    Const pid_dt = board::motor::getPWMPeriod();
-
     Const Ls = g_motor_params.l_ab / 2.0F;
     Const Rs = g_motor_params.r_ab / 2.0F;
 
@@ -277,7 +205,7 @@ void initializeContext()
                                               Ls,
                                               Rs,
                                               g_motor_params.max_current,
-                                              pid_dt);
+                                              board::motor::getPWMPeriod());
 }
 
 void doStop()
@@ -464,7 +392,8 @@ void printStatusInfo()
     Scalar setpoint = 0;
     ErrorCounter error_counter;
 
-    Context::PerfCounters perf_counters;
+    EventCounter Udq_normalizations;
+
     Scalar angular_velocity = 0;
     Vector<2> estimated_Idq = Vector<2>::Zero();
     Vector<2> reference_Udq = Vector<2>::Zero();
@@ -480,7 +409,8 @@ void printStatusInfo()
             setpoint        = g_setpoint;
             error_counter   = g_error_counter;
 
-            perf_counters       = g_context->perf_counters;
+            Udq_normalizations = g_context->modulator.getUdqNormalizationCounter();
+
             angular_velocity    = g_context->angular_velocity;
             estimated_Idq       = g_context->estimated_Idq;
             reference_Udq       = g_context->reference_Udq;
@@ -497,10 +427,8 @@ void printStatusInfo()
                 "Error Count  : %lu\n",
                 int(error_counter.last_error), error_counter.error_count);
 
-    std::printf("Perf Counters: MainIRQ: %s, FastIRQ: %s, UdqNorm: %s\n",
-                perf_counters.main_irq_count.toString().c_str(),
-                perf_counters.fast_irq_count.toString().c_str(),
-                perf_counters.Udq_normalizations.toString().c_str());
+    std::printf("Udq Norm. Cnt: %s\n",
+                Udq_normalizations.toString().c_str());
 
     std::printf("Ang. Velocity: %.1f rad/s\n"
                 "Estimated Idq: %s\n"
@@ -569,8 +497,6 @@ void handleMainIRQ(Const period)
         g_context->observer.update(period, Idq, Udq);
 
         g_debug_tracer.set<5>(g_context->observer.getAngularVelocity());
-
-        g_context->perf_counters.main_irq_count.increment();
 
         /*
          * Updating the state estimate.
@@ -690,65 +616,24 @@ void handleFastIRQ(Const period,
     if (state == State::Running ||
         state == State::Spinup)
     {
-        g_context->perf_counters.fast_irq_count.increment();
+        const auto output = g_context->modulator.update(phase_currents_ab,
+                                                        inverter_voltage,
+                                                        g_context->angular_velocity,
+                                                        g_context->angular_position,
+                                                        g_context->reference_Iq);
 
-        /*
-         * Computing Idq, Udq
-         */
-        Const angle_sine   = math::sin(g_context->angular_position);
-        Const angle_cosine = math::cos(g_context->angular_position);
+        g_pwm_handle.setPWM(output.pwm_setpoint);
 
-        const auto estimated_I_alpha_beta = performClarkeTransform(phase_currents_ab);
+        g_context->estimated_Idq = output.estimated_Idq;
+        g_context->reference_Udq = output.reference_Udq;
 
-        const Vector<2> new_Idq = performParkTransform(estimated_I_alpha_beta, angle_sine, angle_cosine);
-        g_context->estimated_Idq_filter.update(new_Idq);
-        g_context->estimated_Idq = g_context->estimated_Idq_filter.getValue();
-
-        /*
-         * Running PIDs, estimating reference voltage in the rotating reference frame
-         */
-        g_context->reference_Udq[0] = g_context->pid_Id.computeVoltage(0.0F,
-                                                                       g_context->estimated_Idq[0],
-                                                                       inverter_voltage);
-
-        g_context->reference_Udq[1] = g_context->pid_Iq.computeVoltage(g_context->reference_Iq,
-                                                                       g_context->estimated_Idq[1],
-                                                                       inverter_voltage);
-
-        // In SVM we multiply the 3-phase voltage vector to 2/sqrt(3), therefore here we need to adjust for that
-        Const Udq_magnitude_limit = inverter_voltage * (SquareRootOf3 / 2.0F) * 0.9F;
-
-        if (g_context->reference_Udq.norm() > Udq_magnitude_limit)
-        {
-            g_context->reference_Udq = g_context->reference_Udq.normalized() * Udq_magnitude_limit;
-
-            g_context->perf_counters.Udq_normalizations.increment();
-        }
-
-        /*
-         * Transforming back to the stationary reference frame, updating the PWM outputs
-         * TODO: Dead time compensation
-         */
-        auto reference_U_alpha_beta = performInverseParkTransform(g_context->reference_Udq,
-                                                                  angle_sine, angle_cosine);
-
-        const auto pwm_setpoint_and_sector_number = performSpaceVectorTransform(reference_U_alpha_beta,
-                                                                                inverter_voltage);
-        // Sector number is not used
-
-        g_pwm_handle.setPWM(pwm_setpoint_and_sector_number.first);
+        g_context->angular_position = output.extrapolated_angular_position;
 
         g_debug_tracer.set<0>(g_context->reference_Udq[0] * 1e3F);
         g_debug_tracer.set<1>(g_context->reference_Udq[1] * 1e3F);
         g_debug_tracer.set<2>(g_context->estimated_Idq[0] * 1e3F);
         g_debug_tracer.set<3>(g_context->estimated_Idq[1] * 1e3F);
         g_debug_tracer.set<4>(g_context->reference_Iq     * 1e3F);
-
-        /*
-         * Position extrapolation
-         */
-        g_context->angular_position =
-            constrainAngularPosition(g_context->angular_position + g_context->angular_velocity * period);
     }
 
     if (g_state == State::MotorIdentification)

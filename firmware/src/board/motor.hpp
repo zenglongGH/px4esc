@@ -25,6 +25,7 @@
 #pragma once
 
 #include <cstdint>
+#include <board/board.hpp>
 #include <math/math.hpp>
 #include <zubax_chibios/util/heapless.hpp>
 

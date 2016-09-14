@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "common.hpp"
 #include <math/math.hpp>
 
 
@@ -54,12 +55,10 @@ namespace foc
  *
  *      performClarkeTransform[a_, b_] := {a, (a + 2 b)/\[Sqrt]3};
  */
-inline math::Vector<2> performClarkeTransform(const math::Vector<2>& ab)
+inline Vector<2> performClarkeTransform(const Vector<2>& ab)
 {
-    constexpr auto SquareRootOf3 = math::Scalar(1.7320508075688772);
-
-    math::Const alpha = ab[0];
-    math::Const beta = (ab[0] + ab[1] * 2.0F) / SquareRootOf3;
+    Const alpha = ab[0];
+    Const beta = (ab[0] + ab[1] * 2.0F) / SquareRootOf3;
 
     return { alpha, beta };
 }
@@ -67,9 +66,9 @@ inline math::Vector<2> performClarkeTransform(const math::Vector<2>& ab)
 /**
  * Park transform, assming increasing Theta during direct rotation.
  */
-inline math::Vector<2> performParkTransform(const math::Vector<2>& alpha_beta,
-                                            math::Const angle_sine,
-                                            math::Const angle_cosine)
+inline Vector<2> performParkTransform(const Vector<2>& alpha_beta,
+                                      Const angle_sine,
+                                      Const angle_cosine)
 {
     return { alpha_beta[0] * angle_cosine + alpha_beta[1] * angle_sine,
             -alpha_beta[0] * angle_sine   + alpha_beta[1] * angle_cosine };
@@ -78,9 +77,9 @@ inline math::Vector<2> performParkTransform(const math::Vector<2>& alpha_beta,
 /**
  * Inverse Park transform to the above defined.
  */
-inline math::Vector<2> performInverseParkTransform(const math::Vector<2>& dq,
-                                                   math::Const angle_sine,
-                                                   math::Const angle_cosine)
+inline Vector<2> performInverseParkTransform(const Vector<2>& dq,
+                                             Const angle_sine,
+                                             Const angle_cosine)
 {
     return { dq[0] * angle_cosine - dq[1] * angle_sine,
              dq[0] * angle_sine   + dq[1] * angle_cosine };

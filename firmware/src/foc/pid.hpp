@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "common.hpp"
 #include <math/math.hpp>
 #include <cassert>
 
@@ -54,17 +55,17 @@ namespace foc
  */
 class ParallelPIController
 {
-    math::Const kp_;
-    math::Const ki_;
+    Const kp_;
+    Const ki_;
 
-    const math::Range<math::Scalar> integral_limits_;
+    const math::Range<Scalar> integral_limits_;
 
-    math::Scalar integral_ = 0;
+    Scalar integral_ = 0;
 
 public:
-    ParallelPIController(math::Const p,
-                         math::Const i,
-                         const math::Range<math::Scalar>& integration_limits) :
+    ParallelPIController(Const p,
+                         Const i,
+                         const math::Range<Scalar>& integration_limits) :
         kp_(p),
         ki_(i),
         integral_limits_(integration_limits)
@@ -74,15 +75,15 @@ public:
         assert(integral_limits_.contains(0));
     }
 
-    math::Scalar update(math::Const setpoint,
-                        math::Const process_variable,
-                        math::Const time_delta)
+    Scalar update(Const setpoint,
+                  Const process_variable,
+                  Const time_delta)
     {
         assert(time_delta > 0);
 
-        math::Const error = setpoint - process_variable;
+        Const error = setpoint - process_variable;
 
-        math::Const p = error * kp_;
+        Const p = error * kp_;
 
         // The I gain defines the speed of change of the integrated error, not its weight.
         // This enables us to change the I term at any moment without upsetting the output.

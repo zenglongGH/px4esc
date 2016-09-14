@@ -24,6 +24,7 @@
 
 #pragma once
 
+#include "common.hpp"
 #include <zubax_chibios/util/heapless.hpp>
 #include <math/math.hpp>
 #include <cstdint>
@@ -37,22 +38,22 @@ namespace foc
  */
 struct MotorParameters
 {
-    math::Scalar min_current = 0;               ///< Min phase current for stable observer operation, Ampere
-    math::Scalar max_current = 0;               ///< Max phase current, Ampere
+    Scalar min_current = 0;             ///< Min phase current for stable observer operation, Ampere
+    Scalar max_current = 0;             ///< Max phase current, Ampere
 
-    math::Scalar spinup_current_slope = 0;      ///< Current increase rate during spinup, Ampere/second
+    Scalar spinup_current_slope = 0;    ///< Current increase rate during spinup, Ampere/second
 
-    math::Scalar min_electrical_ang_vel = 0;    ///< Min electric angular velocity for stable operation, radian/second
+    Scalar min_electrical_ang_vel = 0;  ///< Min electric angular velocity for stable operation, radian/second
 
-    math::Scalar field_flux = 0;                ///< Phi, Weber
-    math::Scalar r_ab = 0;                      ///< Phase-to-phase resistance, Ohm
-    math::Scalar l_ab = 0;                      ///< Phase-to-phase inductance, Henry
+    Scalar field_flux = 0;              ///< Phi, Weber
+    Scalar r_ab = 0;                    ///< Phase-to-phase resistance, Ohm
+    Scalar l_ab = 0;                    ///< Phase-to-phase inductance, Henry
 
     std::uint_fast8_t num_poles = 0;
 
     bool isValid() const
     {
-        static auto is_positive = [](math::Const x) { return (x > 0) && std::isfinite(x); };
+        static auto is_positive = [](Const x) { return (x > 0) && std::isfinite(x); };
 
         return is_positive(min_current)                 &&
                is_positive(max_current)                 &&

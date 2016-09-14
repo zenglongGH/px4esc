@@ -23,6 +23,7 @@
  */
 
 #include "observer.hpp"
+#include "common.hpp"
 #include <zubax_chibios/config/config.hpp>
 
 
