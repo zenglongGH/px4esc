@@ -800,12 +800,14 @@ void handleFastIRQ(Const period,
         case MotorIdentificationState::PreRsMeasurement:
         case MotorIdentificationState::RsMeasurement:
         {
-            constexpr Scalar TargetVoltage = 1.0F;
+            /// Voltages below 2 tend to produce unreliable results (because of high noise in current measurements)
+            constexpr Scalar TargetVoltage = 2.0F;
 
             Const voltage_drop_due_to_dead_time =
                 (board::motor::getPWMDeadTime() / board::motor::getPWMPeriod()) * inverter_voltage;
 
-            Const target_voltage_pwm_setting = std::min(TargetVoltage / inverter_voltage, 0.4F);
+            Const target_voltage_pwm_setting =
+                std::min((TargetVoltage + voltage_drop_due_to_dead_time) / inverter_voltage, 0.4F);
 
             g_pwm_handle.setPWM({0.5F + target_voltage_pwm_setting, 0.5F, 0.5F});
 
@@ -820,11 +822,10 @@ void handleFastIRQ(Const period,
             }
             else
             {
-                if (phase_currents_ab[0] > 0.01F)
+                if (phase_currents_ab[0] > 1e-3F)
                 {
                     num_samples++;
-                    accumulator +=
-                        double((TargetVoltage - voltage_drop_due_to_dead_time) / phase_currents_ab[0]) * (2.0 / 3.0);
+                    accumulator += double(TargetVoltage / phase_currents_ab[0]) * (2.0 / 3.0);
                 }
 
                 if (g_fast_irq_cycle_counter.get() >= next_state_switch_at)
