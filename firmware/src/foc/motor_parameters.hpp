@@ -52,15 +52,18 @@ struct MotorParameters
 
     bool isValid() const
     {
-        return min_current              > 0 &&
-               spinup_current_slope     > 0 &&
-               min_electrical_ang_vel   > 0 &&
-               field_flux               > 0 &&
-               r_ab                     > 0 &&
-               l_ab                     > 0 &&
-               num_poles               >= 2 &&
-               max_current > min_current &&
-               (num_poles % 2 == 0);
+        static auto is_positive = [](math::Const x) { return (x > 0) && std::isfinite(x); };
+
+        return is_positive(min_current)                 &&
+               is_positive(max_current)                 &&
+               is_positive(spinup_current_slope)        &&
+               is_positive(min_electrical_ang_vel)      &&
+               is_positive(field_flux)                  &&
+               is_positive(r_ab)                        &&
+               is_positive(l_ab)                        &&
+               (num_poles >= 2)                         &&
+               (num_poles % 2 == 0)                     &&
+               (max_current > min_current);
     }
 
     auto toString() const
