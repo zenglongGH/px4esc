@@ -384,7 +384,8 @@ class SetpointCommand : public os::shell::ICommandHandler
             if (!UnityLimits.contains(sp))
             {
                 sp = 0;
-                ios.print("Setpoint out of range [%g, %g]\n", double(UnityLimits.min), double(UnityLimits.max));
+                ios.print("ERROR: Setpoint out of range [%g, %g]\n",
+                          double(UnityLimits.min), double(UnityLimits.max));
             }
             break;
         }
@@ -396,7 +397,8 @@ class SetpointCommand : public os::shell::ICommandHandler
             if (!CurrentLimits.contains(sp))
             {
                 sp = 0;
-                ios.print("Current out of range [%g, %g]\n", double(CurrentLimits.min), double(CurrentLimits.max));
+                ios.print("ERROR: Current out of range [%g, %g]\n",
+                          double(CurrentLimits.min), double(CurrentLimits.max));
             }
             break;
         }
@@ -458,6 +460,56 @@ class BeepCommand : public os::shell::ICommandHandler
 } static cmd_beep;
 
 
+class PerformMotorIdentificationCommand : public os::shell::ICommandHandler
+{
+    const char* getName() const override { return "motor_id"; }
+
+    void execute(os::shell::BaseChannelWrapper& ios, int argc, char** argv) override
+    {
+        if (argc <= 1)
+        {
+            ios.print("Perform motor identification using the specified mode.\n");
+            ios.print("\t%s static|rotating\n", argv[0]);
+            return;
+        }
+
+        // Parsing mode
+        const os::heapless::String<> mode_string(argv[1]);
+        foc::MotorIdentificationMode mode{};
+        if (mode_string == "static")
+        {
+            mode = foc::MotorIdentificationMode::Static;
+        }
+        else if (mode_string == "rotating")
+        {
+            mode = foc::MotorIdentificationMode::RotationWithoutMechanicalLoad;
+        }
+        else
+        {
+            ios.print("ERROR: Invalid identification mode: %s\n", mode_string.c_str());
+            return;
+        }
+
+        // Running
+        if (foc::getState() != foc::State::Idle)
+        {
+            ios.print("ERROR: Controller is not idle\n");
+            return;
+        }
+
+        foc::beginMotorIdentification(mode);
+
+        while (foc::getState() == foc::State::MotorIdentification)
+        {
+            ios.putChar('.');
+            ::sleep(1);
+        }
+
+        ios.print(" Done.\n%s\n", foc::getMotorParameters().toString().c_str());
+    }
+} static cmd_perform_motor_identification;
+
+
 class CLIThread : public chibios_rt::BaseStaticThread<2048>
 {
     os::shell::Shell<20> shell_;
@@ -493,6 +545,7 @@ public:
         (void) shell_.addCommandHandler(&cmd_spin);
         (void) shell_.addCommandHandler(&cmd_setpoint);
         (void) shell_.addCommandHandler(&cmd_beep);
+        (void) shell_.addCommandHandler(&cmd_perform_motor_identification);
     }
 
     virtual ~CLIThread() { }
