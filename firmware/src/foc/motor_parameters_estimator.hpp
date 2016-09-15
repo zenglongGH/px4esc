@@ -330,18 +330,19 @@ public:
             pwm_vector = output.pwm_setpoint;
 
             Const Ud = output.reference_Udq[0];
-            Const Iq = output.estimated_Idq[1];
+            Const Uq = output.reference_Udq[1];
 
             averager_.addSample(Ud * Ud);
-            averager_2_.addSample(Iq * Iq);
+            averager_2_.addSample(Uq * Uq);
 
             if (getTimeSinceStateSwitch() > RoverLMeasurementDuration)
             {
                 Const Ud_squared = averager_.getAverage();
-                Const Iq_squared = averager_2_.getAverage();
+                Const Uq_squared = averager_2_.getAverage();
                 Const w_squared = w * w;
 
-                Const Ls = std::sqrt(Ud_squared / (w_squared * Iq_squared));
+                Const RoverL = std::sqrt((w_squared * Uq_squared) / Ud_squared);
+                Const Ls = result_.r_ab / RoverL;
 
                 result_.l_ab = Ls * 2.0F;
 
