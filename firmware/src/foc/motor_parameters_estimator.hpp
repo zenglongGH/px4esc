@@ -136,7 +136,7 @@ class MotorParametersEstimator
 
     const MotorIdentificationMode mode_;
     Const estimation_current_;
-    Const RoverL_current_frequency_;
+    Const Ls_current_frequency_;
     Const pwm_period_;
     Const pwm_dead_time_;
 
@@ -147,8 +147,8 @@ class MotorParametersEstimator
         Initialization,
         PreRsMeasurement,
         RsMeasurement,
-        PreRoverLMeasurement,
-        RoverLMeasurement,
+        PreLsMeasurement,
+        LsMeasurement,
         PhiMeasurement,
         Finalization,
         Finished
@@ -199,12 +199,12 @@ public:
     MotorParametersEstimator(MotorIdentificationMode mode,
                              const MotorParameters& initial_parameters,
                              Const estimation_current,
-                             Const RoverL_current_frequency,
+                             Const Ls_current_frequency,
                              Const pwm_period,
                              Const pwm_dead_time) :
         mode_(mode),
         estimation_current_(estimation_current),
-        RoverL_current_frequency_(RoverL_current_frequency),
+        Ls_current_frequency_(Ls_current_frequency),
         pwm_period_(pwm_period),
         pwm_dead_time_(pwm_dead_time),
         result_(initial_parameters),
@@ -293,7 +293,7 @@ public:
 
                 if (result_.r_ab > 0)
                 {
-                    switchState(State::PreRoverLMeasurement);
+                    switchState(State::PreLsMeasurement);
                 }
                 else
                 {
@@ -303,7 +303,7 @@ public:
             break;
         }
 
-        case State::PreRoverLMeasurement:
+        case State::PreLsMeasurement:
         {
             constexpr Scalar OneSizeFitsAllLab = 100.0e-6F;
 
@@ -312,13 +312,13 @@ public:
                                             estimation_current_,
                                             pwm_period_);
             // Ourowrapos - a wrapper that wraps itself.
-            switchState(State::RoverLMeasurement);
+            switchState(State::LsMeasurement);
             break;
         }
 
-        case State::RoverLMeasurement:
+        case State::LsMeasurement:
         {
-            Const w = RoverL_current_frequency_ * (math::Pi * 2.0F);
+            Const w = Ls_current_frequency_ * (math::Pi * 2.0F);
 
             const auto output = voltage_modulator_wrapper_.access().update(phase_currents_ab,
                                                                            inverter_voltage,
