@@ -64,7 +64,7 @@ class MotorParametersEstimator
     static constexpr Scalar WarmingUpDuration           = 5.0F;
     static constexpr Scalar RsPreMeasurementTimeout     = 5.0F;
     static constexpr Scalar RsMeasurementDuration       = 10.0F;
-    static constexpr Scalar RoverLMeasurementDuration   = 5.0F;
+    static constexpr Scalar LsMeasurementDuration       = 10.0F;
 
     static constexpr unsigned IdqMovingAverageLength = 5;
 
@@ -335,7 +335,7 @@ public:
             averager_.addSample(Ud * Ud);
             averager_2_.addSample(Iq * Iq);
 
-            if (getTimeSinceStateSwitch() > RoverLMeasurementDuration)
+            if (getTimeSinceStateSwitch() > LsMeasurementDuration)
             {
                 Const Ud_squared = averager_.getAverage();
                 Const Iq_squared = averager_2_.getAverage();

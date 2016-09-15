@@ -197,7 +197,7 @@ os::watchdog::Timer init()
     motor_params.min_electrical_ang_vel = 400.0F;
     motor_params.field_flux = 0.001125F;
     motor_params.r_ab = 0.265F;
-    motor_params.l_ab = 91e-6F;
+    motor_params.l_ab = 68e-6F;
     motor_params.num_poles = 14;
 
     foc::setMotorParameters(motor_params);
@@ -209,7 +209,7 @@ os::watchdog::Timer init()
         ::sleep(1);
     }
 
-    foc::beginMotorIdentification(foc::MotorIdentificationMode::Static);
+    //foc::beginMotorIdentification(foc::MotorIdentificationMode::Static);
 
     while (foc::getState() == foc::State::MotorIdentification)
     {
