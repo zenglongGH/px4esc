@@ -46,7 +46,7 @@ namespace
  */
 constexpr unsigned IdqMovingAverageLength = 5;
 
-constexpr Scalar MotorIdentificationCurrent = 3.0F;
+constexpr Scalar MotorIdentificationCurrent = 5.0F;
 
 /*
  * State variables
@@ -390,13 +390,13 @@ void printStatusInfo()
     {
         AbsoluteCriticalSectionLocker locker;
 
+        state           = g_state;
+        control_mode    = g_control_mode;
+        setpoint        = g_setpoint;
+        error_counter   = g_error_counter;
+
         if (g_context != nullptr)
         {
-            state           = g_state;
-            control_mode    = g_control_mode;
-            setpoint        = g_setpoint;
-            error_counter   = g_error_counter;
-
             Udq_normalizations = g_context->modulator.getUdqNormalizationCounter();
 
             angular_velocity    = g_context->angular_velocity;

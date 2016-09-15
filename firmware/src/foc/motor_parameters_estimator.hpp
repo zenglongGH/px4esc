@@ -62,7 +62,7 @@ enum class MotorIdentificationMode
 class MotorParametersEstimator
 {
     static constexpr Scalar WarmingUpDuration           = 5.0F;
-    static constexpr Scalar RsStabilizationDuration     = 1.0F;
+    static constexpr Scalar RsPreMeasurementTimeout     = 5.0F;
     static constexpr Scalar RsMeasurementDuration       = 5.0F;
     static constexpr Scalar RoverLMeasurementDuration   = 5.0F;
 
@@ -106,7 +106,6 @@ class MotorParametersEstimator
     enum class State
     {
         Initialization,
-        WarmingUp,
         PreRsMeasurement,
         RsMeasurement,
         PreRoverLMeasurement,
@@ -137,9 +136,18 @@ class MotorParametersEstimator
     Scalar computeRelativePhaseVoltage(Const desired_voltage,
                                        Const inverter_voltage) const
     {
+        assert(desired_voltage > 0);
+        assert(inverter_voltage > 0);
+
         Const voltage_drop_due_to_dead_time = (pwm_dead_time_ / pwm_period_) * inverter_voltage;
 
         return (desired_voltage + voltage_drop_due_to_dead_time) / inverter_voltage;
+    }
+
+    static Scalar computeLineVoltageForResistanceMeasurement(Const desired_current,
+                                                             Const phase_to_phase_resistance)
+    {
+        return (desired_current * phase_to_phase_resistance / 2.0F) * Scalar(3.0 / 2.0);
     }
 
 public:
@@ -162,7 +170,7 @@ public:
     Vector<3> onNextPWMPeriod(const Vector<2>& phase_currents_ab,
                               Const inverter_voltage)
     {
-        Vector<3> pwm_vector = Vector<3>::Zero();
+        Vector<3> pwm_vector = Vector<3>::Ones() * 0.5F;
 
         time_ += pwm_period_;
 
@@ -174,74 +182,72 @@ public:
             result_.r_ab = 0;
             result_.l_ab = 0;
 
-            switchState(State::WarmingUp);
-            break;
-        }
-
-        case State::WarmingUp:
-        {
-            if (getTimeSinceStateSwitch() < WarmingUpDuration)
-            {
-                // TODO: Fixed current operation
-                constexpr Scalar TargetVoltage = 2.0F;
-
-                Const angle = constrainAngularPosition(time_);
-
-                const Vector<2> alpha_beta(math::cos(angle), math::sin(angle));
-
-                pwm_vector = performSpaceVectorTransform(alpha_beta * TargetVoltage, inverter_voltage).first;
-            }
-            else
-            {
-                switchState(State::PreRsMeasurement);
-            }
+            switchState(State::PreRsMeasurement);
             break;
         }
 
         case State::PreRsMeasurement:
-        case State::RsMeasurement:
         {
-            // TODO: Fixed current operation
-            /// Voltages below 2 tend to produce unreliable results (because of high noise in current measurements)
-            constexpr Scalar TargetVoltage = 2.0F;
-
-            pwm_vector = Vector<3>(0.5F + computeRelativePhaseVoltage(TargetVoltage, inverter_voltage),
-                                   0.5F,
-                                   0.5F);
-
-            if (state_ == State::PreRsMeasurement)
+            if (getTimeSinceStateSwitch() > RsPreMeasurementTimeout)
             {
-                if (getTimeSinceStateSwitch() > RsStabilizationDuration)
-                {
-                    switchState(State::RsMeasurement);
-                }
+                result_.r_ab = 0;                       // Failed - timeout
+                switchState(State::Finalization);
             }
             else
             {
-                if (phase_currents_ab[0] > 1e-3F)
+                /*
+                 * Slowly increasing the voltage until we've reached the required current.
+                 * Note that we're using phase B instead of A in order to heat up the motor more uniformly
+                 * and also to check correct operation of both phases.
+                 */
+                if (phase_currents_ab[1] < estimation_current_)
                 {
-                    averager_.addSample(double(TargetVoltage / phase_currents_ab[0]) * (2.0 / 3.0));
+                    constexpr Scalar OhmPerSec = 0.1F;
+                    result_.r_ab += OhmPerSec * pwm_period_;    // Very rough initial estimation
+                }
+                else
+                {
+                    switchState(State::RsMeasurement);
                 }
 
-                if (getTimeSinceStateSwitch() > RsMeasurementDuration)
-                {
-                    if (averager_.getNumSamples() > 100)
-                    {
-                        result_.r_ab = averager_.getAverage() * 2.0F;
-                    }
-                    else
-                    {
-                        result_.r_ab = 0;        // Failed
-                    }
+                Const voltage = computeLineVoltageForResistanceMeasurement(estimation_current_, result_.r_ab);
+                pwm_vector[1] += computeRelativePhaseVoltage(voltage, inverter_voltage);
+            }
+            break;
+        }
 
-                    if (result_.r_ab > 0)
-                    {
-                        switchState(State::PreRoverLMeasurement);
-                    }
-                    else
-                    {
-                        switchState(State::Finalization);
-                    }
+        case State::RsMeasurement:
+        {
+            /*
+             * Precise resistance measurement.
+             * We're using the rough measurement in order to maintain the requested current, more or less.
+             */
+            Const voltage = computeLineVoltageForResistanceMeasurement(estimation_current_, result_.r_ab);
+            pwm_vector[0] += computeRelativePhaseVoltage(voltage, inverter_voltage);
+
+            if (phase_currents_ab[0] > 1e-3F)
+            {
+                averager_.addSample(double(voltage / phase_currents_ab[0]) * (2.0 / 3.0));
+            }
+
+            if (getTimeSinceStateSwitch() > RsMeasurementDuration)
+            {
+                if (averager_.getNumSamples() > 100)
+                {
+                    result_.r_ab = averager_.getAverage() * 2.0F;
+                }
+                else
+                {
+                    result_.r_ab = 0;        // Failed
+                }
+
+                if (result_.r_ab > 0)
+                {
+                    switchState(State::PreRoverLMeasurement);
+                }
+                else
+                {
+                    switchState(State::Finalization);
                 }
             }
             break;
