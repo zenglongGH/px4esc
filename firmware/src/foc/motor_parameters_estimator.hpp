@@ -305,9 +305,9 @@ public:
 
         case State::PreRoverLMeasurement:
         {
-            constexpr Scalar OneSizeFitsAllInductance = 100.0e-6F;
+            constexpr Scalar OneSizeFitsAllLab = 100.0e-6F;
 
-            voltage_modulator_wrapper_.init(OneSizeFitsAllInductance,
+            voltage_modulator_wrapper_.init(OneSizeFitsAllLab / 2.0F,
                                             result_.r_ab / 2.0F,
                                             estimation_current_,
                                             pwm_period_);
