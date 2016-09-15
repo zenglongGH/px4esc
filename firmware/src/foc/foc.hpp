@@ -25,6 +25,7 @@
 #pragma once
 
 #include "motor_parameters.hpp"
+#include "motor_parameters_estimator.hpp"
 #include "observer.hpp"
 #include <math/math.hpp>
 #include <cstdint>
@@ -55,27 +56,6 @@ MotorParameters getMotorParameters();
 void setObserverParameters(const ObserverParameters& params);
 
 ObserverParameters getObserverParameters();
-
-/**
- * Greater modes (listed later) allow to identify more parameters,
- * but impose more restrictions on the connected load.
- * Read the comments for details.
- */
-enum class MotorIdentificationMode
-{
-    /**
-     * In this mode, the motor will not rotate, therefore it doesn't matter what load it is connected to.
-     * Estimated parameters: Rab, Lab.
-     */
-    Static,
-
-    /**
-     * In this mode, the motor WILL SPIN.
-     * In order to achieve correct results, the motor MUST NOT BE CONNECTED TO ANY MECHANICAL LOAD.
-     * Estimated parameters: Rab, Lab, Phi.
-     */
-    RotationWithoutMechanicalLoad
-};
 
 /**
  * Begins the asynchronous process of motor identification.

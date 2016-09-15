@@ -42,9 +42,11 @@ namespace foc
 namespace
 {
 /*
- * Constants
+ * Configuration constants
  */
 constexpr unsigned IdqMovingAverageLength = 5;
+
+constexpr Scalar MotorIdentificationCurrent = 3.0F;
 
 /*
  * State variables
@@ -63,20 +65,7 @@ volatile Scalar g_setpoint_remaining_ttl;       ///< Seconds left before the set
 
 board::motor::PWMHandle g_pwm_handle;
 
-
-enum class MotorIdentificationState
-{
-    Initialization,
-    PreHeating,
-    PreRsMeasurement,
-    RsMeasurement,
-    PreRoverLMeasurement,
-    RoverLMeasurement,
-    PhiMeasurement,
-    Finalization
-} g_motor_identification_state = MotorIdentificationState::Initialization;
-
-MotorIdentificationMode g_motor_identification_mode = MotorIdentificationMode::Static;
+MotorIdentificationMode g_requested_motor_identification_mode;
 
 
 struct ErrorCounter
@@ -277,8 +266,7 @@ void beginMotorIdentification(MotorIdentificationMode mode)
     if (g_state == State::Idle)
     {
         g_state = State::MotorIdentification;
-        g_motor_identification_mode = mode;
-        g_motor_identification_state = MotorIdentificationState::Initialization;
+        g_requested_motor_identification_mode = mode;
     }
 }
 
@@ -459,11 +447,6 @@ using namespace foc;
 
 void handleMainIRQ(Const period)
 {
-    if (board::motor::isCalibrationInProgress())
-    {
-        g_state = State::Idle;
-    }
-
     /*
      * It is guaranteed by the driver that the main IRQ is always invoked immediately after the fast IRQ
      * of the same period. This guarantees that the context struct contains the most recent data.
@@ -599,22 +582,25 @@ void handleMainIRQ(Const period)
 
 
 void handleFastIRQ(Const period,
-                   const math::Vector<2>& phase_currents_ab,
+                   const Vector<2>& phase_currents_ab,
                    Const inverter_voltage)
 {
     g_fast_irq_cycle_counter.increment();
 
-    const auto state = g_state;                 // Avoiding excessive volatile reads
+    if (board::motor::isCalibrationInProgress())
+    {
+        if (g_state == State::Running ||
+            g_state == State::Spinup)
+        {
+            g_state = State::Idle;
+        }
+    }
 
     /*
-     * In normal operating mode, we're using this IRQ to do the following:
-     *  - Idq estimation
-     *  - computation of Udq reference using PIDs
-     *  - space vector modulation of PWM outputs
-     *  - angle extrapolation between main IRQs
+     * Normal operating mode
      */
-    if (state == State::Running ||
-        state == State::Spinup)
+    if (g_state == State::Running ||
+        g_state == State::Spinup)
     {
         const auto output = g_context->modulator.update(phase_currents_ab,
                                                         inverter_voltage,
@@ -636,140 +622,60 @@ void handleFastIRQ(Const period,
         g_debug_tracer.set<4>(g_context->reference_Iq     * 1e3F);
     }
 
+    /*
+     * Motor identification
+     */
+    static MotorParametersEstimator* estimator = nullptr;
+
     if (g_state == State::MotorIdentification)
     {
-        constexpr Scalar PreHeatingDurationSec = 10.0F;
-        constexpr Scalar RsMeasurementDurationSec = 5.0F;
-        constexpr Scalar RoverLMeasurementDurationSec = 1.0F;
+        alignas(16) static std::uint8_t estimator_storage[sizeof(MotorParametersEstimator)];
 
-        static std::uint64_t started_at;
-        static std::uint64_t next_state_switch_at;
-
-        switch (g_motor_identification_state)
+        if (estimator == nullptr)
         {
-        case MotorIdentificationState::Initialization:
-        {
-            started_at = g_fast_irq_cycle_counter.get();
-            next_state_switch_at = started_at + std::uint64_t(PreHeatingDurationSec / period + 0.5F);
+            board::motor::beginCalibration();
 
-            g_motor_identification_state = MotorIdentificationState::PreHeating;
-            break;
+            estimator = new (estimator_storage)
+                MotorParametersEstimator(g_requested_motor_identification_mode,
+                                         g_motor_params,
+                                         MotorIdentificationCurrent,
+                                         period,
+                                         board::motor::getPWMDeadTime());
         }
 
-        case MotorIdentificationState::PreHeating:
+        if (board::motor::isCalibrationInProgress())
         {
-            if (g_fast_irq_cycle_counter.get() < next_state_switch_at)
+            g_pwm_handle.release(); // Nothing to do, waiting for the calibration to end before continuing
+        }
+        else
+        {
+            const auto pwm_vector = estimator->onNextPWMPeriod(phase_currents_ab, inverter_voltage);
+
+            g_pwm_handle.setPWM(pwm_vector);
+
+            if (estimator->isFinished())
             {
-                // We don't compensate dead time because we don't really care about precision
-                constexpr Scalar TargetVoltage = 2.0F;
-                constexpr Scalar RotationRateHz = 1.0F;
-
-                static Scalar angle;
-                angle = constrainAngularPosition(angle + RotationRateHz * period);
-
-                const math::Vector<2> alpha_beta(math::cos(angle),
-                                                 math::sin(angle));
-
-                const auto pwm_setting =
-                    performSpaceVectorTransform(alpha_beta * TargetVoltage, inverter_voltage).first;
-
-                g_pwm_handle.setPWM(pwm_setting);
-            }
-            else
-            {
-                // Switching to the next stage if it is time
                 g_pwm_handle.release();
-                g_motor_identification_state = MotorIdentificationState::PreRsMeasurement;
+
+                g_motor_params = estimator->getEstimatedMotorParameters();
+
+                g_state = g_motor_params.isValid() ? State::Idle : State::Fault;
             }
-            break;
-        }
-
-        case MotorIdentificationState::PreRsMeasurement:
-        case MotorIdentificationState::RsMeasurement:
-        {
-            /// Voltages below 2 tend to produce unreliable results (because of high noise in current measurements)
-            constexpr Scalar TargetVoltage = 2.0F;
-
-            Const voltage_drop_due_to_dead_time =
-                (board::motor::getPWMDeadTime() / board::motor::getPWMPeriod()) * inverter_voltage;
-
-            Const target_voltage_pwm_setting =
-                std::min((TargetVoltage + voltage_drop_due_to_dead_time) / inverter_voltage, 0.4F);
-
-            g_pwm_handle.setPWM({0.5F + target_voltage_pwm_setting, 0.5F, 0.5F});
-
-            static double accumulator;
-            static std::uint32_t num_samples;
-
-            if (g_motor_identification_state == MotorIdentificationState::PreRsMeasurement)
-            {
-                g_motor_identification_state = MotorIdentificationState::RsMeasurement;
-                accumulator = 0;
-                num_samples = 0;
-                next_state_switch_at =
-                    g_fast_irq_cycle_counter.get() + std::uint64_t(RsMeasurementDurationSec / period + 0.5F);
-            }
-            else
-            {
-                if (phase_currents_ab[0] > 1e-3F)
-                {
-                    num_samples++;
-                    accumulator += double(TargetVoltage / phase_currents_ab[0]) * (2.0 / 3.0);
-                }
-
-                if (g_fast_irq_cycle_counter.get() >= next_state_switch_at)
-                {
-                    g_pwm_handle.release();
-
-                    if (num_samples > 100)
-                    {
-                        g_motor_params.r_ab = Scalar((accumulator / double(num_samples)) * 2.0);
-                    }
-                    else
-                    {
-                        g_motor_params.r_ab = 0;        // Failed
-                        g_motor_identification_state = MotorIdentificationState::Finalization;
-                    }
-
-                    g_motor_identification_state = MotorIdentificationState::PreRoverLMeasurement;
-                    next_state_switch_at =
-                        g_fast_irq_cycle_counter.get() + std::uint64_t(RoverLMeasurementDurationSec / period + 0.5F);
-                }
-            }
-            break;
-        }
-
-        case MotorIdentificationState::PreRoverLMeasurement:
-        case MotorIdentificationState::RoverLMeasurement:
-        {
-            g_motor_identification_state = MotorIdentificationState::Finalization;
-            break;
-        }
-
-        case MotorIdentificationState::PhiMeasurement:
-        {
-            g_motor_identification_state = MotorIdentificationState::Finalization;
-            break;
-        }
-
-        case MotorIdentificationState::Finalization:
-        {
-            doStop();           // This will destroy the context
-            break;
-        }
-
-        default:
-        {
-            assert(false);
-        }
         }
     }
 
     /*
-     * Idle state handler.
+     * Secondary states
      */
-    if (state == State::Idle)
+    if (g_state == State::Idle ||
+        g_state == State::Fault)
     {
+        if (estimator != nullptr)
+        {
+            estimator->~MotorParametersEstimator();
+            estimator = nullptr;
+        }
+
         if (!board::motor::isCalibrationInProgress() && g_pwm_handle.isUnique())
         {
             static std::uint64_t beeping_deadline;
