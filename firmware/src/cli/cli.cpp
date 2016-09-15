@@ -469,8 +469,22 @@ class PerformMotorIdentificationCommand : public os::shell::ICommandHandler
         if (argc <= 1)
         {
             ios.print("Perform motor identification using the specified mode.\n");
-            ios.print("\t%s static|rotating\n", argv[0]);
+            ios.print("Option -p will plot the real time values.\n");
+            ios.print("\t%s static|rotating [-p]\n", argv[0]);
             return;
+        }
+
+        // Parsing optional stuff
+        bool do_plot = false;
+
+        for (int i = 1; i < argc; i++)
+        {
+            const os::heapless::String<> arg(argv[i]);
+
+            if (arg == "-p")
+            {
+                do_plot = true;
+            }
         }
 
         // Parsing mode
@@ -499,13 +513,22 @@ class PerformMotorIdentificationCommand : public os::shell::ICommandHandler
 
         foc::beginMotorIdentification(mode);
 
-        while (foc::getState() == foc::State::MotorIdentification)
+        if (do_plot)
         {
-            ios.putChar('.');
-            ::sleep(1);
+            while (foc::getState() == foc::State::MotorIdentification)
+            {
+                foc::plotRealTimeValues();
+            }
         }
-
-        ios.print(" Done.\n%s\n", foc::getMotorParameters().toString().c_str());
+        else
+        {
+            while (foc::getState() == foc::State::MotorIdentification)
+            {
+                ios.putChar('.');
+                ::sleep(1);
+            }
+            ios.print(" Done.\n%s\n", foc::getMotorParameters().toString().c_str());
+        }
     }
 } static cmd_perform_motor_identification;
 

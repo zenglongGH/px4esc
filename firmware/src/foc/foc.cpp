@@ -46,7 +46,7 @@ namespace
  */
 constexpr unsigned IdqMovingAverageLength = 5;
 
-constexpr Scalar MotorIdentificationCurrent = 5.0F;
+constexpr Scalar MotorIdentificationCurrent = 7.0F;
 
 /*
  * State variables
@@ -662,6 +662,13 @@ void handleFastIRQ(Const period,
                 g_state = g_motor_params.isValid() ? State::Idle : State::Fault;
             }
         }
+
+        g_debug_tracer.set<0>(phase_currents_ab[0]);
+        g_debug_tracer.set<1>(phase_currents_ab[1]);
+        g_debug_tracer.set<2>(estimator->getEstimatedMotorParameters().r_ab * 1e3F);
+        g_debug_tracer.set<3>(0);
+        g_debug_tracer.set<4>(0);
+        g_debug_tracer.set<5>(0);
     }
 
     /*

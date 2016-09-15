@@ -120,6 +120,8 @@ class MotorParametersEstimator
 
     Averager averager_;
 
+    math::SimpleMovingAverageFilter<100, Vector<2>> phase_currents_filter_;
+
     void switchState(State new_state)
     {
         state_ = new_state;
@@ -160,7 +162,8 @@ public:
         estimation_current_(estimation_current),
         pwm_period_(pwm_period),
         pwm_dead_time_(pwm_dead_time),
-        result_(initial_parameters)
+        result_(initial_parameters),
+        phase_currents_filter_(Vector<2>::Zero())
     { }
 
     /**
@@ -173,6 +176,8 @@ public:
         Vector<3> pwm_vector = Vector<3>::Ones() * 0.5F;
 
         time_ += pwm_period_;
+
+        phase_currents_filter_.update(phase_currents_ab);
 
         switch (state_)
         {
@@ -200,7 +205,7 @@ public:
                  * Note that we're using phase B instead of A in order to heat up the motor more uniformly
                  * and also to check correct operation of both phases.
                  */
-                if (phase_currents_ab[1] < estimation_current_)
+                if (phase_currents_filter_.getValue()[1] < estimation_current_)
                 {
                     constexpr Scalar OhmPerSec = 0.1F;
                     result_.r_ab += OhmPerSec * pwm_period_;    // Very rough initial estimation
