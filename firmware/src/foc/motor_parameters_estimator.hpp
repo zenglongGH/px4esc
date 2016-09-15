@@ -63,8 +63,10 @@ class MotorParametersEstimator
 {
     static constexpr Scalar WarmingUpDuration           = 5.0F;
     static constexpr Scalar RsPreMeasurementTimeout     = 5.0F;
-    static constexpr Scalar RsMeasurementDuration       = 5.0F;
+    static constexpr Scalar RsMeasurementDuration       = 10.0F;
     static constexpr Scalar RoverLMeasurementDuration   = 5.0F;
+
+    static constexpr unsigned IdqMovingAverageLength = 5;
 
     class Averager
     {
@@ -96,8 +98,45 @@ class MotorParametersEstimator
         auto getNumSamples() const { return num_samples_; }
     };
 
+    class VoltageModulatorWrapper       // This is such a massive reinvented wheel. Do something about it.
+    {
+        using Modulator = ThreePhaseVoltageModulator<IdqMovingAverageLength>;
+
+        // Poor man's aligned storage
+        alignas(Modulator) std::uint8_t storage_[sizeof(Modulator)];
+        Modulator* modulator_ = nullptr;
+
+    public:
+        ~VoltageModulatorWrapper()
+        {
+            if (modulator_ != nullptr)
+            {
+                modulator_->~ThreePhaseVoltageModulator();
+                modulator_ = nullptr;
+            }
+        }
+
+        template <typename... Args>
+        void init(Args... args)
+        {
+            if (modulator_ != nullptr)
+            {
+                assert(false);
+                modulator_->~ThreePhaseVoltageModulator();
+            }
+            modulator_ = new (storage_) Modulator(args...);
+        }
+
+        Modulator& access()
+        {
+            assert(modulator_ != nullptr);
+            return *modulator_;
+        }
+    } voltage_modulator_wrapper_;
+
     const MotorIdentificationMode mode_;
     Const estimation_current_;
+    Const RoverL_current_frequency_;
     Const pwm_period_;
     Const pwm_dead_time_;
 
@@ -119,6 +158,9 @@ class MotorParametersEstimator
     Scalar state_switched_at_ = 0;
 
     Averager averager_;
+    Averager averager_2_;
+
+    Scalar angular_position_ = 0;
 
     math::SimpleMovingAverageFilter<100, Vector<2>> phase_currents_filter_;
 
@@ -127,6 +169,7 @@ class MotorParametersEstimator
         state_ = new_state;
         state_switched_at_ = time_;
         averager_ = Averager();
+        averager_2_ = Averager();
     }
 
     Scalar getTimeSinceStateSwitch() const
@@ -156,10 +199,12 @@ public:
     MotorParametersEstimator(MotorIdentificationMode mode,
                              const MotorParameters& initial_parameters,
                              Const estimation_current,
+                             Const RoverL_current_frequency,
                              Const pwm_period,
                              Const pwm_dead_time) :
         mode_(mode),
         estimation_current_(estimation_current),
+        RoverL_current_frequency_(RoverL_current_frequency),
         pwm_period_(pwm_period),
         pwm_dead_time_(pwm_dead_time),
         result_(initial_parameters),
@@ -259,9 +304,61 @@ public:
         }
 
         case State::PreRoverLMeasurement:
+        {
+            constexpr Scalar OneSizeFitsAllInductance = 100.0e-6F;
+
+            voltage_modulator_wrapper_.init(OneSizeFitsAllInductance,
+                                            result_.r_ab / 2.0F,
+                                            estimation_current_,
+                                            pwm_period_);
+            // Ourowrapos - a wrapper that wraps itself.
+            switchState(State::RoverLMeasurement);
+            break;
+        }
+
         case State::RoverLMeasurement:
         {
-            switchState(State::Finalization);
+            Const w = RoverL_current_frequency_ * (math::Pi * 2.0F);
+
+            const auto output = voltage_modulator_wrapper_.access().update(phase_currents_ab,
+                                                                           inverter_voltage,
+                                                                           w,
+                                                                           angular_position_,
+                                                                           estimation_current_);
+
+            angular_position_ = output.extrapolated_angular_position;
+            pwm_vector = output.pwm_setpoint;
+
+            Const Ud = output.reference_Udq[0];
+            Const Iq = output.estimated_Idq[1];
+
+            averager_.addSample(Ud * Ud);
+            averager_2_.addSample(Iq * Iq);
+
+            if (getTimeSinceStateSwitch() > RoverLMeasurementDuration)
+            {
+                Const Ud_squared = averager_.getAverage();
+                Const Iq_squared = averager_2_.getAverage();
+                Const w_squared = w * w;
+
+                Const Ls = std::sqrt(Ud_squared / (w_squared * Iq_squared));
+
+                result_.l_ab = Ls * 2.0F;
+
+                if (mode_ == MotorIdentificationMode::Static)
+                {
+                    switchState(State::Finalization);
+                }
+                else if (mode_ == MotorIdentificationMode::RotationWithoutMechanicalLoad)
+                {
+                    switchState(State::PhiMeasurement);
+                }
+                else
+                {
+                    assert(false);
+                    switchState(State::Finalization);
+                }
+            }
             break;
         }
 

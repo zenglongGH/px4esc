@@ -47,6 +47,7 @@ namespace
 constexpr unsigned IdqMovingAverageLength = 5;
 
 constexpr Scalar MotorIdentificationCurrent = 7.0F;
+constexpr Scalar MotorIdentificationCurrentFrequency = 300.0F;
 
 /*
  * State variables
@@ -639,6 +640,7 @@ void handleFastIRQ(Const period,
                 MotorParametersEstimator(g_requested_motor_identification_mode,
                                          g_motor_params,
                                          MotorIdentificationCurrent,
+                                         MotorIdentificationCurrentFrequency,
                                          period,
                                          board::motor::getPWMDeadTime());
         }
