@@ -146,6 +146,12 @@ public:
         }
     }
 
+    void reset(const T& initial_value)
+    {
+        sum_ = initial_value * Depth;
+        std::fill_n(std::begin(history_), Depth, initial_value);
+    }
+
     T getValue() const
     {
         return sum_ / Depth;

@@ -48,6 +48,7 @@ constexpr unsigned IdqMovingAverageLength = 5;
 
 constexpr Scalar MotorIdentificationCurrent = 7.0F;
 constexpr Scalar MotorIdentificationCurrentFrequency = 300.0F;
+constexpr Scalar MotorIdentificationPhiAngularVelocity = 300.0F;
 
 /*
  * State variables
@@ -94,7 +95,7 @@ EventCounter g_fast_irq_cycle_counter;
 
 class DebugVariableTracer
 {
-    static constexpr unsigned NumVariables = 6;
+    static constexpr unsigned NumVariables = 7;
 
 #if DEBUG_BUILD
     Scalar vars_[NumVariables] = {};
@@ -124,14 +125,15 @@ public:
             std::copy(std::begin(vars_), std::end(vars_), std::begin(vars_copy));
         }
 
-        std::printf("$%.4f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
+        std::printf("$%.4f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
                     double(pwm_cycles) * double(board::motor::getPWMPeriod()),
                     double(vars_copy[0]),
                     double(vars_copy[1]),
                     double(vars_copy[2]),
                     double(vars_copy[3]),
                     double(vars_copy[4]),
-                    double(vars_copy[5]));
+                    double(vars_copy[5]),
+                    double(vars_copy[6]));
 #endif
     }
 } g_debug_tracer;
@@ -481,6 +483,7 @@ void handleMainIRQ(Const period)
         g_context->observer.update(period, Idq, Udq);
 
         g_debug_tracer.set<5>(g_context->observer.getAngularVelocity());
+        g_debug_tracer.set<6>(g_context->observer.getAngularPosition());
 
         /*
          * Updating the state estimate.
@@ -641,6 +644,7 @@ void handleFastIRQ(Const period,
                                          g_motor_params,
                                          MotorIdentificationCurrent,
                                          MotorIdentificationCurrentFrequency,
+                                         MotorIdentificationPhiAngularVelocity,
                                          period,
                                          board::motor::getPWMDeadTime());
         }
@@ -665,12 +669,15 @@ void handleFastIRQ(Const period,
             }
         }
 
-        g_debug_tracer.set<0>(phase_currents_ab[0]);
-        g_debug_tracer.set<1>(phase_currents_ab[1]);
-        g_debug_tracer.set<2>(estimator->getEstimatedMotorParameters().r_ab * 1e3F);
-        g_debug_tracer.set<3>(0);
-        g_debug_tracer.set<4>(0);
-        g_debug_tracer.set<5>(0);
+        const auto filtered_currents = estimator->getCurrentsFilter().getValue();
+
+        g_debug_tracer.set<0>(estimator->getStateVariables()[0]);
+        g_debug_tracer.set<1>(estimator->getStateVariables()[1]);
+        g_debug_tracer.set<2>(estimator->getStateVariables()[2]);
+        g_debug_tracer.set<3>(filtered_currents[0]);
+        g_debug_tracer.set<4>(filtered_currents[1]);
+        g_debug_tracer.set<5>(filtered_currents.norm());
+        g_debug_tracer.set<6>(0);
     }
 
     /*

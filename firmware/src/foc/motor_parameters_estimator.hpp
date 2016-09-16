@@ -58,6 +58,8 @@ enum class MotorIdentificationMode
  * Magical and hard-to-use class that estimates parameters of a given motor, such as magnetic flux and inductance.
  * The business logic of this class outstretches its tentacles of dependency to a lot of other stuff,
  * so it's really hard to encapsulate it cleanly. Or maybe I'm just a shitty architect, you never know.
+ *
+ * Refer to the Dmitry's doc for derivations and explanation of what's going on here.
  */
 class MotorParametersEstimator
 {
@@ -65,6 +67,8 @@ class MotorParametersEstimator
     static constexpr Scalar RsPreMeasurementTimeout     = 5.0F;
     static constexpr Scalar RsMeasurementDuration       = 10.0F;
     static constexpr Scalar LsMeasurementDuration       = 10.0F;
+
+    static constexpr Scalar PhiMeasurementFullRangeSweepDuration   = 10.0F;
 
     static constexpr unsigned IdqMovingAverageLength = 5;
 
@@ -137,6 +141,7 @@ class MotorParametersEstimator
     const MotorIdentificationMode mode_;
     Const estimation_current_;
     Const Ls_current_frequency_;
+    Const Phi_angular_velocity_;
     Const pwm_period_;
     Const pwm_dead_time_;
 
@@ -149,6 +154,8 @@ class MotorParametersEstimator
         RsMeasurement,
         PreLsMeasurement,
         LsMeasurement,
+        PhiMeasurementInitialization,
+        PhiMeasurementAcceleration,
         PhiMeasurement,
         Finalization,
         Finished
@@ -160,16 +167,24 @@ class MotorParametersEstimator
     Averager averager_;
     Averager averager_2_;
 
-    Scalar angular_position_ = 0;
+    std::array<Scalar, 4> state_variables_{};
 
-    math::SimpleMovingAverageFilter<100, Vector<2>> phase_currents_filter_;
+    math::SimpleMovingAverageFilter<500, Vector<2>> currents_filter_;
 
-    void switchState(State new_state)
+    void switchState(State new_state, bool retain_states = false)
     {
         state_ = new_state;
         state_switched_at_ = time_;
-        averager_ = Averager();
-        averager_2_ = Averager();
+
+        if (!retain_states)
+        {
+            averager_ = Averager();
+            averager_2_ = Averager();
+
+            std::fill(std::begin(state_variables_), std::end(state_variables_), 0.0F);
+
+            currents_filter_.reset(Vector<2>::Zero());
+        }
     }
 
     Scalar getTimeSinceStateSwitch() const
@@ -200,15 +215,17 @@ public:
                              const MotorParameters& initial_parameters,
                              Const estimation_current,
                              Const Ls_current_frequency,
+                             Const Phi_angular_velocity,
                              Const pwm_period,
                              Const pwm_dead_time) :
         mode_(mode),
         estimation_current_(estimation_current),
         Ls_current_frequency_(Ls_current_frequency),
+        Phi_angular_velocity_(Phi_angular_velocity),
         pwm_period_(pwm_period),
         pwm_dead_time_(pwm_dead_time),
         result_(initial_parameters),
-        phase_currents_filter_(Vector<2>::Zero())
+        currents_filter_(Vector<2>::Zero())
     { }
 
     /**
@@ -221,8 +238,6 @@ public:
         Vector<3> pwm_vector = Vector<3>::Ones() * 0.5F;
 
         time_ += pwm_period_;
-
-        phase_currents_filter_.update(phase_currents_ab);
 
         switch (state_)
         {
@@ -238,6 +253,8 @@ public:
 
         case State::PreRsMeasurement:
         {
+            currents_filter_.update(phase_currents_ab);
+
             if (getTimeSinceStateSwitch() > RsPreMeasurementTimeout)
             {
                 result_.r_ab = 0;                       // Failed - timeout
@@ -250,7 +267,7 @@ public:
                  * Note that we're using phase B instead of A in order to heat up the motor more uniformly
                  * and also to check correct operation of both phases.
                  */
-                if (phase_currents_filter_.getValue()[1] < estimation_current_)
+                if (currents_filter_.getValue()[1] < estimation_current_)
                 {
                     constexpr Scalar OhmPerSec = 0.1F;
                     result_.r_ab += OhmPerSec * pwm_period_;    // Very rough initial estimation
@@ -323,10 +340,10 @@ public:
             const auto output = voltage_modulator_wrapper_.access().update(phase_currents_ab,
                                                                            inverter_voltage,
                                                                            w,
-                                                                           angular_position_,
+                                                                           state_variables_[0],
                                                                            estimation_current_);
 
-            angular_position_ = output.extrapolated_angular_position;
+            state_variables_[0] = output.extrapolated_angular_position;
             pwm_vector = output.pwm_setpoint;
 
             Const Ud = output.reference_Udq[0];
@@ -351,7 +368,7 @@ public:
                 }
                 else if (mode_ == MotorIdentificationMode::RotationWithoutMechanicalLoad)
                 {
-                    switchState(State::PhiMeasurement);
+                    switchState(State::PhiMeasurementInitialization);
                 }
                 else
                 {
@@ -362,9 +379,72 @@ public:
             break;
         }
 
+        case State::PhiMeasurementInitialization:
+        case State::PhiMeasurementAcceleration:
         case State::PhiMeasurement:
         {
-            switchState(State::Finalization);
+            constexpr int IdxVoltage = 0;
+            constexpr int IdxAngVel = 1;
+            constexpr int IdxAngPos = 2;
+
+            // This is the maximum voltage we start from.
+            Const initial_voltage = estimation_current_ * (result_.r_ab / 2.0F) * (3.0F / 2.0F);
+
+            // Continuously maintaining the smoothed out current estimates throughout the whole process.
+            const auto Idq = performParkTransform(performClarkeTransform(phase_currents_ab),
+                                                  math::sin(state_variables_[IdxAngPos]),
+                                                  math::cos(state_variables_[IdxAngPos]));
+            currents_filter_.update(Idq);
+
+            if (state_ == State::PhiMeasurementInitialization)
+            {
+                result_.field_flux = 0;
+
+                state_variables_[IdxVoltage] = initial_voltage;
+                state_variables_[IdxAngVel] = 0;
+                state_variables_[IdxAngPos] = 0;
+
+                switchState(State::PhiMeasurementAcceleration, true);
+            }
+            else if (state_ == State::PhiMeasurementAcceleration)
+            {
+                state_variables_[IdxAngVel] +=
+                    (Phi_angular_velocity_ / PhiMeasurementFullRangeSweepDuration) * pwm_period_;
+
+                if (state_variables_[IdxAngVel] >= Phi_angular_velocity_)
+                {
+                    switchState(State::PhiMeasurement, true);
+                }
+            }
+            else if (state_ == State::PhiMeasurement)
+            {
+                state_variables_[IdxVoltage] -= (initial_voltage / PhiMeasurementFullRangeSweepDuration) * pwm_period_;
+
+                Const Uq = state_variables_[IdxVoltage];
+                Const Iq = Idq[1];
+                Const w = state_variables_[IdxAngVel];
+                Const Rs = result_.r_ab / 2.0F;
+
+                Const Phi = (Uq - Iq * Rs) / w;
+
+                // The true Phi is the maximum we'll encounter over the whole test
+                result_.field_flux = std::max(result_.field_flux, Phi);
+
+                if (state_variables_[IdxVoltage] <= 0.1F)
+                {
+                    switchState(State::Finalization);
+                }
+            }
+
+            state_variables_[IdxAngPos] =
+                constrainAngularPosition(state_variables_[IdxAngPos] + state_variables_[IdxAngVel] * pwm_period_);
+
+            const auto Uab = performInverseParkTransform(Vector<2>{0.0F, state_variables_[IdxVoltage]},
+                                                         math::sin(state_variables_[IdxAngPos]),
+                                                         math::cos(state_variables_[IdxAngPos]));
+
+            pwm_vector = performSpaceVectorTransform(Uab, inverter_voltage).first;
+
             break;
         }
 
@@ -391,6 +471,12 @@ public:
     bool isFinished() const { return state_ == State::Finished; }
 
     const MotorParameters& getEstimatedMotorParameters() const { return result_; }
+
+    /**
+     * State accessors for debugging purposes.
+     */
+    const auto& getStateVariables() const { return state_variables_; }
+    const auto& getCurrentsFilter() const { return currents_filter_; }
 };
 
 }
