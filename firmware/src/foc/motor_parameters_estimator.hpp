@@ -63,10 +63,9 @@ enum class MotorIdentificationMode
  */
 class MotorParametersEstimator
 {
-    static constexpr Scalar WarmingUpDuration           = 5.0F;
     static constexpr Scalar RsPreMeasurementTimeout     = 5.0F;
-    static constexpr Scalar RsMeasurementDuration       = 10.0F;
-    static constexpr Scalar LsMeasurementDuration       = 10.0F;
+    static constexpr Scalar RsMeasurementDuration       = 15.0F;
+    static constexpr Scalar LsMeasurementDuration       = 15.0F;
 
     static constexpr Scalar PhiMeasurementFullRangeSweepDuration = 15.0F;
 
