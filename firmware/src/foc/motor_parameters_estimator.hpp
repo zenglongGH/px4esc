@@ -386,7 +386,7 @@ public:
             constexpr int IdxVoltage = 0;
             constexpr int IdxAngVel  = 1;
             constexpr int IdxAngPos  = 2;
-            constexpr int IdxPhi     = 3;
+            constexpr int IdxIq      = 3;
 
             // This is the maximum voltage we start from.
             Const initial_voltage = estimation_current_ * (result_.r_ab / 2.0F) * (3.0F / 2.0F);
@@ -404,7 +404,7 @@ public:
                 state_variables_[IdxVoltage] = initial_voltage;
                 state_variables_[IdxAngVel] = 0;
                 state_variables_[IdxAngPos] = 0;
-                state_variables_[IdxPhi] = 0;
+                state_variables_[IdxIq] = 0;
 
                 switchState(State::PhiMeasurementAcceleration, true);
             }
@@ -420,24 +420,33 @@ public:
             }
             else if (state_ == State::PhiMeasurement)
             {
-                Const Uq = state_variables_[IdxVoltage];
-                Const Iq = currents_filter_.getValue()[1];
-                Const w = state_variables_[IdxAngVel];
-                Const Rs = result_.r_ab / 2.0F;
+                // Additional Iq filtering
+                state_variables_[IdxIq] += 0.01F * (currents_filter_.getValue()[1] - state_variables_[IdxIq]);
 
-                Const new_phi = (Uq - Iq * Rs) / w;
-
-                state_variables_[IdxPhi] += 0.01F * (new_phi - state_variables_[IdxPhi]);
-
-                // The true Phi is the maximum we'll encounter over the whole test. Right, Dmitry?
-                result_.field_flux = std::max(result_.field_flux, state_variables_[IdxPhi]);
-
-                // Decreasing voltage
-                state_variables_[IdxVoltage] -= (initial_voltage / PhiMeasurementFullRangeSweepDuration) * pwm_period_;
-
-                if (state_variables_[IdxVoltage] <= 0.1F)
+                if (currents_filter_.getValue()[0] < 0)
                 {
+                    // Negative Id means that the motor has just stopped; we're at the minimum current now
+                    Const Uq = state_variables_[IdxVoltage];
+                    Const Iq = state_variables_[IdxIq];
+                    Const w  = state_variables_[IdxAngVel];
+                    Const Rs = result_.r_ab / 2.0F;
+
+                    result_.field_flux = (Uq - Iq * Rs) / w;
+
                     switchState(State::Finalization);
+                }
+                else
+                {
+                    // Minimum is not reached yet, continuing to decrease voltage
+                    state_variables_[IdxVoltage] -=
+                        (initial_voltage / PhiMeasurementFullRangeSweepDuration) * pwm_period_;
+
+                    if (state_variables_[IdxVoltage] <= 0.1F)
+                    {
+                        // Hit the minimum, something went wrong, aborting.
+                        result_.field_flux = 0;
+                        switchState(State::Finalization);
+                    }
                 }
             }
             else
@@ -459,12 +468,14 @@ public:
 
         case State::Finalization:
         {
+            pwm_vector.setZero();
             switchState(State::Finished);
             break;
         }
 
         case State::Finished:
         {
+            pwm_vector.setZero();
             break;
         }
 

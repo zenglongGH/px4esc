@@ -517,6 +517,7 @@ class PerformMotorIdentificationCommand : public os::shell::ICommandHandler
         {
             while (foc::getState() == foc::State::MotorIdentification)
             {
+                ::usleep(100);
                 foc::plotRealTimeValues();
             }
         }

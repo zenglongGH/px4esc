@@ -674,10 +674,10 @@ void handleFastIRQ(Const period,
         g_debug_tracer.set<0>(estimator->getStateVariables()[0]);
         g_debug_tracer.set<1>(estimator->getStateVariables()[1]);
         g_debug_tracer.set<2>(estimator->getStateVariables()[2]);
-        g_debug_tracer.set<3>(filtered_currents[0]);
-        g_debug_tracer.set<4>(filtered_currents[1]);
-        g_debug_tracer.set<5>(filtered_currents.norm());
-        g_debug_tracer.set<6>(0);
+        g_debug_tracer.set<3>(estimator->getStateVariables()[3]);
+        g_debug_tracer.set<4>(filtered_currents[0]);
+        g_debug_tracer.set<5>(filtered_currents[1]);
+        g_debug_tracer.set<6>(filtered_currents.norm());
     }
 
     /*
