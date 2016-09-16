@@ -195,7 +195,7 @@ os::watchdog::Timer init()
     motor_params.max_current = 20.0F;
     motor_params.spinup_current_slope = 10.0F;
     motor_params.min_electrical_ang_vel = 400.0F;
-    motor_params.field_flux = 0.001125F;
+    motor_params.field_flux = 0.001681F;
     motor_params.r_ab = 0.265F;
     motor_params.l_ab = 68e-6F;
     motor_params.num_poles = 14;
