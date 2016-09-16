@@ -307,8 +307,8 @@ class SpinCommand : public os::shell::ICommandHandler
                 angle = 0.0F;
             }
 
-            const auto alpha = math::sin(angle) * voltage;
-            const auto beta  = math::cos(angle) * voltage;
+            const auto alpha = math::cos(angle) * voltage;
+            const auto beta  = math::sin(angle) * voltage;
             const auto inverter_voltage = board::motor::getInverterVoltage();
 
             const auto setpoint = foc::performSpaceVectorTransform({alpha, beta}, inverter_voltage).first;
