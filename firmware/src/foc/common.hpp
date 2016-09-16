@@ -118,4 +118,35 @@ inline Scalar convertKVToFluxLinkage(Const kv,
     }
 }
 
+/**
+ * Obviously, this function is equally applicable both to electrical and mechanical angular velocity.
+ * @param radian_per_sec        Angular velocity in Rad/sec
+ * @return                      Revolutions per minute
+ */
+constexpr inline Scalar convertAngularVelocityToRPM(Const radian_per_sec)
+{
+    return (radian_per_sec * 60.0F) / (math::Pi * 2.0F);
+}
+
+/**
+ * This function is applicable to any quantity that measures the rotation rate.
+ * @param rate          Rotation rate in any unit, e.g. Radian/sec, RPM, Hertz, etc.
+ * @param num_poles     Number of magnetic poles in the rotor; positive, even.
+ * @return              Scaled rotation rate in the same units.
+ */
+inline Scalar convertRotationRateElectricalToMechanical(Const rate,
+                                                        const unsigned num_poles)
+{
+    if ((num_poles >= 2) &&
+        (num_poles % 2 == 0))
+    {
+        return rate / Scalar(num_poles / 2U);
+    }
+    else
+    {
+        assert(false);
+        return 0;
+    }
+}
+
 }

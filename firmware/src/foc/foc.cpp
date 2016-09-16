@@ -421,11 +421,22 @@ void printStatusInfo()
     std::printf("Udq Norm. Cnt: %s\n",
                 Udq_normalizations.toString().c_str());
 
-    std::printf("Ang. Velocity: %.1f rad/s\n"
+    Scalar mrpm = 0;
+
+    if ((g_motor_params.num_poles >= 2) &&
+        (g_motor_params.num_poles % 2 == 0))
+    {
+        mrpm = convertRotationRateElectricalToMechanical(convertAngularVelocityToRPM(angular_velocity),
+                                                         g_motor_params.num_poles);
+    }
+
+    std::printf("Elect. AngVel: %.1f rad/s\n"
+                "Mech. RPM    : %.1f MRPM\n"
                 "Estimated Idq: %s\n"
                 "Reference Udq: %s\n"
                 "Reference Iq : %.1f\n",
                 double(angular_velocity),
+                double(mrpm),
                 math::toString(estimated_Idq).c_str(),
                 math::toString(reference_Udq).c_str(),
                 double(reference_Iq));
