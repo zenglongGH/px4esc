@@ -421,7 +421,7 @@ public:
             else if (state_ == State::PhiMeasurement)
             {
                 // Additional Iq filtering
-                state_variables_[IdxIq] += 0.01F * (currents_filter_.getValue()[1] - state_variables_[IdxIq]);
+                state_variables_[IdxIq] += 1e-3F * (currents_filter_.getValue()[1] - state_variables_[IdxIq]);
 
                 if (currents_filter_.getValue()[0] < 0)
                 {
