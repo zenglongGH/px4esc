@@ -76,4 +76,46 @@ inline math::Scalar constrainAngularPosition(math::Const x)
     }
 }
 
+/**
+ * @param flux_linkage  Positive, in Weber.
+ * @param num_poles     Positive, even.
+ * @return              KV if inputs are valid; zero and assertion failure if not.
+ */
+inline Scalar convertFluxLinkageToKV(Const flux_linkage,
+                                     const unsigned num_poles)
+{
+    if ((flux_linkage > 0) &&
+        (num_poles >= 2) &&
+        (num_poles % 2 == 0))
+    {
+        return (20.0F * SquareRootOf3) / (math::Pi * flux_linkage * Scalar(num_poles));
+    }
+    else
+    {
+        assert(false);
+        return 0;
+    }
+}
+
+/**
+ * @param kv            Positive, in MRPM/V; MRPM is mechanical RPM.
+ * @param num_poles     Positive, even.
+ * @return              Field flux linkage if inputs are valid; zero and assertion failure if not.
+ */
+inline Scalar convertKVToFluxLinkage(Const kv,
+                                     const unsigned num_poles)
+{
+    if ((kv > 0) &&
+        (num_poles >= 2) &&
+        (num_poles % 2 == 0))
+    {
+        return (20.0F * SquareRootOf3) / (math::Pi * kv * Scalar(num_poles));
+    }
+    else
+    {
+        assert(false);
+        return 0;
+    }
+}
+
 }

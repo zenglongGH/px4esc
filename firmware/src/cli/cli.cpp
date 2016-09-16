@@ -534,6 +534,46 @@ class PerformMotorIdentificationCommand : public os::shell::ICommandHandler
 } static cmd_perform_motor_identification;
 
 
+class KVConvertCommand : public os::shell::ICommandHandler
+{
+    const char* getName() const override { return "kvconv"; }
+
+    void execute(os::shell::BaseChannelWrapper& ios, int argc, char** argv) override
+    {
+        if (argc < 2)
+        {
+            ios.print("Usage: %s <KV [MRPM/V] | field-flix-linkage [mWb]> <num-poles>\n", argv[0]);
+            ios.print("Where: KV is in MRPM/V (MRPM - mechanical RPM),\n"
+                      "       Flux linkage is in milli Weber\n");
+            return;
+        }
+
+        using namespace std;
+
+        const float kv_mWb = strtof(argv[1], nullptr);
+        const long num_poles = strtol(argv[2], nullptr, 10);
+
+        if ((kv_mWb <= 0.0F) ||
+            (num_poles < 2) ||
+            (num_poles % 2 != 0))
+        {
+            ios.print("ERROR: Invalid arguments\n");
+            return;
+        }
+
+        ios.print("Num poles: %d\n", int(num_poles));
+
+        ios.print("%.6f Wb --> %.1f MRPM/V \n",
+                  double(kv_mWb * 1e-3F),
+                  double(foc::convertFluxLinkageToKV(kv_mWb * 1e-3F, unsigned(num_poles))));
+
+        ios.print("%.1f MRPM/V --> %.6f Wb \n",
+                  double(kv_mWb),
+                  double(foc::convertKVToFluxLinkage(kv_mWb, unsigned(num_poles))));
+    }
+} static cmd_kv_convert;
+
+
 class CLIThread : public chibios_rt::BaseStaticThread<2048>
 {
     os::shell::Shell<20> shell_;
@@ -570,6 +610,7 @@ public:
         (void) shell_.addCommandHandler(&cmd_setpoint);
         (void) shell_.addCommandHandler(&cmd_beep);
         (void) shell_.addCommandHandler(&cmd_perform_motor_identification);
+        (void) shell_.addCommandHandler(&cmd_kv_convert);
     }
 
     virtual ~CLIThread() { }

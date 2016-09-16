@@ -69,6 +69,15 @@ struct MotorParameters
 
     auto toString() const
     {
+        Scalar kv = 0;
+
+        if ((field_flux > 0) &&
+            (num_poles >= 2) &&
+            (num_poles % 2 == 0))
+        {
+            kv = convertFluxLinkageToKV(field_flux, num_poles);
+        }
+
         return os::heapless::format("Imin  : %-7.1f A\n"
                                     "Imax  : %-7.1f A\n"
                                     "SCS   : %-7.1f A/s\n"
@@ -76,7 +85,7 @@ struct MotorParameters
                                     "Phi   : %-7.3f mWb\n"
                                     "Rab   : %-7.3f Ohm\n"
                                     "Lab   : %-7.3f uH\n"
-                                    "Npoles: %u\n"
+                                    "Npoles: %u, %.1f MRPM/V\n"
                                     "Valid : %s\n",
                                     double(min_current),
                                     double(max_current),
@@ -85,7 +94,7 @@ struct MotorParameters
                                     double(field_flux) * 1e3,
                                     double(r_ab),
                                     double(l_ab) * 1e6,
-                                    unsigned(num_poles),
+                                    unsigned(num_poles), double(kv),
                                     isValid() ? "YES" : "NO");
     }
 };
