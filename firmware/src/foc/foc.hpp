@@ -26,6 +26,7 @@
 
 #include "motor_parameters.hpp"
 #include "motor_parameters_estimator.hpp"
+#include "hardware_tester.hpp"
 #include "observer.hpp"
 #include <math/math.hpp>
 #include <cstdint>
@@ -82,6 +83,14 @@ enum class State
      * @ref beginMotorIdentification().
      */
     MotorIdentification,
+
+    /**
+     * Hardware testing is underway.
+     * Possible outcomes:
+     *  - Test passed                                   -> Idle
+     *  - Test failed (hardware problems detected)      -> Fault
+     */
+    HardwareTesting,
 
     /**
      * The motor is starting, or some pre-start procedures are underway. This is a transient state.

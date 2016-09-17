@@ -300,12 +300,17 @@ void setSetpoint(ControlMode control_mode,
     case State::Idle:
     case State::Spinup:
     case State::Running:
-    case State::MotorIdentification:    // Implying that the motor will start once identification is finished
     {
         // Normal handling
         g_setpoint = value;
         g_setpoint_remaining_ttl = request_ttl;
         break;
+    }
+
+    case State::MotorIdentification:
+    case State::HardwareTesting:
+    {
+        break;          // Ignoring
     }
 
     case State::Fault:
@@ -731,6 +736,11 @@ void handleFastIRQ(Const period,
         g_debug_tracer.set<5>(filtered_currents[1]);
         g_debug_tracer.set<6>(filtered_currents.norm());
     }
+
+    /*
+     * Hardware testing
+     * TODO
+     */
 
     /*
      * Secondary states

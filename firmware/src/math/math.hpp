@@ -53,6 +53,11 @@ constexpr inline Scalar convertKelvinToCelsius(Const kelvin)
     return kelvin - 273.15F;
 }
 
+constexpr inline Scalar convertCelsiusToKelvin(Const kelvin)
+{
+    return kelvin + 273.15F;
+}
+
 /**
  * Constants
  */
