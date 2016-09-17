@@ -536,28 +536,46 @@ void handleMainIRQ(Const period)
             }
             else
             {
+                Const variable_delta = period / g_motor_params.nominal_spinup_duration;
+
                 // Direction change requests and current setpoint initialization
                 if (((g_setpoint > 0) != (g_context->reference_Iq > 0)) ||
-                    (os::float_eq::closeToZero(g_context->reference_Iq)))
+                    os::float_eq::closeToZero(g_context->reference_Iq))
                 {
-                    Const initial_current = g_motor_params.max_current * 0.5F;
-                    g_context->reference_Iq = (g_setpoint > 0) ? initial_current : -initial_current;
+                    g_context->reference_Iq = g_motor_params.spinup_current;
+                    if (g_setpoint < 0)
+                    {
+                        g_context->reference_Iq = -g_context->reference_Iq;
+                    }
                 }
 
-                // Open loop acceleration
-                if (std::abs(g_context->angular_velocity) <= (g_motor_params.min_electrical_ang_vel * 5.0F))
+                // Open loop acceleration (shall we get rid of the hard-coded multiplier?)
+                if (std::abs(g_context->angular_velocity) <= (g_motor_params.min_electrical_ang_vel * 3.0F))
                 {
-                    Const increase = g_motor_params.min_electrical_ang_vel * period;
+                    Const increase = g_motor_params.min_electrical_ang_vel * variable_delta;
+
                     g_context->angular_velocity += (g_setpoint > 0) ? increase : -increase;
                 }
 
                 // Observer synchronization
                 if (std::abs(g_context->angular_velocity) >= g_motor_params.min_electrical_ang_vel)
                 {
-                    // The current is steadily decreasing until the observer has picked up.
-                    // This also limits the maximum time alloted for spinup - when the current drops
-                    // below the minimum, spinup will be aborted.
-                    g_context->reference_Iq -= g_context->reference_Iq * period;
+                    {
+                        // The current is steadily decreasing until observer synchronization is established.
+                        // This also limits the maximum time alloted for spinup - when the current drops
+                        // below the minimum, spinup will be aborted.
+                        // Note that the current starts decreasing not synchronously with acceleration,
+                        // but this behavior is intended - they don't need to be synchronized.
+                        Const decrease = g_motor_params.spinup_current * variable_delta;
+                        if (g_context->reference_Iq > 0)
+                        {
+                            g_context->reference_Iq -= decrease;
+                        }
+                        else
+                        {
+                            g_context->reference_Iq += decrease;
+                        }
+                    }
 
                     // Evaluating the observer synchronization precision
                     Const ang_pos_error = math::subtractAngles(g_context->observer.getAngularPosition(),
@@ -566,7 +584,8 @@ void handleMainIRQ(Const period)
                         std::abs(g_context->observer.getAngularVelocity() - g_context->angular_velocity) /
                         std::abs(g_context->angular_velocity);
 
-                    // Decision to hand-off control to the normal node
+                    // Decision to hand-off control to the normal node.
+                    // Not sure if the hardcoded thresholds are okay.
                     const bool ang_pos_ok = std::abs(ang_pos_error) < math::convertDegreesToRadian(20.0F);
                     const bool ang_vel_ok = ang_vel_rel_error < 0.2F;
                     if (ang_vel_ok && ang_pos_ok)

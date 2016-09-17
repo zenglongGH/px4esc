@@ -193,8 +193,9 @@ os::watchdog::Timer init()
     foc::MotorParameters motor_params;
     motor_params.min_current = 0.4F;
     motor_params.max_current = 20.0F;
-    motor_params.spinup_current_slope = 10.0F;
-    motor_params.min_electrical_ang_vel = 200.0F;
+    motor_params.spinup_current = 10.0F;
+    motor_params.nominal_spinup_duration = 1.0F;
+    motor_params.min_electrical_ang_vel = 300.0F;
     motor_params.field_flux = 0.001681F;
     motor_params.r_ab = 0.265F;
     motor_params.l_ab = 68e-6F;
