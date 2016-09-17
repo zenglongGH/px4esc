@@ -494,7 +494,7 @@ void handleMainIRQ(Const period)
         g_context->observer.update(period, Idq, Udq);
 
         g_debug_tracer.set<5>(g_context->observer.getAngularVelocity());
-        g_debug_tracer.set<6>(g_context->observer.getAngularPosition());
+        g_debug_tracer.set<6>(g_context->angular_velocity);
 
         /*
          * Updating the state estimate.
@@ -503,15 +503,16 @@ void handleMainIRQ(Const period)
         {
             AbsoluteCriticalSectionLocker locker;
 
-            g_context->angular_velocity = g_context->observer.getAngularVelocity();
-
-            // Angle delay compensation
-            Const angle_slip = g_context->observer.getAngularVelocity() * period;
-            g_context->angular_position =
-                constrainAngularPosition(g_context->observer.getAngularPosition() + angle_slip);
-
             if (g_state == State::Running)
             {
+                // Updating the dynamic parameters from the observer
+                g_context->angular_velocity = g_context->observer.getAngularVelocity();
+
+                Const angle_slip = g_context->observer.getAngularVelocity() * period;
+                g_context->angular_position =
+                    constrainAngularPosition(g_context->observer.getAngularPosition() + angle_slip);
+
+                // Setpoint update
                 if (g_control_mode == ControlMode::RatiometricCurrent)
                 {
                     static constexpr math::Range<> UnityLimits(-1.0F, 1.0F);
@@ -528,34 +529,55 @@ void handleMainIRQ(Const period)
                 }
 
                 // Stopping if the angular velocity is too low
-                if (std::abs(g_context->angular_velocity) < (g_motor_params.min_electrical_ang_vel / 2.0F))
+                if (std::abs(g_context->angular_velocity) < (g_motor_params.min_electrical_ang_vel * 0.25F))
                 {
                     g_state = State::Spinup;    // Dropping into the spinup mode to change direction if necessary
                 }
             }
             else
             {
-                if ((g_setpoint > 0) != (g_context->reference_Iq > 0))
+                // Direction change requests and current setpoint initialization
+                if (((g_setpoint > 0) != (g_context->reference_Iq > 0)) ||
+                    (os::float_eq::closeToZero(g_context->reference_Iq)))
                 {
-                    g_context->reference_Iq = 0;        // Direction changed, reset
+                    Const initial_current = g_motor_params.max_current * 0.5F;
+                    g_context->reference_Iq = (g_setpoint > 0) ? initial_current : -initial_current;
                 }
 
-                if (g_setpoint > 0)
+                // Open loop acceleration
+                if (std::abs(g_context->angular_velocity) <= (g_motor_params.min_electrical_ang_vel * 5.0F))
                 {
-                    g_context->reference_Iq += g_motor_params.spinup_current_slope * period;
-                }
-                else
-                {
-                    g_context->reference_Iq -= g_motor_params.spinup_current_slope * period;
+                    Const increase = g_motor_params.min_electrical_ang_vel * period;
+                    g_context->angular_velocity += (g_setpoint > 0) ? increase : -increase;
                 }
 
-                if (std::abs(g_context->angular_velocity) > g_motor_params.min_electrical_ang_vel &&
-                    std::abs(g_context->reference_Iq) > g_motor_params.min_current)
+                // Observer synchronization
+                if (std::abs(g_context->angular_velocity) >= g_motor_params.min_electrical_ang_vel)
                 {
-                    g_state = State::Running;
+                    // The current is steadily decreasing until the observer has picked up.
+                    // This also limits the maximum time alloted for spinup - when the current drops
+                    // below the minimum, spinup will be aborted.
+                    g_context->reference_Iq -= g_context->reference_Iq * period;
+
+                    // Evaluating the observer synchronization precision
+                    Const ang_pos_error = math::subtractAngles(g_context->observer.getAngularPosition(),
+                                                               g_context->angular_position);
+                    Const ang_vel_rel_error =
+                        std::abs(g_context->observer.getAngularVelocity() - g_context->angular_velocity) /
+                        std::abs(g_context->angular_velocity);
+
+                    // Decision to hand-off control to the normal node
+                    const bool ang_pos_ok = std::abs(ang_pos_error) < math::convertDegreesToRadian(20.0F);
+                    const bool ang_vel_ok = ang_vel_rel_error < 0.2F;
+                    if (ang_vel_ok && ang_pos_ok)
+                    {
+                        g_state = State::Running;
+                    }
                 }
 
-                if (!g_context->current_limit.contains(g_context->reference_Iq))
+                // Fault detection
+                if (!g_context->current_limit.contains(g_context->reference_Iq) ||
+                    (std::abs(g_context->reference_Iq) < g_motor_params.min_current))
                 {
                     g_setpoint = 0;     // Stopping
                 }
