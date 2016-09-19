@@ -77,10 +77,9 @@ public:
 
         auto toString() const
         {
-            return os::heapless::format("0x%04x = 0b%s [Errors: %u]",
-                                        unsigned(mask_),
-                                        os::heapless::intToString<2>(mask_).c_str(),
-                                        getNumberOfErrors());
+            return os::heapless::format("NumErrors: %u, Code: 0b%s",
+                                        getNumberOfErrors(),
+                                        os::heapless::intToString<2>(mask_).c_str());
         }
     };
 

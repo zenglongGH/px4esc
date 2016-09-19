@@ -186,38 +186,48 @@ os::watchdog::Timer init()
     /*
      * Motor initialization
      */
-    // This is only for testing purposes, will be removed later
     board::motor::init();
     foc::init();
 
-    foc::MotorParameters motor_params;
-    motor_params.min_current = 0.4F;
-    motor_params.max_current = 20.0F;
-    motor_params.spinup_current = 10.0F;
-    motor_params.nominal_spinup_duration = 1.0F;
-    motor_params.min_electrical_ang_vel = 300.0F;
-    motor_params.field_flux = 0.001681F;
-    motor_params.r_ab = 0.265F;
-    motor_params.l_ab = 68e-6F;
-    motor_params.num_poles = 14;
+    // Power on self test
+    os::lowsyslog("Main: Testing hardware...\n");
 
-    foc::setMotorParameters(motor_params);
+    foc::beginHardwareTest();
 
-    foc::setObserverParameters(foc::ObserverParameters());
-
-    while (board::motor::isCalibrationInProgress())
+    while (foc::getState() == foc::State::HardwareTesting)
     {
         ::sleep(1);
     }
 
-    //foc::beginMotorIdentification(foc::MotorIdentificationMode::Static);
+    os::lowsyslog("Hardware test result:\n%s\n", foc::getLastHardwareTestReport().toString().c_str());
 
-    while (foc::getState() == foc::State::MotorIdentification)
+    // TODO Motor parameter initialization should go here
     {
-        ::sleep(1);
+        foc::MotorParameters motor_params;
+
+        motor_params.min_current = 0.4F;
+        motor_params.max_current = 20.0F;
+        motor_params.spinup_current = 10.0F;
+        motor_params.nominal_spinup_duration = 1.0F;
+        motor_params.min_electrical_ang_vel = 300.0F;
+        motor_params.field_flux = 0.001681F;
+        motor_params.r_ab = 0.265F;
+        motor_params.l_ab = 68e-6F;
+        motor_params.num_poles = 14;
+
+        foc::setMotorParameters(motor_params);
     }
 
     os::lowsyslog("Motor params:\n%s\n", foc::getMotorParameters().toString().c_str());
+
+    // TODO Observer parameter initialization should go here
+    {
+        foc::ObserverParameters observer_params;
+
+        foc::setObserverParameters(observer_params);
+    }
+
+    os::lowsyslog("Observer params:\n%s\n", foc::getObserverParameters().toString().c_str());
 
     /*
      * CLI initialization
