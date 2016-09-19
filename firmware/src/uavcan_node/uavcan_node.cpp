@@ -23,6 +23,7 @@
  */
 
 #include "uavcan_node.hpp"
+#include "esc_controller.hpp"
 
 #include <zubax_chibios/os.hpp>
 #include <zubax_chibios/config/config.hpp>
@@ -452,7 +453,12 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
             board::die(res);
         }
 
-        // TODO: ESC API
+        res = esc_controller::init(getNode());
+        if (res < 0)
+        {
+            board::die(res);
+        }
+
         // TODO: Indication API
         // TODO: Enumeration API
 
