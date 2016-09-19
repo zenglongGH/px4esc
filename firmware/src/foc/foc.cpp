@@ -175,7 +175,7 @@ void initializeContext()
     std::fill(std::begin(context_storage), std::end(context_storage), 0);       // Paranoia time
 
     g_context = new (context_storage) Context(g_observer_params,
-                                              g_motor_params.field_flux,
+                                              g_motor_params.phi,
                                               Ls,
                                               Rs,
                                               g_motor_params.max_current,

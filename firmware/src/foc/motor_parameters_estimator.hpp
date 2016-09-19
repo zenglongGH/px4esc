@@ -398,7 +398,7 @@ public:
 
             if (state_ == State::PhiMeasurementInitialization)
             {
-                result_.field_flux = 0;
+                result_.phi = 0;
 
                 state_variables_[IdxVoltage] = initial_voltage;
                 state_variables_[IdxAngVel] = 0;
@@ -430,7 +430,7 @@ public:
                     Const w  = state_variables_[IdxAngVel];
                     Const Rs = result_.r_ab / 2.0F;
 
-                    result_.field_flux = (Uq - Iq * Rs) / w;
+                    result_.phi = (Uq - Iq * Rs) / w;
 
                     switchState(State::Finalization);
                 }
@@ -443,7 +443,7 @@ public:
                     if (state_variables_[IdxVoltage] <= 0.1F)
                     {
                         // Hit the minimum, something went wrong, aborting.
-                        result_.field_flux = 0;
+                        result_.phi = 0;
                         switchState(State::Finalization);
                     }
                 }

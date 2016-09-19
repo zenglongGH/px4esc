@@ -46,11 +46,31 @@ struct MotorParameters
 
     Scalar min_electrical_ang_vel = 0;  ///< Min electric angular velocity for stable operation, radian/second
 
-    Scalar field_flux = 0;              ///< Phi, Weber
+    Scalar phi = 0;                     ///< Magnetic field flux linkage, Weber
     Scalar r_ab = 0;                    ///< Phase-to-phase resistance, Ohm
     Scalar l_ab = 0;                    ///< Phase-to-phase inductance, Henry
 
     std::uint_fast8_t num_poles = 0;    ///< Number of magnetic poles (not pairs!); must be a positive even number
+
+
+    static math::Range<> getPhiLimits() const
+    {
+        return {   0.02e-3F,
+                 100.00e-3F };
+    }
+
+    static math::Range<> getRabLimits() const
+    {
+        return { 0.01F,
+                 2.00F };
+    }
+
+    static math::Range<> getLabLimits() const
+    {
+        return {    5e-6F,
+                 1000e-6F };
+    }
+
 
     bool isValid() const
     {
@@ -61,9 +81,9 @@ struct MotorParameters
                is_positive(spinup_current)              &&
                is_positive(nominal_spinup_duration)     &&
                is_positive(min_electrical_ang_vel)      &&
-               is_positive(field_flux)                  &&
-               is_positive(r_ab)                        &&
-               is_positive(l_ab)                        &&
+               getPhiLimits().contains(phi)             &&
+               getRabLimits().contains(r_ab)            &&
+               getLabLimits().contains(l_ab)            &&
                (num_poles >= 2)                         &&
                (num_poles % 2 == 0)                     &&
                (max_current > min_current)              &&
@@ -76,9 +96,9 @@ struct MotorParameters
         const bool num_poles_known = (num_poles >= 2) && (num_poles % 2 == 0);
 
         Scalar kv = 0;
-        if ((field_flux > 0) && num_poles_known)
+        if ((phi > 0) && num_poles_known)
         {
-            kv = convertFluxLinkageToKV(field_flux, num_poles);
+            kv = convertFluxLinkageToKV(phi, num_poles);
         }
 
         Scalar min_mrpm = 0;
@@ -104,7 +124,7 @@ struct MotorParameters
                                     double(nominal_spinup_duration),
                                     double(min_electrical_ang_vel),
                                     double(min_mrpm),
-                                    double(field_flux) * 1e3,
+                                    double(phi) * 1e3,
                                     double(r_ab),
                                     double(l_ab) * 1e6,
                                     unsigned(num_poles),
