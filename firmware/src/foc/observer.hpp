@@ -58,7 +58,7 @@ struct ObserverParameters
         return os::heapless::format("Q diag : %s\n"
                                     "R diag : %s\n"
                                     "P0 diag: %s\n"
-                                    "CC Comp: %.3f\n",
+                                    "CC Comp: %.3f",
                                     math::toString(Q.diagonal()).c_str(),
                                     math::toString(R.diagonal()).c_str(),
                                     math::toString(P0.diagonal()).c_str(),

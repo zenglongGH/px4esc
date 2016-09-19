@@ -153,7 +153,7 @@ struct Status
                                     "Current ADC Z-Offset: %s\n"
                                     "Power OK            : %u\n"
                                     "Overload            : %u\n"
-                                    "Fault               : %u\n",
+                                    "Fault               : %u",
                                     double(math::convertKelvinToCelsius(inverter_temperature)),
                                     double(inverter_voltage),
                                     math::toString(phase_current_zero_offset).c_str(),

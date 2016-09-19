@@ -117,7 +117,7 @@ struct MotorParameters
                                     "Rab  : %-7.3f Ohm\n"
                                     "Lab  : %-7.3f uH\n"
                                     "Npols: %u, %.1f MRPM/V\n"
-                                    "Valid: %s\n",
+                                    "Valid: %s",
                                     double(min_current),
                                     double(max_current),
                                     double(spinup_current),

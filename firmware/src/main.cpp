@@ -199,7 +199,7 @@ os::watchdog::Timer init()
         ::sleep(1);
     }
 
-    os::lowsyslog("Hardware test result:\n%s\n", foc::getLastHardwareTestReport().toString().c_str());
+    os::lowsyslog("Hardware test result:\n%s\n\n", foc::getLastHardwareTestReport().toString().c_str());
 
     // TODO Motor parameter initialization should go here
     {
@@ -218,7 +218,7 @@ os::watchdog::Timer init()
         foc::setMotorParameters(motor_params);
     }
 
-    os::lowsyslog("Motor params:\n%s\n", foc::getMotorParameters().toString().c_str());
+    os::lowsyslog("Motor params:\n%s\n\n", foc::getMotorParameters().toString().c_str());
 
     // TODO Observer parameter initialization should go here
     {
@@ -227,7 +227,7 @@ os::watchdog::Timer init()
         foc::setObserverParameters(observer_params);
     }
 
-    os::lowsyslog("Observer params:\n%s\n", foc::getObserverParameters().toString().c_str());
+    os::lowsyslog("Observer params:\n%s\n\n", foc::getObserverParameters().toString().c_str());
 
     // Initializing to Idle
     foc::stop();
