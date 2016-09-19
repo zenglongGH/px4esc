@@ -675,119 +675,139 @@ void handleFastIRQ(Const period,
     /*
      * Motor identification
      */
-    static MotorParametersEstimator* estimator = nullptr;
-
-    if (g_state == State::MotorIdentification)
     {
-        alignas(16) static std::uint8_t estimator_storage[sizeof(MotorParametersEstimator)];
+        static MotorParametersEstimator* estimator = nullptr;
 
-        if (estimator == nullptr)
+        if (g_state == State::MotorIdentification)
         {
-            board::motor::beginCalibration();
+            alignas(16) static std::uint8_t estimator_storage[sizeof(MotorParametersEstimator)];
 
-            estimator = new (estimator_storage)
-                MotorParametersEstimator(g_requested_motor_identification_mode,
-                                         g_motor_params,
-                                         MotorIdentificationCurrent,
-                                         MotorIdentificationCurrentFrequency,
-                                         MotorIdentificationPhiAngularVelocity,
-                                         period,
-                                         board::motor::getPWMDeadTime());
-        }
+            if (estimator == nullptr)
+            {
+                board::motor::beginCalibration();
 
-        if (board::motor::isCalibrationInProgress())
-        {
-            g_pwm_handle.release(); // Nothing to do, waiting for the calibration to end before continuing
+                estimator = new (estimator_storage)
+                    MotorParametersEstimator(g_requested_motor_identification_mode,
+                                             g_motor_params,
+                                             MotorIdentificationCurrent,
+                                             MotorIdentificationCurrentFrequency,
+                                             MotorIdentificationPhiAngularVelocity,
+                                             period,
+                                             board::motor::getPWMDeadTime());
+            }
+
+            if (board::motor::isCalibrationInProgress())
+            {
+                g_pwm_handle.release(); // Nothing to do, waiting for the calibration to end before continuing
+            }
+            else
+            {
+                const auto pwm_vector = estimator->onNextPWMPeriod(phase_currents_ab, inverter_voltage);
+
+                g_pwm_handle.setPWM(pwm_vector);
+
+                if (estimator->isFinished())
+                {
+                    g_pwm_handle.release();
+
+                    g_motor_params = estimator->getEstimatedMotorParameters();
+
+                    if (g_motor_params.isValid())
+                    {
+                        g_state = State::Idle;
+                    }
+                    else
+                    {
+                        g_state = State::Fault;
+                    }
+                }
+            }
+
+            const auto filtered_currents = estimator->getCurrentsFilter().getValue();
+
+            g_debug_tracer.set<0>(estimator->getStateVariables()[0]);
+            g_debug_tracer.set<1>(estimator->getStateVariables()[1]);
+            g_debug_tracer.set<2>(estimator->getStateVariables()[2]);
+            g_debug_tracer.set<3>(estimator->getStateVariables()[3]);
+            g_debug_tracer.set<4>(filtered_currents[0]);
+            g_debug_tracer.set<5>(filtered_currents[1]);
+            g_debug_tracer.set<6>(filtered_currents.norm());
         }
         else
         {
-            const auto pwm_vector = estimator->onNextPWMPeriod(phase_currents_ab, inverter_voltage);
-
-            g_pwm_handle.setPWM(pwm_vector);
-
-            if (estimator->isFinished())
+            if (estimator != nullptr)
             {
-                g_pwm_handle.release();
-
-                g_motor_params = estimator->getEstimatedMotorParameters();
-
-                if (g_motor_params.isValid())
-                {
-                    g_state = State::Idle;
-                }
-                else
-                {
-                    g_state = State::Fault;
-                }
+                estimator->~MotorParametersEstimator();
+                estimator = nullptr;
             }
         }
-
-        const auto filtered_currents = estimator->getCurrentsFilter().getValue();
-
-        g_debug_tracer.set<0>(estimator->getStateVariables()[0]);
-        g_debug_tracer.set<1>(estimator->getStateVariables()[1]);
-        g_debug_tracer.set<2>(estimator->getStateVariables()[2]);
-        g_debug_tracer.set<3>(estimator->getStateVariables()[3]);
-        g_debug_tracer.set<4>(filtered_currents[0]);
-        g_debug_tracer.set<5>(filtered_currents[1]);
-        g_debug_tracer.set<6>(filtered_currents.norm());
     }
 
     /*
      * Hardware testing
      */
-    static HardwareTester* hardware_tester = nullptr;
-
-    if (g_state == State::HardwareTesting)
     {
-        alignas(16) static std::uint8_t hardware_tester_storage[sizeof(HardwareTester)];
+        static HardwareTester* hardware_tester = nullptr;
 
-        if (hardware_tester == nullptr)
+        if (g_state == State::HardwareTesting)
         {
-            board::motor::beginCalibration();
+            alignas(16) static std::uint8_t hardware_tester_storage[sizeof(HardwareTester)];
 
-            // TODO: Pass valid parameter ranges from the board driver.
-            hardware_tester = new (hardware_tester_storage) HardwareTester(period);
-        }
+            if (hardware_tester == nullptr)
+            {
+                board::motor::beginCalibration();
 
-        if (board::motor::isCalibrationInProgress())
-        {
-            g_pwm_handle.release(); // Nothing to do, waiting for the calibration to end before continuing
+                // TODO: Pass valid parameter ranges from the board driver.
+                hardware_tester = new (hardware_tester_storage) HardwareTester(period);
+            }
+
+            if (board::motor::isCalibrationInProgress())
+            {
+                g_pwm_handle.release(); // Nothing to do, waiting for the calibration to end before continuing
+            }
+            else
+            {
+                const auto pwm_vector = hardware_tester->onNextPWMPeriod(phase_currents_ab,
+                                                                         inverter_voltage,
+                                                                         board::motor::getInverterTemperature());
+
+                g_pwm_handle.setPWM(pwm_vector);
+
+                if (hardware_tester->isFinished())
+                {
+                    g_pwm_handle.release();
+
+                    g_last_hardware_test_report = hardware_tester->getTestReport();
+
+                    if (g_last_hardware_test_report.isSuccessful())
+                    {
+                        g_state = State::Idle;
+                    }
+                    else
+                    {
+                        g_state = State::Fault;
+                    }
+                }
+            }
+
+            const auto filtered_currents = hardware_tester->getCurrentsFilter().getValue();
+
+            g_debug_tracer.set<0>(phase_currents_ab[0]);
+            g_debug_tracer.set<1>(phase_currents_ab[1]);
+            g_debug_tracer.set<2>(inverter_voltage);
+            g_debug_tracer.set<3>(filtered_currents[0]);
+            g_debug_tracer.set<4>(filtered_currents[1]);
+            g_debug_tracer.set<5>(math::convertKelvinToCelsius(board::motor::getInverterTemperature()));
+            g_debug_tracer.set<6>(0);
         }
         else
         {
-            const auto pwm_vector = hardware_tester->onNextPWMPeriod(phase_currents_ab,
-                                                                     inverter_voltage,
-                                                                     board::motor::getInverterTemperature());
-
-            g_pwm_handle.setPWM(pwm_vector);
-
-            if (hardware_tester->isFinished())
+            if (hardware_tester != nullptr)
             {
-                g_pwm_handle.release();
-
-                g_last_hardware_test_report = hardware_tester->getTestReport();
-
-                if (g_last_hardware_test_report.isSuccessful())
-                {
-                    g_state = State::Idle;
-                }
-                else
-                {
-                    g_state = State::Fault;
-                }
+                hardware_tester->~HardwareTester();
+                hardware_tester = nullptr;
             }
         }
-
-        const auto filtered_currents = hardware_tester->getCurrentsFilter().getValue();
-
-        g_debug_tracer.set<0>(phase_currents_ab[0]);
-        g_debug_tracer.set<1>(phase_currents_ab[1]);
-        g_debug_tracer.set<2>(inverter_voltage);
-        g_debug_tracer.set<3>(filtered_currents[0]);
-        g_debug_tracer.set<4>(filtered_currents[1]);
-        g_debug_tracer.set<5>(math::convertKelvinToCelsius(board::motor::getInverterTemperature()));
-        g_debug_tracer.set<6>(0);
     }
 
     /*
@@ -796,18 +816,6 @@ void handleFastIRQ(Const period,
     if (g_state == State::Idle ||
         g_state == State::Fault)
     {
-        if (estimator != nullptr)
-        {
-            estimator->~MotorParametersEstimator();
-            estimator = nullptr;
-        }
-
-        if (hardware_tester != nullptr)
-        {
-            hardware_tester->~HardwareTester();
-            hardware_tester = nullptr;
-        }
-
         if (!board::motor::isCalibrationInProgress() && g_pwm_handle.isUnique())
         {
             static std::uint64_t beeping_deadline;
