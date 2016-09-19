@@ -277,7 +277,17 @@ public:
                 }
 
                 Const voltage = computeLineVoltageForResistanceMeasurement(estimation_current_, result_.r_ab);
-                pwm_vector[1] += computeRelativePhaseVoltage(voltage, inverter_voltage);
+                Const relative_voltage = computeRelativePhaseVoltage(voltage, inverter_voltage);
+                if (relative_voltage < 0.4F)
+                {
+                    pwm_vector[1] += relative_voltage;
+                }
+                else
+                {
+                    // Voltage is too high, aborting
+                    result_.r_ab = 0;
+                    switchState(State::Finalization);
+                }
             }
             break;
         }
@@ -307,7 +317,7 @@ public:
                     result_.r_ab = 0;        // Failed
                 }
 
-                if (result_.r_ab > 0)
+                if (MotorParameters::getRabLimits().contains(result_.r_ab))
                 {
                     switchState(State::PreLsMeasurement);
                 }
@@ -361,7 +371,8 @@ public:
 
                 result_.l_ab = Ls * 2.0F;
 
-                if (mode_ == MotorIdentificationMode::Static)
+                if ((mode_ == MotorIdentificationMode::Static) ||
+                    (!MotorParameters::getLabLimits().contains(result_.l_ab)))
                 {
                     switchState(State::Finalization);
                 }
@@ -439,13 +450,6 @@ public:
                     // Minimum is not reached yet, continuing to decrease voltage
                     state_variables_[IdxVoltage] -=
                         (initial_voltage / PhiMeasurementFullRangeSweepDuration) * pwm_period_;
-
-                    if (state_variables_[IdxVoltage] <= 0.1F)
-                    {
-                        // Hit the minimum, something went wrong, aborting.
-                        result_.phi = 0;
-                        switchState(State::Finalization);
-                    }
                 }
             }
             else
@@ -453,14 +457,28 @@ public:
                 assert(false);
             }
 
-            state_variables_[IdxAngPos] =
-                constrainAngularPosition(state_variables_[IdxAngPos] + state_variables_[IdxAngVel] * pwm_period_);
+            // In SVM we multiply the 3-phase voltage vector to 2/sqrt(3), therefore here we need to adjust for that
+            Const max_voltage = inverter_voltage * (SquareRootOf3 / 2.0F) * 0.8F;
 
-            const auto Uab = performInverseParkTransform(Vector<2>{0.0F, state_variables_[IdxVoltage]},
-                                                         math::sin(state_variables_[IdxAngPos]),
-                                                         math::cos(state_variables_[IdxAngPos]));
+            const math::Range<> voltage_range(0.1F, max_voltage);
 
-            pwm_vector = performSpaceVectorTransform(Uab, inverter_voltage).first;
+            if (voltage_range.contains(state_variables_[IdxVoltage]))
+            {
+                state_variables_[IdxAngPos] =
+                    constrainAngularPosition(state_variables_[IdxAngPos] + state_variables_[IdxAngVel] * pwm_period_);
+
+                const auto Uab = performInverseParkTransform({0.0F, state_variables_[IdxVoltage]},
+                                                             math::sin(state_variables_[IdxAngPos]),
+                                                             math::cos(state_variables_[IdxAngPos]));
+
+                pwm_vector = performSpaceVectorTransform(Uab, inverter_voltage).first;
+            }
+            else
+            {
+                // Voltage is not in the valid range, aborting
+                result_.phi = 0;
+                switchState(State::Finalization);
+            }
 
             break;
         }

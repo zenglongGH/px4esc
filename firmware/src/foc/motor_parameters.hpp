@@ -53,19 +53,19 @@ struct MotorParameters
     std::uint_fast8_t num_poles = 0;    ///< Number of magnetic poles (not pairs!); must be a positive even number
 
 
-    static math::Range<> getPhiLimits() const
+    static math::Range<> getPhiLimits()
     {
         return {   0.02e-3F,
                  100.00e-3F };
     }
 
-    static math::Range<> getRabLimits() const
+    static math::Range<> getRabLimits()
     {
         return { 0.01F,
                  2.00F };
     }
 
-    static math::Range<> getLabLimits() const
+    static math::Range<> getLabLimits()
     {
         return {    5e-6F,
                  1000e-6F };
