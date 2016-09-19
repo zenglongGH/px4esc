@@ -457,27 +457,33 @@ public:
                 assert(false);
             }
 
-            // In SVM we multiply the 3-phase voltage vector to 2/sqrt(3), therefore here we need to adjust for that
-            Const max_voltage = inverter_voltage * (SquareRootOf3 / 2.0F) * 0.8F;
-
-            const math::Range<> voltage_range(0.1F, max_voltage);
-
-            if (voltage_range.contains(state_variables_[IdxVoltage]))
+            // Voltage modulation
+            if (state_ == State::PhiMeasurementInitialization ||
+                state_ == State::PhiMeasurementAcceleration ||
+                state_ == State::PhiMeasurement)
             {
-                state_variables_[IdxAngPos] =
-                    constrainAngularPosition(state_variables_[IdxAngPos] + state_variables_[IdxAngVel] * pwm_period_);
+                // In SVM we multiply the 3-phase voltage vector to 2/sqrt(3), therefore here we need to adjust for that
+                Const max_voltage = inverter_voltage * (SquareRootOf3 / 2.0F) * 0.8F;
 
-                const auto Uab = performInverseParkTransform({0.0F, state_variables_[IdxVoltage]},
-                                                             math::sin(state_variables_[IdxAngPos]),
-                                                             math::cos(state_variables_[IdxAngPos]));
+                const math::Range<> voltage_range(0.1F, max_voltage);
 
-                pwm_vector = performSpaceVectorTransform(Uab, inverter_voltage).first;
-            }
-            else
-            {
-                // Voltage is not in the valid range, aborting
-                result_.phi = 0;
-                switchState(State::Finalization);
+                if (voltage_range.contains(state_variables_[IdxVoltage]))
+                {
+                    state_variables_[IdxAngPos] = constrainAngularPosition(state_variables_[IdxAngPos] +
+                                                                           state_variables_[IdxAngVel] * pwm_period_);
+
+                    const auto Uab = performInverseParkTransform({0.0F, state_variables_[IdxVoltage]},
+                                                                 math::sin(state_variables_[IdxAngPos]),
+                                                                 math::cos(state_variables_[IdxAngPos]));
+
+                    pwm_vector = performSpaceVectorTransform(Uab, inverter_voltage).first;
+                }
+                else
+                {
+                    // Voltage is not in the valid range, aborting
+                    result_.phi = 0;
+                    switchState(State::Finalization);
+                }
             }
 
             break;
