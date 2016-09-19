@@ -574,6 +574,59 @@ class KVConvertCommand : public os::shell::ICommandHandler
 } static cmd_kv_convert;
 
 
+class HardwareTestCommand : public os::shell::ICommandHandler
+{
+    const char* getName() const override { return "hwtest"; }
+
+    void execute(os::shell::BaseChannelWrapper& ios, int argc, char** argv) override
+    {
+        ios.print("Testing the hardware (option -p will plot real time values)...\n");
+
+        // Parsing optional stuff
+        bool do_plot = false;
+
+        for (int i = 1; i < argc; i++)
+        {
+            const os::heapless::String<> arg(argv[i]);
+
+            if (arg == "-p")
+            {
+                do_plot = true;
+            }
+        }
+
+        // Running
+        if (foc::getState() != foc::State::Idle)
+        {
+            ios.print("ERROR: Controller is not idle\n");
+            return;
+        }
+
+        foc::beginHardwareTest();
+
+        if (do_plot)
+        {
+            while (foc::getState() == foc::State::HardwareTesting)
+            {
+                ::usleep(100);
+                foc::plotRealTimeValues();
+            }
+        }
+        else
+        {
+            while (foc::getState() == foc::State::HardwareTesting)
+            {
+                ios.putChar('.');
+                ::sleep(1);
+            }
+            ios.print(" Done.\n");
+        }
+
+        ios.print("%s\n", foc::getLastHardwareTestReport().toString().c_str());
+    }
+} static cmd_hardware_test;
+
+
 class CLIThread : public chibios_rt::BaseStaticThread<2048>
 {
     os::shell::Shell<20> shell_;
@@ -611,6 +664,7 @@ public:
         (void) shell_.addCommandHandler(&cmd_beep);
         (void) shell_.addCommandHandler(&cmd_perform_motor_identification);
         (void) shell_.addCommandHandler(&cmd_kv_convert);
+        (void) shell_.addCommandHandler(&cmd_hardware_test);
     }
 
     virtual ~CLIThread() { }

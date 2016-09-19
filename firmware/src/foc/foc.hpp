@@ -67,6 +67,18 @@ ObserverParameters getObserverParameters();
 void beginMotorIdentification(MotorIdentificationMode mode);
 
 /**
+ * Begins the asynchronous process of hardware testing.
+ * Completion of the process can be detected by means of monitoring the current state of the controller, see @ref State.
+ * The result of the test can be obtained via @ref getLastHardwareTestReport().
+ */
+void beginHardwareTest();
+
+/**
+ * See @ref beginHardwareTest().
+ */
+HardwareTester::TestReport getLastHardwareTestReport();
+
+/**
  * State of the control logic.
  * Some of the functions may be unavailable in certain states.
  */
@@ -89,6 +101,7 @@ enum class State
      * Possible outcomes:
      *  - Test passed                                   -> Idle
      *  - Test failed (hardware problems detected)      -> Fault
+     * @ref beginHardwareTest().
      */
     HardwareTesting,
 
@@ -118,24 +131,6 @@ enum class State
 State getState();
 
 /**
- * Error codes complement the states defined above with additional failure information.
- * Errors are just indications, they do not require any actions from the user except when the state is Fault.
- */
-enum class Error
-{
-    None,
-    SpinupUnsuccessful,
-    HardwareFailure,
-    InvalidMotorParameters
-};
-
-/**
- * Returns the code of the last encountered error and the total number of errors encountered since the motor was
- * last stopped or since reboot, whichever was the last. See @ref Error.
- */
-std::pair<Error, std::uint32_t> getLastErrorWithErrorCount();
-
-/**
  * Various control modes.
  * See the function definitions below for usages.
  */
@@ -155,8 +150,8 @@ enum class ControlMode
  * @param request_ttl           After this timeout (in seconds) the motor will be stopped automatically.
  */
 void setSetpoint(ControlMode control_mode,
-                 math::Const value,
-                 math::Const request_ttl);
+                 Const value,
+                 Const request_ttl);
 
 /**
  * See @ref ControlMode.
@@ -173,27 +168,27 @@ void stop();
 /**
  * Returns the instant motor current in Amperes.
  */
-math::Scalar getInstantCurrent();
+Scalar getInstantCurrent();
 
 /**
  * Returns the instant motor power in Watts.
  */
-math::Scalar getInstantPower();
+Scalar getInstantPower();
 
 /**
  * Returns the maximum power that can be delivered to the motor.
  * This value is defined either by the ESC hardware or by the motor's specification.
  * In conjunction with @ref getInstantPower(), this value can be used to determine the instant power rating in percent.
  */
-math::Scalar getMaximumPower();
+Scalar getMaximumPower();
 
 /**
  * Generate sound using the motor windings.
- * The request MAY be ignored if the controller is in not in the Standby mode.
+ * The request MAY be ignored if the controller is in not in the Idle state.
  * Units are SI (Hertz, seconds).
  */
-void beep(math::Const frequency,
-          math::Const duration);
+void beep(Const frequency,
+          Const duration);
 
 /**
  * Prints the current status information into stdout.

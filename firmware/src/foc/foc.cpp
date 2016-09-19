@@ -69,25 +69,7 @@ board::motor::PWMHandle g_pwm_handle;
 
 MotorIdentificationMode g_requested_motor_identification_mode;
 
-
-struct ErrorCounter
-{
-    Error last_error = Error::None;
-    std::uint32_t error_count = 0;
-
-    void reset()
-    {
-        last_error = Error::None;
-        error_count = 0;
-    }
-
-    void registerError(Error e)
-    {
-        AbsoluteCriticalSectionLocker locker;
-        last_error = e;
-        error_count++;
-    }
-} g_error_counter;
+HardwareTester::TestReport g_last_hardware_test_report;
 
 
 EventCounter g_fast_irq_cycle_counter;
@@ -226,7 +208,6 @@ void init()
         g_state = State::Idle;
         g_setpoint = 0;
         g_setpoint_remaining_ttl = 0;
-        g_error_counter.reset();
         g_context = nullptr;
     }
 
@@ -266,7 +247,8 @@ void beginMotorIdentification(MotorIdentificationMode mode)
 {
     AbsoluteCriticalSectionLocker locker;
 
-    if (g_state == State::Idle)
+    if (g_state == State::Idle ||
+        g_state == State::Fault)
     {
         g_state = State::MotorIdentification;
         g_requested_motor_identification_mode = mode;
@@ -274,16 +256,28 @@ void beginMotorIdentification(MotorIdentificationMode mode)
 }
 
 
-State getState()
+void beginHardwareTest()
 {
-    return g_state;             // Atomic read, no locking
+    AbsoluteCriticalSectionLocker locker;
+
+    if (g_state == State::Idle ||
+        g_state == State::Fault)
+    {
+        g_state = State::HardwareTesting;
+    }
 }
 
 
-std::pair<Error, std::uint32_t> getLastErrorWithErrorCount()
+HardwareTester::TestReport getLastHardwareTestReport()
 {
     AbsoluteCriticalSectionLocker locker;
-    return { g_error_counter.last_error, g_error_counter.error_count };
+    return g_last_hardware_test_report;
+}
+
+
+State getState()
+{
+    return g_state;             // Atomic read, no locking
 }
 
 
@@ -386,7 +380,6 @@ void printStatusInfo()
     State state = State();
     ControlMode control_mode = ControlMode();
     Scalar setpoint = 0;
-    ErrorCounter error_counter;
 
     EventCounter Udq_normalizations;
 
@@ -401,7 +394,6 @@ void printStatusInfo()
         state           = g_state;
         control_mode    = g_control_mode;
         setpoint        = g_setpoint;
-        error_counter   = g_error_counter;
 
         if (g_context != nullptr)
         {
@@ -418,10 +410,6 @@ void printStatusInfo()
                 "Control Mode : %d\n"
                 "Setpoint     : %.3f\n",
                 int(state), int(control_mode), double(setpoint));
-
-    std::printf("Last Error   : %d\n"
-                "Error Count  : %lu\n",
-                int(error_counter.last_error), error_counter.error_count);
 
     std::printf("Udq Norm. Cnt: %s\n",
                 Udq_normalizations.toString().c_str());
@@ -589,7 +577,7 @@ void handleMainIRQ(Const period)
                         std::abs(g_context->observer.getAngularVelocity() - g_context->angular_velocity) /
                         std::abs(g_context->angular_velocity);
 
-                    // Decision to hand-off control to the normal node.
+                    // Decision to hand-off control to the normal mode.
                     // Not sure if the hardcoded thresholds are okay.
                     const bool ang_pos_ok = std::abs(ang_pos_error) < math::convertDegreesToRadian(20.0F);
                     const bool ang_vel_ok = ang_vel_rel_error < 0.2F;
@@ -623,16 +611,17 @@ void handleMainIRQ(Const period)
 
     if (g_state == State::Idle)
     {
-        if (!g_motor_params.isValid())
+        // Retaining the Fault state if there's something wrong
+        if (!g_motor_params.isValid() ||
+            !g_last_hardware_test_report.isSuccessful())
         {
             g_setpoint = 0;             // No way
+            g_state = State::Fault;
         }
 
-        const bool need_to_start = !os::float_eq::closeToZero(Scalar(g_setpoint));
-        if (need_to_start)
+        if (!os::float_eq::closeToZero(Scalar(g_setpoint)))
         {
             initializeContext();
-            g_error_counter.reset();
 
             g_context->reference_Iq = 0;
 
@@ -722,7 +711,14 @@ void handleFastIRQ(Const period,
 
                 g_motor_params = estimator->getEstimatedMotorParameters();
 
-                g_state = g_motor_params.isValid() ? State::Idle : State::Fault;
+                if (g_motor_params.isValid())
+                {
+                    g_state = State::Idle;
+                }
+                else
+                {
+                    g_state = State::Fault;
+                }
             }
         }
 
@@ -739,8 +735,60 @@ void handleFastIRQ(Const period,
 
     /*
      * Hardware testing
-     * TODO
      */
+    static HardwareTester* hardware_tester = nullptr;
+
+    if (g_state == State::HardwareTesting)
+    {
+        alignas(16) static std::uint8_t hardware_tester_storage[sizeof(HardwareTester)];
+
+        if (hardware_tester == nullptr)
+        {
+            board::motor::beginCalibration();
+
+            // TODO: Pass valid parameter ranges from the board driver.
+            hardware_tester = new (hardware_tester_storage) HardwareTester(period);
+        }
+
+        if (board::motor::isCalibrationInProgress())
+        {
+            g_pwm_handle.release(); // Nothing to do, waiting for the calibration to end before continuing
+        }
+        else
+        {
+            const auto pwm_vector = hardware_tester->onNextPWMPeriod(phase_currents_ab,
+                                                                     inverter_voltage,
+                                                                     board::motor::getInverterTemperature());
+
+            g_pwm_handle.setPWM(pwm_vector);
+
+            if (hardware_tester->isFinished())
+            {
+                g_pwm_handle.release();
+
+                g_last_hardware_test_report = hardware_tester->getTestReport();
+
+                if (g_last_hardware_test_report.isSuccessful())
+                {
+                    g_state = State::Idle;
+                }
+                else
+                {
+                    g_state = State::Fault;
+                }
+            }
+        }
+
+        const auto filtered_currents = hardware_tester->getCurrentsFilter().getValue();
+
+        g_debug_tracer.set<0>(phase_currents_ab[0]);
+        g_debug_tracer.set<1>(phase_currents_ab[1]);
+        g_debug_tracer.set<2>(inverter_voltage);
+        g_debug_tracer.set<3>(filtered_currents[0]);
+        g_debug_tracer.set<4>(filtered_currents[1]);
+        g_debug_tracer.set<5>(math::convertKelvinToCelsius(board::motor::getInverterTemperature()));
+        g_debug_tracer.set<6>(0);
+    }
 
     /*
      * Secondary states
@@ -752,6 +800,12 @@ void handleFastIRQ(Const period,
         {
             estimator->~MotorParametersEstimator();
             estimator = nullptr;
+        }
+
+        if (hardware_tester != nullptr)
+        {
+            hardware_tester->~HardwareTester();
+            hardware_tester = nullptr;
         }
 
         if (!board::motor::isCalibrationInProgress() && g_pwm_handle.isUnique())

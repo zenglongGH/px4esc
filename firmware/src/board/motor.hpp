@@ -115,6 +115,11 @@ float getPWMDeadTime();
 float getInverterVoltage();
 
 /**
+ * Returns the power stage temperature, in Kelvin.
+ */
+float getInverterTemperature();
+
+/**
  * Immediately deactivates the PWM outputs (shuts down the carrier).
  * Further use of the driver may not be possible.
  * This function can be called from ANY context, e.g. from Hard Fault handler.

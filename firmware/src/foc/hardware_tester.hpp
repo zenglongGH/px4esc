@@ -73,6 +73,8 @@ public:
             return out;
         }
 
+        bool isSuccessful() const { return getErrorMask() == 0U; }
+
         auto toString() const
         {
             return os::heapless::format("0x%04x = 0b%s [Errors: %u]",
@@ -84,8 +86,8 @@ public:
 
 private:
     static constexpr Scalar TestingVoltage      = 1.0F;
-    static constexpr Scalar ThresholdCurrent    = 0.1F;
-    static constexpr Scalar StabilizationTime   = 0.2F;
+    static constexpr Scalar ThresholdCurrent    = 0.15F;
+    static constexpr Scalar StabilizationTime   = 0.3F;
 
     using Range = math::Range<>;
 
@@ -113,6 +115,8 @@ private:
     State state_ = State::Initialization;
     Scalar time_ = 0;
     Scalar state_switched_at_ = 0;
+
+    math::SimpleMovingAverageFilter<200, Vector<2>> currents_filter_;
 
     TestReport test_report_;
 
@@ -165,7 +169,8 @@ public:
                                                                   math::convertCelsiusToKelvin(125.0F))) :
         pwm_period_(pwm_period),
         inverter_voltage_range_(inverter_voltage_range),
-        inverter_temperature_range_(inverter_temperature_range)
+        inverter_temperature_range_(inverter_temperature_range),
+        currents_filter_(Vector<2>::Zero())
     {
         assert(pwm_period_ > 0);
         assert(inverter_temperature_range_.contains(math::convertCelsiusToKelvin(25.0F)));
@@ -175,13 +180,16 @@ public:
      * Must be invoked on every PWM period with appropriate measurements.
      * Returns the desired PWM setpoints, possibly zero.
      */
-    Vector<3> onNextPWMPeriod(const Vector<2>& phase_currents_ab,
+    Vector<3> onNextPWMPeriod(const Vector<2>& raw_phase_currents_ab,
                               Const inverter_voltage,
                               Const inverter_temperature)
     {
         time_ += pwm_period_;
 
         Vector<3> pwm_vector = Vector<3>::Ones() * 0.5F;
+
+        currents_filter_.update(raw_phase_currents_ab);
+        const auto currents = currents_filter_.getValue();
 
         // No dead time compensation here
         Const relative_testing_voltage = TestingVoltage / inverter_voltage;
@@ -206,8 +214,9 @@ public:
 
         case State::ZeroCheck:
         {
-            if ((std::abs(phase_currents_ab[0]) < ThresholdCurrent) &&
-                (std::abs(phase_currents_ab[1]) < ThresholdCurrent))
+            const bool ok = (std::abs(currents[0]) < ThresholdCurrent) &&
+                            (std::abs(currents[1]) < ThresholdCurrent);
+            if (!ok)
             {
                 registerError(TestReport::ErrorFlag::CurrentSensorsZeroOffsetError);
             }
@@ -224,8 +233,9 @@ public:
 
         case State::TestA:
         {
-            if ((phase_currents_ab[0] > ThresholdCurrent) &&
-                (phase_currents_ab[1] < ThresholdCurrent))
+            const bool ok = (currents[0] > ThresholdCurrent) &&
+                            (currents[1] < -ThresholdCurrent);
+            if (!ok)
             {
                 registerError(TestReport::ErrorFlag::PhaseAError);
             }
@@ -242,8 +252,9 @@ public:
 
         case State::TestB:
         {
-            if ((phase_currents_ab[0] < ThresholdCurrent) &&
-                (phase_currents_ab[1] > ThresholdCurrent))
+            const bool ok = (currents[0] < -ThresholdCurrent) &&
+                            (currents[1] > ThresholdCurrent);
+            if (!ok)
             {
                 registerError(TestReport::ErrorFlag::PhaseBError);
             }
@@ -260,8 +271,9 @@ public:
 
         case State::TestC:
         {
-            if ((phase_currents_ab[0] < ThresholdCurrent) &&
-                (phase_currents_ab[1] < ThresholdCurrent))
+            const bool ok = (currents[0] < -ThresholdCurrent) &&
+                            (currents[1] < -ThresholdCurrent);
+            if (!ok)
             {
                 registerError(TestReport::ErrorFlag::PhaseCError);
             }
@@ -288,6 +300,11 @@ public:
     bool isFinished() const { return state_ == State::Finished; }
 
     const TestReport& getTestReport() const { return test_report_; }
+
+    /**
+     * State accessors for debugging purposes.
+     */
+    const auto& getCurrentsFilter() const { return currents_filter_; }
 };
 
 }
