@@ -396,7 +396,7 @@ public:
             constexpr int IdxVoltage = 0;
             constexpr int IdxAngVel  = 1;
             constexpr int IdxAngPos  = 2;
-            constexpr int IdxIq      = 3;
+            constexpr int IdxI       = 3;
 
             // This is the maximum voltage we start from.
             Const initial_voltage = estimation_current_ * (result_.r_ab / 2.0F) * (3.0F / 2.0F);
@@ -414,7 +414,7 @@ public:
                 state_variables_[IdxVoltage] = initial_voltage;
                 state_variables_[IdxAngVel] = 0;
                 state_variables_[IdxAngPos] = 0;
-                state_variables_[IdxIq] = 0;
+                state_variables_[IdxI] = 0;
 
                 switchState(State::PhiMeasurementAcceleration, true);
             }
@@ -431,17 +431,17 @@ public:
             else if (state_ == State::PhiMeasurement)
             {
                 // Additional Iq filtering
-                state_variables_[IdxIq] += 1e-3F * (currents_filter_.getValue()[1] - state_variables_[IdxIq]);
+                state_variables_[IdxI] += 1e-3F * (currents_filter_.getValue().norm() - state_variables_[IdxI]);
 
                 if (currents_filter_.getValue()[0] < 0)
                 {
                     // Negative Id means that the motor has just stopped; we're at the minimum current now
                     Const Uq = state_variables_[IdxVoltage];
-                    Const Iq = state_variables_[IdxIq];
+                    Const I  = state_variables_[IdxI];
                     Const w  = state_variables_[IdxAngVel];
                     Const Rs = result_.r_ab / 2.0F;
 
-                    result_.phi = (Uq - Iq * Rs) / w;
+                    result_.phi = (Uq - I * Rs) / w;
 
                     switchState(State::Finalization);
                 }
