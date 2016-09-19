@@ -46,7 +46,7 @@ namespace
  */
 constexpr unsigned IdqMovingAverageLength = 5;
 
-constexpr Scalar MotorIdentificationCurrentFrequency = 1000.0F;
+constexpr Scalar MotorIdentificationCurrentFrequency = 3000.0F;
 constexpr Scalar MotorIdentificationPhiAngularVelocity = 300.0F;
 
 /*

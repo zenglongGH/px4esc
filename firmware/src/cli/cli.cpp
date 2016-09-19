@@ -521,6 +521,7 @@ class PerformMotorIdentificationCommand : public os::shell::ICommandHandler
                 ::usleep(100);
                 foc::plotRealTimeValues();
             }
+            foc::plotRealTimeValues();
         }
         else
         {

@@ -217,7 +217,7 @@ public:
                              Const pwm_period,
                              Const pwm_dead_time) :
         mode_(mode),
-        estimation_current_(initial_parameters.max_current * 0.75F),
+        estimation_current_(initial_parameters.max_current * 0.5F),
         Ls_current_frequency_(Ls_current_frequency),
         Phi_angular_velocity_(Phi_angular_velocity),
         pwm_period_(pwm_period),
@@ -407,7 +407,7 @@ public:
             constexpr int IdxI       = 3;
 
             // This is the maximum voltage we start from.
-            Const initial_voltage = estimation_current_ * (result_.r_ab / 2.0F) * (3.0F / 2.0F);
+            Const initial_voltage = estimation_current_ * (result_.r_ab / 2.0F);
 
             // Continuously maintaining the smoothed out current estimates throughout the whole process.
             const auto Idq = performParkTransform(performClarkeTransform(phase_currents_ab),
@@ -440,11 +440,11 @@ public:
             {
                 Const current_magnitude = currents_filter_.getValue().norm();
 
-                Const stop_detection_current_threshold = estimation_current_ * 0.1F;
+                //Const stop_detection_current_threshold = estimation_current_ * 0.1F;
 
-                if ((current_magnitude - state_variables_[IdxI]) > stop_detection_current_threshold)
+                //if (std::abs(current_magnitude - state_variables_[IdxI]) > stop_detection_current_threshold)
+                if (currents_filter_.getValue()[0] < 0)
                 {
-                    // Negative Id means that the motor has just stopped; we're at the minimum current now
                     Const Uq = state_variables_[IdxVoltage];
                     Const I  = state_variables_[IdxI];
                     Const w  = state_variables_[IdxAngVel];
@@ -462,6 +462,7 @@ public:
                     // Minimum is not reached yet, continuing to decrease voltage
                     state_variables_[IdxVoltage] -=
                         (initial_voltage / PhiMeasurementFullRangeSweepDuration) * pwm_period_;
+
                 }
             }
             else
