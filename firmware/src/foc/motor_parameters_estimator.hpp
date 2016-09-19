@@ -212,20 +212,21 @@ class MotorParametersEstimator
 public:
     MotorParametersEstimator(MotorIdentificationMode mode,
                              const MotorParameters& initial_parameters,
-                             Const estimation_current,
                              Const Ls_current_frequency,
                              Const Phi_angular_velocity,
                              Const pwm_period,
                              Const pwm_dead_time) :
         mode_(mode),
-        estimation_current_(estimation_current),
+        estimation_current_(initial_parameters.max_current * 0.5F),
         Ls_current_frequency_(Ls_current_frequency),
         Phi_angular_velocity_(Phi_angular_velocity),
         pwm_period_(pwm_period),
         pwm_dead_time_(pwm_dead_time),
         result_(initial_parameters),
         currents_filter_(Vector<2>::Zero())
-    { }
+    {
+        assert(estimation_current_ > 0);
+    }
 
     /**
      * Must be invoked on every PWM period with appropriate measurements.
@@ -246,7 +247,14 @@ public:
             result_.r_ab = 0;
             result_.l_ab = 0;
 
-            switchState(State::PreRsMeasurement);
+            if (estimation_current_ > 0.1F)
+            {
+                switchState(State::PreRsMeasurement);
+            }
+            else
+            {
+                switchState(State::Finalization);       // Invalid settings
+            }
             break;
         }
 
