@@ -217,7 +217,7 @@ public:
                              Const pwm_period,
                              Const pwm_dead_time) :
         mode_(mode),
-        estimation_current_(initial_parameters.max_current * 0.5F),
+        estimation_current_(initial_parameters.max_current * 0.75F),
         Ls_current_frequency_(Ls_current_frequency),
         Phi_angular_velocity_(Phi_angular_velocity),
         pwm_period_(pwm_period),
@@ -438,10 +438,11 @@ public:
             }
             else if (state_ == State::PhiMeasurement)
             {
-                // Additional Iq filtering
-                state_variables_[IdxI] += 1e-3F * (currents_filter_.getValue().norm() - state_variables_[IdxI]);
+                Const current_magnitude = currents_filter_.getValue().norm();
 
-                if (currents_filter_.getValue()[0] < 0)
+                Const stop_detection_current_threshold = estimation_current_ * 0.1F;
+
+                if ((current_magnitude - state_variables_[IdxI]) > stop_detection_current_threshold)
                 {
                     // Negative Id means that the motor has just stopped; we're at the minimum current now
                     Const Uq = state_variables_[IdxVoltage];
@@ -455,6 +456,9 @@ public:
                 }
                 else
                 {
+                    // Additional Iq filtering
+                    state_variables_[IdxI] += 1e-3F * (current_magnitude - state_variables_[IdxI]);
+
                     // Minimum is not reached yet, continuing to decrease voltage
                     state_variables_[IdxVoltage] -=
                         (initial_voltage / PhiMeasurementFullRangeSweepDuration) * pwm_period_;
