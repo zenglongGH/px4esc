@@ -505,9 +505,10 @@ class PerformMotorIdentificationCommand : public os::shell::ICommandHandler
         }
 
         // Running
-        if (foc::getState() != foc::State::Idle)
+        if (foc::getState() != foc::State::Idle &&
+            foc::getState() != foc::State::Fault)
         {
-            ios.print("ERROR: Controller is not idle\n");
+            ios.print("ERROR: Invalid state\n");
             return;
         }
 
@@ -596,9 +597,10 @@ class HardwareTestCommand : public os::shell::ICommandHandler
         }
 
         // Running
-        if (foc::getState() != foc::State::Idle)
+        if (foc::getState() != foc::State::Idle &&
+            foc::getState() != foc::State::Fault)
         {
-            ios.print("ERROR: Controller is not idle\n");
+            ios.print("ERROR: Invalid state\n");
             return;
         }
 

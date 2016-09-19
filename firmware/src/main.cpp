@@ -229,6 +229,9 @@ os::watchdog::Timer init()
 
     os::lowsyslog("Observer params:\n%s\n", foc::getObserverParameters().toString().c_str());
 
+    // Initializing to Idle
+    foc::stop();
+
     /*
      * CLI initialization
      */
