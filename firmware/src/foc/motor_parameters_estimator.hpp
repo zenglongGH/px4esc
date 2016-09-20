@@ -242,6 +242,8 @@ public:
     Vector<3> onNextPWMPeriod(const Vector<2>& phase_currents_ab,
                               Const inverter_voltage)
     {
+        static constexpr int PhaseIndexC = 2;
+
         Vector<3> pwm_vector = Vector<3>::Ones() * 0.5F;
 
         time_ += pwm_period_;
@@ -269,17 +271,13 @@ public:
         {
             currents_filter_.update(phase_currents_ab);
 
-            /*
-             * Slowly increasing the voltage until we've reached the required current.
-             * Note that we're using phase B instead of A in order to heat up the motor more uniformly
-             * and also to check correct operation of both phases.
-             */
-            if (currents_filter_.getValue()[1] < estimation_current_)
+            // Slowly increasing the voltage until we've reached the required current.
+            if (currents_filter_.getValue().sum() < estimation_current_)
             {
                 constexpr Scalar OhmPerSec = 0.1F;
 
                 result_.r_ab = std::max(MotorParameters::getRabLimits().min,
-                                        result_.r_ab + OhmPerSec * pwm_period_);    // Very rough initial estimation
+                                        result_.r_ab + OhmPerSec * pwm_period_);    // Very coarse initial estimation
             }
             else
             {
@@ -292,7 +290,7 @@ public:
             if ((relative_voltage < (PWMLimit - 0.5F)) &&
                 MotorParameters::getRabLimits().contains(result_.r_ab))
             {
-                pwm_vector[1] += relative_voltage;
+                pwm_vector[PhaseIndexC] -= relative_voltage;
             }
             else
             {
@@ -305,16 +303,20 @@ public:
 
         case State::RsMeasurement:
         {
+            static constexpr Scalar ValidCurrentThreshold = 1e-3F;
+
             /*
              * Precise resistance measurement.
              * We're using the rough measurement in order to maintain the requested current, more or less.
              */
             Const voltage = computeLineVoltageForResistanceMeasurement(estimation_current_, result_.r_ab);
-            pwm_vector[0] += computeRelativePhaseVoltage(voltage, inverter_voltage);
+            pwm_vector[PhaseIndexC] -= computeRelativePhaseVoltage(voltage, inverter_voltage);
 
-            if (phase_currents_ab[0] > 1e-3F)
+            Const phase_c_current = phase_currents_ab.sum();
+
+            if (phase_c_current > ValidCurrentThreshold)
             {
-                averager_.addSample(double(voltage / phase_currents_ab[0]) * (2.0 / 3.0));
+                averager_.addSample(double(voltage / phase_c_current) * (2.0 / 3.0));
             }
 
             if (getTimeSinceStateSwitch() > RsMeasurementDuration)
