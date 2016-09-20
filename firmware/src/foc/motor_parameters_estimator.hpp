@@ -438,31 +438,34 @@ public:
             }
             else if (state_ == State::PhiMeasurement)
             {
-                Const current_magnitude = currents_filter_.getValue().norm();
+                Const Uq = state_variables_[IdxVoltage];
+                Const I  = state_variables_[IdxI];
+                Const w  = state_variables_[IdxAngVel];
+                Const Rs = result_.r_ab / 2.0F;
 
-                //Const stop_detection_current_threshold = estimation_current_ * 0.1F;
+                Const new_phi = (Uq - I * Rs) / w;
 
-                //if (std::abs(current_magnitude - state_variables_[IdxI]) > stop_detection_current_threshold)
-                if (currents_filter_.getValue()[0] < 0)
+                if (result_.phi > 0)
                 {
-                    Const Uq = state_variables_[IdxVoltage];
-                    Const I  = state_variables_[IdxI];
-                    Const w  = state_variables_[IdxAngVel];
-                    Const Rs = result_.r_ab / 2.0F;
+                    result_.phi = std::min(result_.phi, new_phi);
+                }
+                else
+                {
+                    result_.phi = new_phi;
+                }
 
-                    result_.phi = (Uq - I * Rs) / w;
+                Const stop_detection_current_threshold = estimation_current_ * 0.1F;
 
+                if (std::abs(currents_filter_.getValue().norm() - state_variables_[IdxI]) >
+                    stop_detection_current_threshold)
+                {
                     switchState(State::Finalization);
                 }
                 else
                 {
-                    // Additional Iq filtering
-                    state_variables_[IdxI] += 1e-3F * (current_magnitude - state_variables_[IdxI]);
-
                     // Minimum is not reached yet, continuing to decrease voltage
                     state_variables_[IdxVoltage] -=
                         (initial_voltage / PhiMeasurementFullRangeSweepDuration) * pwm_period_;
-
                 }
             }
             else
@@ -475,6 +478,9 @@ public:
                 state_ == State::PhiMeasurementAcceleration ||
                 state_ == State::PhiMeasurement)
             {
+                // Additional Iq filtering
+                state_variables_[IdxI] += 1e-3F * (currents_filter_.getValue().norm() - state_variables_[IdxI]);
+
                 Const max_voltage = inverter_voltage * 0.8F;
 
                 const math::Range<> voltage_range(0.1F, max_voltage);
