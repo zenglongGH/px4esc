@@ -475,8 +475,7 @@ public:
                 state_ == State::PhiMeasurementAcceleration ||
                 state_ == State::PhiMeasurement)
             {
-                // In SVM we multiply the 3-phase voltage vector to 2/sqrt(3), therefore here we need to adjust for that
-                Const max_voltage = inverter_voltage * (SquareRootOf3 / 2.0F) * 0.8F;
+                Const max_voltage = inverter_voltage * 0.8F;
 
                 const math::Range<> voltage_range(0.1F, max_voltage);
 

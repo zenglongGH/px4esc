@@ -81,6 +81,14 @@ public:
 template <unsigned IdqMovingAverageLength>
 class ThreePhaseVoltageModulator
 {
+    /*
+     * This constant limits the maximum PWM value.
+     * Exceeding this value may cause the ADC samples to occur at the moment when FET are switching,
+     * which leads to incorrect measurements.
+     * TODO: This parameter is heavily hardware-dependent, so it should be provided by the board driver.
+     */
+    static constexpr Scalar PWMLimit = 0.8F;
+
     Const dt_;
 
     CurrentPIController pid_Id_;
@@ -140,8 +148,7 @@ public:
                                                       out.estimated_Idq[1],
                                                       inverter_voltage);
 
-        // In SVM we multiply the 3-phase voltage vector to 2/sqrt(3), therefore here we need to adjust for that
-        Const Udq_magnitude_limit = inverter_voltage * (SquareRootOf3 / 2.0F) * 0.9F;
+        Const Udq_magnitude_limit = inverter_voltage * PWMLimit;
 
         if (out.reference_Udq.norm() > Udq_magnitude_limit)
         {
