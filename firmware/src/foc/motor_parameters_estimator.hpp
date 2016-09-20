@@ -63,13 +63,20 @@ enum class MotorIdentificationMode
  */
 class MotorParametersEstimator
 {
-    static constexpr Scalar RsPreMeasurementTimeout     = 30.0F;
     static constexpr Scalar RsMeasurementDuration       = 15.0F;
     static constexpr Scalar LsMeasurementDuration       = 15.0F;
 
     static constexpr Scalar PhiMeasurementFullRangeSweepDuration = 15.0F;
 
     static constexpr unsigned IdqMovingAverageLength = 5;
+
+    /*
+     * This constant limits the maximum PWM value.
+     * Exceeding this value may cause the ADC samples to occur at the moment when FET are switching,
+     * which leads to incorrect measurements.
+     * TODO: This parameter is heavily hardware-dependent, so it should be provided by the board driver.
+     */
+    static constexpr Scalar PWMLimit = 0.8F;
 
     class Averager
     {
@@ -262,40 +269,36 @@ public:
         {
             currents_filter_.update(phase_currents_ab);
 
-            if (getTimeSinceStateSwitch() > RsPreMeasurementTimeout)
+            /*
+             * Slowly increasing the voltage until we've reached the required current.
+             * Note that we're using phase B instead of A in order to heat up the motor more uniformly
+             * and also to check correct operation of both phases.
+             */
+            if (currents_filter_.getValue()[1] < estimation_current_)
             {
-                result_.r_ab = 0;                       // Failed - timeout
-                switchState(State::Finalization);
+                constexpr Scalar OhmPerSec = 0.1F;
+
+                result_.r_ab = std::max(MotorParameters::getRabLimits().min,
+                                        result_.r_ab + OhmPerSec * pwm_period_);    // Very rough initial estimation
             }
             else
             {
-                /*
-                 * Slowly increasing the voltage until we've reached the required current.
-                 * Note that we're using phase B instead of A in order to heat up the motor more uniformly
-                 * and also to check correct operation of both phases.
-                 */
-                if (currents_filter_.getValue()[1] < estimation_current_)
-                {
-                    constexpr Scalar OhmPerSec = 0.1F;
-                    result_.r_ab += OhmPerSec * pwm_period_;    // Very rough initial estimation
-                }
-                else
-                {
-                    switchState(State::RsMeasurement);
-                }
+                switchState(State::RsMeasurement);
+            }
 
-                Const voltage = computeLineVoltageForResistanceMeasurement(estimation_current_, result_.r_ab);
-                Const relative_voltage = computeRelativePhaseVoltage(voltage, inverter_voltage);
-                if (relative_voltage < 0.4F)
-                {
-                    pwm_vector[1] += relative_voltage;
-                }
-                else
-                {
-                    // Voltage is too high, aborting
-                    result_.r_ab = 0;
-                    switchState(State::Finalization);
-                }
+            Const voltage = computeLineVoltageForResistanceMeasurement(estimation_current_, result_.r_ab);
+            Const relative_voltage = computeRelativePhaseVoltage(voltage, inverter_voltage);
+
+            if ((relative_voltage < (PWMLimit - 0.5F)) &&
+                MotorParameters::getRabLimits().contains(result_.r_ab))
+            {
+                pwm_vector[1] += relative_voltage;
+            }
+            else
+            {
+                // Voltage or resistance is too high, aborting
+                result_.r_ab = 0;
+                switchState(State::Finalization);
             }
             break;
         }
