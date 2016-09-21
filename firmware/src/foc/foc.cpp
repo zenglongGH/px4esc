@@ -159,7 +159,8 @@ struct Context
                   stator_phase_resistance,
                   max_current,
                   pwm_period,
-                  pwm_dead_time)
+                  pwm_dead_time,
+                  modulator.DeadTimeCompensationPolicy::Disabled)
     { }
 };
 

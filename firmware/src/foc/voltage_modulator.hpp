@@ -80,6 +80,14 @@ public:
 template <unsigned IdqMovingAverageLength>
 class ThreePhaseVoltageModulator
 {
+public:
+    enum class DeadTimeCompensationPolicy
+    {
+        Disabled,
+        Enabled
+    };
+
+private:
     /*
      * This constant limits the maximum PWM value.
      * Exceeding this value may cause the ADC samples to occur at the moment when FET are switching,
@@ -87,6 +95,8 @@ class ThreePhaseVoltageModulator
      * TODO: This parameter is heavily hardware-dependent, so it should be provided by the board driver.
      */
     static constexpr Scalar PWMLimit = 0.8F;
+
+    const DeadTimeCompensationPolicy dead_time_compensation_policy_;
 
     Const pwm_period_;
     Const pwm_dead_time_;
@@ -111,7 +121,9 @@ public:
                                Const stator_phase_resistance,
                                Const max_current,
                                Const pwm_period,
-                               Const pwm_dead_time) :
+                               Const pwm_dead_time,
+                               const DeadTimeCompensationPolicy dtcomp_policy) :
+        dead_time_compensation_policy_(dtcomp_policy),
         pwm_period_(pwm_period),
         pwm_dead_time_(pwm_dead_time),
         pid_Id_(stator_phase_inductance, stator_phase_resistance, max_current, pwm_period),
@@ -168,10 +180,17 @@ public:
         const auto pwm_setpoint_and_sector_number = performSpaceVectorTransform(reference_U_alpha_beta,
                                                                                 inverter_voltage);
         // Sector number is not used
-        out.pwm_setpoint = performDeadTimeCompensation(pwm_setpoint_and_sector_number.first,
-                                                       phase_currents_ab,
-                                                       pwm_period_,
-                                                       pwm_dead_time_);
+        if (dead_time_compensation_policy_ == DeadTimeCompensationPolicy::Enabled)
+        {
+            out.pwm_setpoint = performDeadTimeCompensation(pwm_setpoint_and_sector_number.first,
+                                                           phase_currents_ab,
+                                                           pwm_period_,
+                                                           pwm_dead_time_);
+        }
+        else
+        {
+            out.pwm_setpoint = pwm_setpoint_and_sector_number.first;
+        }
 
         out.extrapolated_angular_position = constrainAngularPosition(angular_position + angular_velocity * pwm_period_);
 

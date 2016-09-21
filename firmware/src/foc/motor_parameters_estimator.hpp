@@ -112,8 +112,10 @@ class MotorParametersEstimator
 
     class VoltageModulatorWrapper       // This is such a massive reinvented wheel. Do something about it.
     {
+    public:
         using Modulator = ThreePhaseVoltageModulator<IdqMovingAverageLength>;
 
+    private:
         // Poor man's aligned storage
         alignas(Modulator) std::uint8_t storage_[sizeof(Modulator)];
         Modulator* modulator_ = nullptr;
@@ -352,7 +354,8 @@ public:
                                             result_.r_ab / 2.0F,
                                             estimation_current_,
                                             pwm_period_,
-                                            pwm_dead_time_);
+                                            pwm_dead_time_,
+                                            VoltageModulatorWrapper::Modulator::DeadTimeCompensationPolicy::Disabled);
             // Ourowrapos - a wrapper that wraps itself.
             switchState(State::LsMeasurement);
             break;
@@ -508,10 +511,8 @@ public:
 
                     const auto uncompensated = performSpaceVectorTransform(Uab, inverter_voltage).first;
 
-                    pwm_vector = performDeadTimeCompensation(uncompensated,
-                                                             phase_currents_ab,
-                                                             pwm_period_,
-                                                             pwm_dead_time_);
+                    // Compensation is not used because it underperforms at low currents
+                    pwm_vector = uncompensated;
                 }
                 else
                 {
