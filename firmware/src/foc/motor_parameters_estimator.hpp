@@ -66,7 +66,9 @@ class MotorParametersEstimator
     static constexpr Scalar RsMeasurementDuration       = 15.0F;
     static constexpr Scalar LsMeasurementDuration       = 15.0F;
 
-    static constexpr Scalar PhiMeasurementFullRangeSweepDuration = 15.0F;
+    // Voltage reduction during the measurement phase shold be very slow in order to
+    // reduce phase delay of the current filter.
+    static constexpr Scalar PhiMeasurementFullRangeSweepDuration = 30.0F;
 
     static constexpr unsigned IdqMovingAverageLength = 5;
 
@@ -464,7 +466,10 @@ public:
                 Const dIdt = (state_variables_[IdxI] - prev_I) / pwm_period_;
 
                 // TODO: we could automatically learn the worst case di/dt after the acceleration phase?
-                Const dIdt_threshold = prev_I * 5.0F;
+                // 2 - triggers false positive
+                // 3 - works fine
+                // 6 - works fine
+                Const dIdt_threshold = prev_I * 4.0F;
 
                 if (dIdt > dIdt_threshold)
                 {
@@ -515,7 +520,7 @@ public:
         case State::Finalization:
         {
             pwm_vector.setZero();
-            switchState(State::Finished);
+            switchState(State::Finished, true); // Retaining last variables for debugging purposes
             break;
         }
 
