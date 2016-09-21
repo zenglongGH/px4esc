@@ -351,7 +351,8 @@ public:
             voltage_modulator_wrapper_.init(OneSizeFitsAllLab / 2.0F,
                                             result_.r_ab / 2.0F,
                                             estimation_current_,
-                                            pwm_period_);
+                                            pwm_period_,
+                                            pwm_dead_time_);
             // Ourowrapos - a wrapper that wraps itself.
             switchState(State::LsMeasurement);
             break;
@@ -361,11 +362,11 @@ public:
         {
             Const w = Ls_current_frequency_ * (math::Pi * 2.0F);
 
-            const auto output = voltage_modulator_wrapper_.access().update(phase_currents_ab,
-                                                                           inverter_voltage,
-                                                                           w,
-                                                                           state_variables_[0],
-                                                                           estimation_current_);
+            const auto output = voltage_modulator_wrapper_.access().onNextPWMPeriod(phase_currents_ab,
+                                                                                    inverter_voltage,
+                                                                                    w,
+                                                                                    state_variables_[0],
+                                                                                    estimation_current_);
 
             state_variables_[0] = output.extrapolated_angular_position;
             pwm_vector = output.pwm_setpoint;
@@ -505,7 +506,12 @@ public:
                                                                  math::sin(state_variables_[IdxAngPos]),
                                                                  math::cos(state_variables_[IdxAngPos]));
 
-                    pwm_vector = performSpaceVectorTransform(Uab, inverter_voltage).first;
+                    const auto uncompensated = performSpaceVectorTransform(Uab, inverter_voltage).first;
+
+                    pwm_vector = performDeadTimeCompensation(uncompensated,
+                                                             phase_currents_ab,
+                                                             pwm_period_,
+                                                             pwm_dead_time_);
                 }
                 else
                 {

@@ -88,7 +88,8 @@ class ThreePhaseVoltageModulator
      */
     static constexpr Scalar PWMLimit = 0.8F;
 
-    Const dt_;
+    Const pwm_period_;
+    Const pwm_dead_time_;
 
     CurrentPIController pid_Id_;
     CurrentPIController pid_Iq_;
@@ -109,14 +110,16 @@ public:
     ThreePhaseVoltageModulator(Const stator_phase_inductance,
                                Const stator_phase_resistance,
                                Const max_current,
-                               Const update_period) :
-        dt_(update_period),
-        pid_Id_(stator_phase_inductance, stator_phase_resistance, max_current, update_period),
-        pid_Iq_(stator_phase_inductance, stator_phase_resistance, max_current, update_period),
+                               Const pwm_period,
+                               Const pwm_dead_time) :
+        pwm_period_(pwm_period),
+        pwm_dead_time_(pwm_dead_time),
+        pid_Id_(stator_phase_inductance, stator_phase_resistance, max_current, pwm_period),
+        pid_Iq_(stator_phase_inductance, stator_phase_resistance, max_current, pwm_period),
         estimated_Idq_filter_(Vector<2>::Zero())
     { }
 
-    Output update(const Vector<2>& phase_currents_ab,
+    Output onNextPWMPeriod(const Vector<2>& phase_currents_ab,
                   Const inverter_voltage,
                   Const angular_velocity,
                   Const angular_position,
@@ -165,9 +168,12 @@ public:
         const auto pwm_setpoint_and_sector_number = performSpaceVectorTransform(reference_U_alpha_beta,
                                                                                 inverter_voltage);
         // Sector number is not used
-        out.pwm_setpoint = pwm_setpoint_and_sector_number.first;
+        out.pwm_setpoint = performDeadTimeCompensation(pwm_setpoint_and_sector_number.first,
+                                                       phase_currents_ab,
+                                                       pwm_period_,
+                                                       pwm_dead_time_);
 
-        out.extrapolated_angular_position = constrainAngularPosition(angular_position + angular_velocity * dt_);
+        out.extrapolated_angular_position = constrainAngularPosition(angular_position + angular_velocity * pwm_period_);
 
         return out;
     }

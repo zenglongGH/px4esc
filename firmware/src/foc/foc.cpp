@@ -147,7 +147,8 @@ struct Context
             Const stator_phase_inductance,
             Const stator_phase_resistance,
             Const max_current,
-            Const fast_irq_period) :
+            Const pwm_period,
+            Const pwm_dead_time) :
         current_limit(-max_current, max_current),
         observer(observer_params,
                  field_flux,
@@ -157,7 +158,8 @@ struct Context
         modulator(stator_phase_inductance,
                   stator_phase_resistance,
                   max_current,
-                  fast_irq_period)
+                  pwm_period,
+                  pwm_dead_time)
     { }
 };
 
@@ -177,7 +179,8 @@ void initializeContext()
                                               Ls,
                                               Rs,
                                               g_motor_params.max_current,
-                                              board::motor::getPWMPeriod());
+                                              board::motor::getPWMPeriod(),
+                                              board::motor::getPWMDeadTime());
 }
 
 void doStop()
@@ -650,11 +653,11 @@ void handleFastIRQ(Const period,
     if (g_state == State::Running ||
         g_state == State::Spinup)
     {
-        const auto output = g_context->modulator.update(phase_currents_ab,
-                                                        inverter_voltage,
-                                                        g_context->angular_velocity,
-                                                        g_context->angular_position,
-                                                        g_context->reference_Iq);
+        const auto output = g_context->modulator.onNextPWMPeriod(phase_currents_ab,
+                                                                 inverter_voltage,
+                                                                 g_context->angular_velocity,
+                                                                 g_context->angular_position,
+                                                                 g_context->reference_Iq);
 
         g_pwm_handle.setPWM(output.pwm_setpoint);
 

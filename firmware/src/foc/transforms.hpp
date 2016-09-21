@@ -117,6 +117,33 @@ performSpaceVectorTransform(const Vector<2>& alpha_beta_voltage,
 }
 
 /**
+ * Accepts a PWM setpoint vector in [0, 1], returns corrected PWM setpoint.
+ */
+inline Vector<3> performDeadTimeCompensation(Vector<3> pwm_setpoint,
+                                             const Vector<2>& phase_currents_ab,
+                                             Const pwm_period,
+                                             Const pwm_dead_time)
+{
+    static constexpr math::Range<> PWMRange(0.0F, 1.0F);
+
+    Const currents[3] =
+    {
+        phase_currents_ab[0],
+        phase_currents_ab[1],
+       -phase_currents_ab.sum(),
+    };
+
+    Const correction = (pwm_dead_time / pwm_period) * 0.5F;
+
+    for (unsigned i = 0; i < 3; i++)
+    {
+        pwm_setpoint[i] = PWMRange.constrain(pwm_setpoint[i] + std::copysign(correction, currents[i]));
+    }
+
+    return pwm_setpoint;
+}
+
+/**
  * Simplified Clarke transformation for balanced systems.
  * Overview: https://en.wikipedia.org/wiki/Alpha%E2%80%93beta_transformation
  *
