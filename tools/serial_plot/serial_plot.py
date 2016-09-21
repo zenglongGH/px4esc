@@ -71,6 +71,8 @@ def add_crosshair(plot, render_measurements, color=Qt.gray):
 
 
 class RealtimePlotWidget(QWidget):
+    AUTO_RANGE_FRACTION = 0.99
+
     COLORS = [Qt.red, Qt.blue, Qt.green, Qt.magenta, Qt.cyan,
               Qt.darkRed, Qt.darkBlue, Qt.darkGreen, Qt.darkYellow, Qt.gray]
 
@@ -81,7 +83,6 @@ class RealtimePlotWidget(QWidget):
         self._plot_widget.setBackground((0, 0, 0))
         self._legend = self._plot_widget.addLegend()
         self._plot_widget.showButtons()
-        self._plot_widget.enableAutoRange()
         self._plot_widget.showGrid(x=True, y=True, alpha=0.3)
         vbox = QVBoxLayout(self)
         vbox.addWidget(self._plot_widget)
@@ -111,6 +112,9 @@ class RealtimePlotWidget(QWidget):
         display_measurements('Hover to sample Time/Y, click to set new reference')
         add_crosshair(self._plot_widget, _render_measurements)
 
+        # Final reset
+        self.reset()
+
     def add_curve(self, curve_id, curve_name, data_x=[], data_y=[]):
         color = QColor(self.COLORS[self._color_index % len(self.COLORS)])
         self._color_index += 1
@@ -127,7 +131,9 @@ class RealtimePlotWidget(QWidget):
         self._curves = {}
         self._color_index = 0
 
-        self._plot_widget.enableAutoRange()
+        self._plot_widget.enableAutoRange(enable=self.AUTO_RANGE_FRACTION,
+                                          x=self.AUTO_RANGE_FRACTION,
+                                          y=self.AUTO_RANGE_FRACTION)
 
         self._legend.scene().removeItem(self._legend)
         self._legend = self._plot_widget.addLegend()
