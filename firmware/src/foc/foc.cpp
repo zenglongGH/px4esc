@@ -23,7 +23,6 @@
  */
 
 #include "foc.hpp"
-#include "svm.hpp"
 #include "pid.hpp"
 #include "transforms.hpp"
 #include "voltage_modulator.hpp"

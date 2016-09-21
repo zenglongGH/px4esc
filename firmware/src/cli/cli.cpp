@@ -34,7 +34,7 @@
 #include <zubax_chibios/util/base64.hpp>
 
 #include <foc/foc.hpp>
-#include <foc/svm.hpp>
+#include <foc/transforms.hpp>
 #include <motor_database/motor_database.hpp>
 
 #include <cstdlib>

@@ -26,7 +26,6 @@
 
 #include "common.hpp"
 #include "transforms.hpp"
-#include "svm.hpp"
 #include <math/math.hpp>
 #include <cassert>
 

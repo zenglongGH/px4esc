@@ -204,7 +204,7 @@ os::watchdog::Timer init()
 
     // TODO Motor parameter initialization should go here
     {
-        foc::MotorParameters motor_params = motor_database::getByName("T-Motor MT2216-12").parameters;
+        foc::MotorParameters motor_params = motor_database::getByName("Maxon 339285").parameters;
 
         foc::setMotorParameters(motor_params);
     }
