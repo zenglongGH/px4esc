@@ -38,13 +38,12 @@ namespace foc
  */
 struct MotorParameters
 {
+    Scalar nominal_spinup_duration = 0; ///< Preferred duration of spinup, real duration may slightly differ, seconds
+    Scalar min_electrical_ang_vel = 0;  ///< Min electric angular velocity for stable operation, radian/second
+
     Scalar min_current = 0;             ///< Min phase current for stable observer operation, Ampere
     Scalar max_current = 0;             ///< Max phase current, Ampere
     Scalar spinup_current = 0;          ///< Initial current applied at spinup, Ampere
-
-    Scalar nominal_spinup_duration = 0; ///< Preferred duration of spinup, real duration may slightly differ, seconds
-
-    Scalar min_electrical_ang_vel = 0;  ///< Min electric angular velocity for stable operation, radian/second
 
     Scalar phi = 0;                     ///< Magnetic field flux linkage, Weber
     Scalar r_ab = 0;                    ///< Phase-to-phase resistance, Ohm
@@ -76,11 +75,11 @@ struct MotorParameters
     {
         static const auto is_positive = [](Const x) { return (x > 0) && std::isfinite(x); };
 
-        return is_positive(min_current)                 &&
+        return is_positive(nominal_spinup_duration)     &&
+               is_positive(min_electrical_ang_vel)      &&
+               is_positive(min_current)                 &&
                is_positive(max_current)                 &&
                is_positive(spinup_current)              &&
-               is_positive(nominal_spinup_duration)     &&
-               is_positive(min_electrical_ang_vel)      &&
                getPhiLimits().contains(phi)             &&
                getRabLimits().contains(r_ab)            &&
                getLabLimits().contains(l_ab)            &&
@@ -108,22 +107,22 @@ struct MotorParameters
                                                                  num_poles);
         }
 
-        return os::heapless::format("Imin : %-7.1f A\n"
+        return os::heapless::format("Tspup: %-7.1f s\n"
+                                    "Wmin : %-7.1f Rad/s, %.1f MRPM\n"
+                                    "Imin : %-7.1f A\n"
                                     "Imax : %-7.1f A\n"
                                     "Ispup: %-7.1f A\n"
-                                    "Tspup: %-7.1f s\n"
-                                    "Wmin : %-7.1f Rad/s, %.1f MRPM\n"
                                     "Phi  : %-7.3f mWb\n"
                                     "Rab  : %-7.3f Ohm\n"
                                     "Lab  : %-7.3f uH\n"
                                     "Npols: %u, %.1f MRPM/V\n"
                                     "Valid: %s",
-                                    double(min_current),
-                                    double(max_current),
-                                    double(spinup_current),
                                     double(nominal_spinup_duration),
                                     double(min_electrical_ang_vel),
                                     double(min_mrpm),
+                                    double(min_current),
+                                    double(max_current),
+                                    double(spinup_current),
                                     double(phi) * 1e3,
                                     double(r_ab),
                                     double(l_ab) * 1e6,
