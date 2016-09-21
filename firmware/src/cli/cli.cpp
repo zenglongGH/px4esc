@@ -427,6 +427,13 @@ class SetpointCommand : public os::shell::ICommandHandler
             while (ios.getChar(0) <= 0)
             {
                 foc::plotRealTimeValues();
+
+                const auto state = foc::getState();
+                if (state != foc::State::Running &&
+                    state != foc::State::Spinup)
+                {
+                    break;
+                }
             }
 
             foc::stop();
