@@ -106,7 +106,7 @@ public:
             std::copy(std::begin(vars_), std::end(vars_), std::begin(vars_copy));
         }
 
-        std::printf("$%.4f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
+        std::printf("$%.4f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
                     double(pwm_cycles) * double(board::motor::getPWMPeriod()),
                     double(vars_copy[0]),
                     double(vars_copy[1]),
@@ -727,8 +727,8 @@ void handleFastIRQ(Const period,
             g_debug_tracer.set<1>(estimator->getStateVariables()[1]);
             g_debug_tracer.set<2>(estimator->getStateVariables()[2]);
             g_debug_tracer.set<3>(estimator->getStateVariables()[3]);
-            g_debug_tracer.set<4>(filtered_currents[0]);
-            g_debug_tracer.set<5>(filtered_currents[1]);
+            g_debug_tracer.set<4>(estimator->getStateVariables()[4]);
+            g_debug_tracer.set<5>(filtered_currents[0]);
             g_debug_tracer.set<6>(filtered_currents.norm());
         }
         else

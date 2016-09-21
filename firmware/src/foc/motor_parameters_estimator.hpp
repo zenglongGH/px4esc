@@ -173,7 +173,7 @@ class MotorParametersEstimator
     Averager averager_;
     Averager averager_2_;
 
-    std::array<Scalar, 4> state_variables_{};
+    std::array<Scalar, 5> state_variables_{};
 
     math::SimpleMovingAverageFilter<500, Vector<2>> currents_filter_;
 
@@ -420,14 +420,16 @@ public:
                                                   math::cos(state_variables_[IdxAngPos]));
             currents_filter_.update(Idq);
 
+            // Additional Iq filtering
+            Const prev_I = state_variables_[IdxI];
+            state_variables_[IdxI] += pwm_period_ * 10.0F *
+                (currents_filter_.getValue().norm() - state_variables_[IdxI]);
+
             if (state_ == State::PhiMeasurementInitialization)
             {
                 result_.phi = 0;
 
                 state_variables_[IdxVoltage] = initial_voltage;
-                state_variables_[IdxAngVel] = 0;
-                state_variables_[IdxAngPos] = 0;
-                state_variables_[IdxI] = 0;
 
                 switchState(State::PhiMeasurementAcceleration, true);
             }
@@ -459,16 +461,18 @@ public:
                     result_.phi = new_phi;
                 }
 
-                Const stop_detection_current_threshold = estimation_current_ * 0.1F;
+                Const dIdt = (state_variables_[IdxI] - prev_I) / pwm_period_;
 
-                if (std::abs(currents_filter_.getValue().norm() - state_variables_[IdxI]) >
-                    stop_detection_current_threshold)
+                // TODO: we could automatically learn the worst case di/dt after the acceleration phase?
+                Const dIdt_threshold = prev_I * 5.0F;
+
+                if (dIdt > dIdt_threshold)
                 {
                     switchState(State::Finalization);
                 }
                 else
                 {
-                    // Minimum is not reached yet, continuing to decrease voltage
+                    // Minimum is not reached yet, continuing to reduce voltage
                     state_variables_[IdxVoltage] -=
                         (initial_voltage / PhiMeasurementFullRangeSweepDuration) * pwm_period_;
                 }
@@ -483,9 +487,6 @@ public:
                 state_ == State::PhiMeasurementAcceleration ||
                 state_ == State::PhiMeasurement)
             {
-                // Additional Iq filtering
-                state_variables_[IdxI] += 1e-3F * (currents_filter_.getValue().norm() - state_variables_[IdxI]);
-
                 Const max_voltage = inverter_voltage * 0.8F;
 
                 const math::Range<> voltage_range(0.1F, max_voltage);
@@ -508,7 +509,6 @@ public:
                     switchState(State::Finalization);
                 }
             }
-
             break;
         }
 
