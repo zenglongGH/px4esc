@@ -35,6 +35,7 @@
 
 #include <foc/foc.hpp>
 #include <foc/svm.hpp>
+#include <motor_database/motor_database.hpp>
 
 #include <cstdlib>
 #include <unistd.h>
@@ -542,7 +543,7 @@ class KVConvertCommand : public os::shell::ICommandHandler
 
     void execute(os::shell::BaseChannelWrapper& ios, int argc, char** argv) override
     {
-        if (argc < 2)
+        if (argc < 3)
         {
             ios.print("Usage: %s <KV [MRPM/V] | field-flix-linkage [mWb]> <num-poles>\n", argv[0]);
             ios.print("Where: KV is in MRPM/V (MRPM - mechanical RPM),\n"
@@ -630,6 +631,85 @@ class HardwareTestCommand : public os::shell::ICommandHandler
 } static cmd_hardware_test;
 
 
+class MotorDatabaseCommand : public os::shell::ICommandHandler
+{
+    const char* getName() const override { return "motor_db"; }
+
+    void execute(os::shell::BaseChannelWrapper& ios, int argc, char** argv) override
+    {
+        if (argc < 2)
+        {
+            ios.puts("Use this command to access the built-in motor database.");
+            ios.print("Usage: %s (list|show|use) <entry-index>\n", argv[0]);
+            ios.puts("Where: Entry index is a natural number.\n"
+                     "       'list' prints all known motor profiles.\n"
+                     "       'show' displays the specified motor profile, if such exists.\n"
+                     "       'use' applies the specified motor profile.");
+            return;
+        }
+
+        // This is weird but it greatly conserves stack.
+        static const auto print = [](os::shell::BaseChannelWrapper& ios, auto item)
+        {
+            ios.puts(item.toString().c_str());
+        };
+
+        const auto command = os::heapless::String<40>(argv[1]);
+
+        if (command == "list")
+        {
+            for (unsigned index = 0; true; index++)
+            {
+                const auto entry = motor_database::getByIndex(index);
+                if (entry.isEmpty())
+                {
+                    break;
+                }
+                else
+                {
+                    if (index > 0)
+                    {
+                        ios.puts("");
+                    }
+                    ios.print("---------- Entry %02u ----------\n", index);
+                    print(ios, entry);
+                }
+            }
+        }
+        else if (command == "show" ||
+                 command == "use")
+        {
+            if (argc >= 3)
+            {
+                using namespace std;
+                const auto entry = motor_database::getByIndex(unsigned(atoi(argv[2])));
+                if (entry.isEmpty())
+                {
+                    ios.puts("Error: No such entry");
+                }
+                else
+                {
+                    print(ios, entry);
+                    if (command == "use")
+                    {
+                        foc::setMotorParameters(entry.parameters);
+                        ios.puts("Motor parameters updated.");
+                    }
+                }
+            }
+            else
+            {
+                ios.puts("Error: Missing entry index.");
+            }
+        }
+        else
+        {
+            ios.puts("Error: Invalid command.");
+        }
+    }
+} static cmd_motor_database;
+
+
 class CLIThread : public chibios_rt::BaseStaticThread<2048>
 {
     os::shell::Shell<20> shell_;
@@ -668,6 +748,7 @@ public:
         (void) shell_.addCommandHandler(&cmd_perform_motor_identification);
         (void) shell_.addCommandHandler(&cmd_kv_convert);
         (void) shell_.addCommandHandler(&cmd_hardware_test);
+        (void) shell_.addCommandHandler(&cmd_motor_database);
     }
 
     virtual ~CLIThread() { }

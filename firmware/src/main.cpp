@@ -35,6 +35,7 @@
 #include "uavcan_node/uavcan_node.hpp"
 #include "cli/cli.hpp"
 #include "foc/foc.hpp"
+#include "motor_database/motor_database.hpp"
 
 #if __GNUC__ < 5
 # error "GCC version 5.x or newer is required"
@@ -203,34 +204,7 @@ os::watchdog::Timer init()
 
     // TODO Motor parameter initialization should go here
     {
-        foc::MotorParameters motor_params;
-
-        motor_params.nominal_spinup_duration = 1.0F;
-        motor_params.min_electrical_ang_vel = 300.0F;
-
-        if (true)
-        {
-            // Maxon 339285 (http://www.maxonmotor.com/maxon/view/product/motor/ecmotor/ecflat/ecflat45/339285)
-            motor_params.min_current = 0.3F;
-            motor_params.max_current = 3.52F;
-            motor_params.spinup_current = 3.0F;
-            motor_params.phi = 0.001814F;
-            motor_params.r_ab = 0.464F;
-            motor_params.l_ab = 0.000322F;
-            motor_params.num_poles = 16;
-        }
-        else
-        {
-            // T-Motor MT2216-12
-            motor_params.min_current = 0.4F;
-            motor_params.max_current = 20.0F;
-            motor_params.spinup_current = 10.0F;
-            motor_params.phi = 0.001125F;
-            motor_params.r_ab = 0.28F;
-            motor_params.l_ab = 68e-6F;
-            motor_params.num_poles = 14;
-        }
-
+        foc::MotorParameters motor_params = motor_database::getByName("T-Motor MT2216-12").parameters;
 
         foc::setMotorParameters(motor_params);
     }
