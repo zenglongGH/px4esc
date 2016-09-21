@@ -424,7 +424,7 @@ class SetpointCommand : public os::shell::ICommandHandler
                 ;   // Clearing the input buffer
             }
 
-            while (ios.getChar(1) <= 0)
+            while (ios.getChar(0) <= 0)
             {
                 foc::plotRealTimeValues();
             }
@@ -519,7 +519,6 @@ class PerformMotorIdentificationCommand : public os::shell::ICommandHandler
         {
             while (foc::getState() == foc::State::MotorIdentification)
             {
-                ::usleep(100);
                 foc::plotRealTimeValues();
             }
             foc::plotRealTimeValues();
@@ -612,9 +611,9 @@ class HardwareTestCommand : public os::shell::ICommandHandler
         {
             while (foc::getState() == foc::State::HardwareTesting)
             {
-                ::usleep(100);
                 foc::plotRealTimeValues();
             }
+            foc::plotRealTimeValues();
         }
         else
         {
