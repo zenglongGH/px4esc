@@ -15,7 +15,7 @@ import serial
 import glob
 
 from PyQt5.QtWidgets import QVBoxLayout, QWidget, QApplication, QMainWindow, QAction
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QColor, QKeySequence
 
 try:
@@ -76,6 +76,7 @@ class RealtimePlotWidget(QWidget):
 
     def __init__(self, display_measurements, parent):
         super(RealtimePlotWidget, self).__init__(parent)
+        self.setAttribute(Qt.WA_DeleteOnClose)              # This is required to stop background timers!
         self._plot_widget = PlotWidget()
         self._plot_widget.setBackground((0, 0, 0))
         self._legend = self._plot_widget.addLegend()
@@ -85,6 +86,11 @@ class RealtimePlotWidget(QWidget):
         vbox = QVBoxLayout(self)
         vbox.addWidget(self._plot_widget)
         self.setLayout(vbox)
+
+        self._update_timer = QTimer(self)
+        self._update_timer.setSingleShot(False)
+        self._update_timer.timeout.connect(self._update)
+        self._update_timer.start(200)
 
         self._color_index = 0
         self._curves = {}
@@ -112,7 +118,7 @@ class RealtimePlotWidget(QWidget):
         plot = self._plot_widget.plot(name=curve_name, pen=pen)
         data_x = numpy.array(data_x)
         data_y = numpy.array(data_y)
-        self._curves[curve_id] = {'x': data_x, 'y': data_y, 'plot': plot}
+        self._curves[curve_id] = {'data': (data_x, data_y), 'plot': plot}
 
     def reset(self):
         for curve in self._curves.keys():
@@ -128,18 +134,13 @@ class RealtimePlotWidget(QWidget):
 
     def update_values(self, curve_id, x, y):
         curve = self._curves[curve_id]
-        curve['x'] = numpy.append(curve['x'], x)
-        curve['y'] = numpy.append(curve['y'], y)
+        old_x, old_y = curve['data']
+        curve['data'] = numpy.append(old_x, x), numpy.append(old_y, y)
 
-    def lazy_redraw(self, period):
-        timestamp = time.time()
-        if not hasattr(self, '_prev_lazy_redraw'):
-            self._prev_lazy_redraw = 0.0
-        if timestamp - self._prev_lazy_redraw > period:
-            self._prev_lazy_redraw = timestamp
-            for curve in self._curves.values():
-                if len(curve['x']):
-                    curve['plot'].setData(curve['x'], curve['y'])
+    def _update(self):
+        for curve in self._curves.values():
+            if len(curve['data'][0]):
+                curve['plot'].setData(*curve['data'])
 
 
 class Window(QMainWindow):
@@ -211,7 +212,6 @@ def value_handler(x, values):
             window.plot.update_values(i, [x], [val])
         except KeyError:
             window.plot.add_curve(i, str(i), [x], [val])
-    window.plot.lazy_redraw(0.2)
 
 
 app = QApplication(sys.argv)
