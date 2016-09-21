@@ -725,12 +725,12 @@ void handleFastIRQ(Const period,
 
             const auto filtered_currents = estimator->getCurrentsFilter().getValue();
 
-            g_debug_tracer.set<0>(estimator->getStateVariables()[0]);
-            g_debug_tracer.set<1>(estimator->getStateVariables()[1]);
-            g_debug_tracer.set<2>(estimator->getStateVariables()[2]);
-            g_debug_tracer.set<3>(estimator->getStateVariables()[3]);
-            g_debug_tracer.set<4>(estimator->getStateVariables()[4]);
-            g_debug_tracer.set<5>(filtered_currents[0]);
+            g_debug_tracer.set<0>(estimator->getStateVariables().at(0));
+            g_debug_tracer.set<1>(estimator->getStateVariables().at(1));
+            g_debug_tracer.set<2>(estimator->getStateVariables().at(2));
+            g_debug_tracer.set<3>(estimator->getStateVariables().at(3));
+            g_debug_tracer.set<4>(filtered_currents[0]);
+            g_debug_tracer.set<5>(filtered_currents[1]);
             g_debug_tracer.set<6>(filtered_currents.norm());
         }
         else

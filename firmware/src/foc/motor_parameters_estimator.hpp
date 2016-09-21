@@ -68,7 +68,7 @@ class MotorParametersEstimator
 
     // Voltage reduction during the measurement phase shold be very slow in order to
     // reduce phase delay of the current filter.
-    static constexpr Scalar PhiMeasurementFullRangeSweepDuration = 30.0F;
+    static constexpr Scalar PhiMeasurementVoltageSlopeLengthSec = 40.0F;
 
     static constexpr unsigned IdqMovingAverageLength = 5;
 
@@ -175,7 +175,7 @@ class MotorParametersEstimator
     Averager averager_;
     Averager averager_2_;
 
-    std::array<Scalar, 5> state_variables_{};
+    std::array<Scalar, 4> state_variables_{};
 
     math::SimpleMovingAverageFilter<500, Vector<2>> currents_filter_;
 
@@ -439,7 +439,7 @@ public:
             else if (state_ == State::PhiMeasurementAcceleration)
             {
                 state_variables_[IdxAngVel] +=
-                    (Phi_angular_velocity_ / PhiMeasurementFullRangeSweepDuration) * pwm_period_;
+                    (Phi_angular_velocity_ / (PhiMeasurementVoltageSlopeLengthSec / 2.0F)) * pwm_period_;
 
                 if (state_variables_[IdxAngVel] >= Phi_angular_velocity_)
                 {
@@ -480,7 +480,7 @@ public:
                 {
                     // Minimum is not reached yet, continuing to reduce voltage
                     state_variables_[IdxVoltage] -=
-                        (initial_voltage / PhiMeasurementFullRangeSweepDuration) * pwm_period_;
+                        (initial_voltage / PhiMeasurementVoltageSlopeLengthSec) * pwm_period_;
                 }
             }
             else
