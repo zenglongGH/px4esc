@@ -132,10 +132,10 @@ public:
     { }
 
     Output onNextPWMPeriod(const Vector<2>& phase_currents_ab,
-                  Const inverter_voltage,
-                  Const angular_velocity,
-                  Const angular_position,
-                  Const reference_Iq)
+                           Const inverter_voltage,
+                           Const angular_velocity,
+                           Const angular_position,
+                           Const reference_Iq)
     {
         Output out;
 

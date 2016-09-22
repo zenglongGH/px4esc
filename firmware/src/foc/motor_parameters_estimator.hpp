@@ -174,9 +174,7 @@ class MotorParametersEstimator
     Scalar time_ = 0;
     Scalar state_switched_at_ = 0;
 
-    Averager averager_;
-    Averager averager_2_;
-
+    std::array<Averager, 2> averagers_;
     std::array<Scalar, 4> state_variables_{};
 
     math::SimpleMovingAverageFilter<500, Vector<2>> currents_filter_;
@@ -188,11 +186,8 @@ class MotorParametersEstimator
 
         if (!retain_states)
         {
-            averager_ = Averager();
-            averager_2_ = Averager();
-
+            std::fill(std::begin(averagers_), std::end(averagers_), Averager());
             std::fill(std::begin(state_variables_), std::end(state_variables_), 0.0F);
-
             currents_filter_.reset(Vector<2>::Zero());
         }
     }
@@ -320,14 +315,14 @@ public:
 
             if (phase_c_current > ValidCurrentThreshold)
             {
-                averager_.addSample(double(voltage / phase_c_current) * (2.0 / 3.0));
+                averagers_[0].addSample(double(voltage / phase_c_current) * (2.0 / 3.0));
             }
 
             if (getTimeSinceStateSwitch() > RsMeasurementDuration)
             {
-                if (averager_.getNumSamples() > 100)
+                if (averagers_[0].getNumSamples() > 100)
                 {
-                    result_.r_ab = averager_.getAverage() * 2.0F;
+                    result_.r_ab = averagers_[0].getAverage() * 2.0F;
                 }
                 else
                 {
@@ -363,6 +358,9 @@ public:
 
         case State::LsMeasurement:
         {
+            auto& avg_Ud_rms = averagers_[0];
+            auto& avg_Uq_rms = averagers_[1];
+
             Const w = Ls_current_frequency_ * (math::Pi * 2.0F);
 
             const auto output = voltage_modulator_wrapper_.access().onNextPWMPeriod(phase_currents_ab,
@@ -374,24 +372,25 @@ public:
             state_variables_[0] = output.extrapolated_angular_position;
             pwm_vector = output.pwm_setpoint;
 
-            Const Ud = output.reference_Udq[0];
-            Const Iq = output.estimated_Idq[1];
+            avg_Ud_rms.addSample(output.reference_Udq[0] * output.reference_Udq[0]);
+            avg_Uq_rms.addSample(output.reference_Udq[1] * output.reference_Udq[1]);
 
-            averager_.addSample(Ud * Ud);
-            averager_2_.addSample(Iq * Iq);
+            // Saving internal states into the state variables to make them observable from outside, for debugging.
+            state_variables_[1] = output.reference_Udq[0];
+            state_variables_[2] = output.reference_Udq[1];
 
             if (getTimeSinceStateSwitch() > LsMeasurementDuration)
             {
-                Const Ud_squared = averager_.getAverage();
-                Const Iq_squared = averager_2_.getAverage();
-                Const w_squared = w * w;
+                // We're crunching very large numbers here, so we use double to avoid degradation of precision
+                Const RoverL = Scalar(std::sqrt((double(avg_Uq_rms.getAverage()) * double(w) * double(w)) /
+                                                double(avg_Ud_rms.getAverage())));
 
-                Const Ls = std::sqrt(Ud_squared / (w_squared * Iq_squared));
+                Const Ls = (result_.r_ab / 2.0F) / RoverL;
 
                 result_.l_ab = Ls * 2.0F;
 
                 if ((mode_ == MotorIdentificationMode::Static) ||
-                    (!MotorParameters::getLabLimits().contains(result_.l_ab)))
+                    !MotorParameters::getLabLimits().contains(result_.l_ab))
                 {
                     switchState(State::Finalization);
                 }
@@ -551,10 +550,20 @@ public:
     const MotorParameters& getEstimatedMotorParameters() const { return result_; }
 
     /**
-     * State accessors for debugging purposes.
+     * State accessor for debugging purposes.
      */
-    const auto& getStateVariables() const { return state_variables_; }
-    const auto& getCurrentsFilter() const { return currents_filter_; }
+    auto getDebugValues() const
+    {
+        std::array<Scalar, 7> out
+        {
+            state_variables_[0],
+            state_variables_[1],
+            state_variables_[2],
+            state_variables_[3]
+        };
+
+        return out;
+    }
 };
 
 }

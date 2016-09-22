@@ -45,7 +45,7 @@ namespace
  */
 constexpr unsigned IdqMovingAverageLength = 5;
 
-constexpr Scalar MotorIdentificationCurrentFrequency = 3000.0F;
+constexpr Scalar MotorIdentificationCurrentFrequency = 300.0F;
 constexpr Scalar MotorIdentificationPhiAngularVelocity = 150.0F;
 
 /*
@@ -91,6 +91,12 @@ public:
 #else
         (void) x;
 #endif
+    }
+
+    template <typename Container>
+    void set(const Container cont)
+    {
+        std::copy_n(std::begin(cont), std::min(cont.size(), NumVariables), std::begin(vars_));
     }
 
     void print() const
@@ -724,15 +730,7 @@ void handleFastIRQ(Const period,
                 }
             }
 
-            const auto filtered_currents = estimator->getCurrentsFilter().getValue();
-
-            g_debug_tracer.set<0>(estimator->getStateVariables().at(0));
-            g_debug_tracer.set<1>(estimator->getStateVariables().at(1));
-            g_debug_tracer.set<2>(estimator->getStateVariables().at(2));
-            g_debug_tracer.set<3>(estimator->getStateVariables().at(3));
-            g_debug_tracer.set<4>(filtered_currents[0]);
-            g_debug_tracer.set<5>(filtered_currents[1]);
-            g_debug_tracer.set<6>(filtered_currents.norm());
+            g_debug_tracer.set(estimator->getDebugValues());
         }
         else
         {
