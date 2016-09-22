@@ -572,13 +572,13 @@ class KVConvertCommand : public os::shell::ICommandHandler
 
         ios.print("Num poles: %d\n", int(num_poles));
 
-        ios.print("%.6f Wb --> %.1f MRPM/V \n",
-                  double(kv_mWb * 1e-3F),
+        ios.print("%.4f mWb --> %.1f MRPM/V \n",
+                  double(kv_mWb),
                   double(foc::convertFluxLinkageToKV(kv_mWb * 1e-3F, unsigned(num_poles))));
 
-        ios.print("%.1f MRPM/V --> %.6f Wb \n",
+        ios.print("%.1f MRPM/V --> %.4f mWb \n",
                   double(kv_mWb),
-                  double(foc::convertKVToFluxLinkage(kv_mWb, unsigned(num_poles))));
+                  double(foc::convertKVToFluxLinkage(kv_mWb, unsigned(num_poles))) * 1e3);
     }
 } static cmd_kv_convert;
 
