@@ -537,8 +537,10 @@ class PerformMotorIdentificationCommand : public os::shell::ICommandHandler
                 ios.putChar('.');
                 ::sleep(1);
             }
-            ios.print(" Done.\n%s\n", foc::getMotorParameters().toString().c_str());
+            ios.puts(" Done.");
         }
+
+        ios.puts(foc::getMotorParameters().toString().c_str());
     }
 } static cmd_perform_motor_identification;
 
