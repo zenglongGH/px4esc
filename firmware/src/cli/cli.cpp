@@ -468,7 +468,7 @@ class BeepCommand : public os::shell::ICommandHandler
 } static cmd_beep;
 
 
-class PerformMotorIdentificationCommand : public os::shell::ICommandHandler
+class MotorIdentificationCommand : public os::shell::ICommandHandler
 {
     const char* getName() const override { return "motor_id"; }
 
@@ -542,7 +542,7 @@ class PerformMotorIdentificationCommand : public os::shell::ICommandHandler
 
         ios.puts(foc::getMotorParameters().toString().c_str());
     }
-} static cmd_perform_motor_identification;
+} static cmd_motor_identification;
 
 
 class KVConvertCommand : public os::shell::ICommandHandler
@@ -718,6 +718,28 @@ class MotorDatabaseCommand : public os::shell::ICommandHandler
 } static cmd_motor_database;
 
 
+class PlotCommand : public os::shell::ICommandHandler
+{
+    const char* getName() const override { return "plot"; }
+
+    void execute(os::shell::BaseChannelWrapper& ios, int, char**) override
+    {
+        ios.puts("PRESS ANY KEY TO STOP PLOTTING");
+        ::sleep(1);               // Making sure the human has enough time to read the message
+
+        while (ios.getChar(1) > 0)
+        {
+            ;   // Clearing the input buffer
+        }
+
+        while (ios.getChar(0) <= 0)
+        {
+            foc::plotRealTimeValues();
+        }
+    }
+} static cmd_plot;
+
+
 class CLIThread : public chibios_rt::BaseStaticThread<2048>
 {
     os::shell::Shell<20> shell_;
@@ -753,10 +775,11 @@ public:
         (void) shell_.addCommandHandler(&cmd_spin);
         (void) shell_.addCommandHandler(&cmd_setpoint);
         (void) shell_.addCommandHandler(&cmd_beep);
-        (void) shell_.addCommandHandler(&cmd_perform_motor_identification);
+        (void) shell_.addCommandHandler(&cmd_motor_identification);
         (void) shell_.addCommandHandler(&cmd_kv_convert);
         (void) shell_.addCommandHandler(&cmd_hardware_test);
         (void) shell_.addCommandHandler(&cmd_motor_database);
+        (void) shell_.addCommandHandler(&cmd_plot);
     }
 
     virtual ~CLIThread() { }
