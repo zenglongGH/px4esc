@@ -146,6 +146,12 @@ class MotorParametersEstimator
             assert(modulator_ != nullptr);
             return *modulator_;
         }
+
+        const Modulator& access() const
+        {
+            assert(modulator_ != nullptr);
+            return *modulator_;
+        }
     } voltage_modulator_wrapper_;
 
     const MotorIdentificationMode mode_;
@@ -369,6 +375,9 @@ public:
                                                                                     state_variables_[0],
                                                                                     estimation_current_);
 
+            const bool Udq_was_constrained =
+                voltage_modulator_wrapper_.access().getUdqNormalizationCounter().get() > 0;
+
             state_variables_[0] = output.extrapolated_angular_position;
             pwm_vector = output.pwm_setpoint;
 
@@ -380,7 +389,7 @@ public:
             state_variables_[2] = output.reference_Udq[1];
             state_variables_[3] = output.estimated_Idq[1];
 
-            if (getTimeSinceStateSwitch() > LsMeasurementDuration)
+            if ((getTimeSinceStateSwitch() > LsMeasurementDuration) && !Udq_was_constrained)
             {
                 // We're crunching very large numbers here, so we use double to avoid degradation of precision
                 Const RoverL = Scalar(std::sqrt((double(avg_Uq_rms.getAverage()) * double(w) * double(w)) /
@@ -404,6 +413,13 @@ public:
                     assert(false);
                     switchState(State::Finalization);
                 }
+            }
+
+            if (Udq_was_constrained)
+            {
+                // Udq was constrained, therefore the measurements cannot be trusted
+                result_.l_ab = 0;
+                switchState(State::Finalization);
             }
             break;
         }
@@ -562,6 +578,11 @@ public:
             state_variables_[2],
             state_variables_[3]
         };
+
+        if (state_ == State::LsMeasurement)
+        {
+            out[4] = Scalar(voltage_modulator_wrapper_.access().getUdqNormalizationCounter().get());
+        }
 
         return out;
     }
