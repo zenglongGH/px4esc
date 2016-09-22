@@ -378,6 +378,7 @@ public:
             // Saving internal states into the state variables to make them observable from outside, for debugging.
             state_variables_[1] = output.reference_Udq[0];
             state_variables_[2] = output.reference_Udq[1];
+            state_variables_[3] = output.estimated_Idq[1];
 
             if (getTimeSinceStateSwitch() > LsMeasurementDuration)
             {
