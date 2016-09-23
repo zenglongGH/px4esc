@@ -190,6 +190,7 @@ void initializeContext()
                                               board::motor::getPWMDeadTime());
 }
 
+
 void doStop()
 {
     AbsoluteCriticalSectionLocker locker;
@@ -202,6 +203,52 @@ void doStop()
     {
         g_context->~Context();
         g_context = nullptr;
+    }
+}
+
+
+void updateSetpointFromCriticalSection(Const period)
+{
+    assert(g_context != nullptr);
+
+    switch (g_control_mode)
+    {
+    case ControlMode::RatiometricCurrent:
+    case ControlMode::Current:
+    {
+        // Computing the new setpoint
+        Scalar new_setpoint = g_setpoint;
+        if (g_control_mode == ControlMode::RatiometricCurrent)
+        {
+            new_setpoint *= g_context->current_limit.max;
+        }
+        new_setpoint = g_context->current_limit.constrain(new_setpoint);
+
+        // Applying the ramp
+        if (new_setpoint > g_context->reference_Iq)
+        {
+            g_context->reference_Iq += g_motor_params.current_ramp_amp_per_s * period;
+        }
+        else
+        {
+            g_context->reference_Iq -= g_motor_params.current_ramp_amp_per_s * period;
+        }
+
+        // Constraining the minimums, only if the new setpoint and the reference are of the same sign
+        if ((new_setpoint > 0) == (g_context->reference_Iq > 0))
+        {
+            Const magnitude = std::max(g_motor_params.min_current, std::abs(g_context->reference_Iq));
+
+            g_context->reference_Iq = std::copysign(magnitude, g_context->reference_Iq);
+        }
+        break;
+    }
+
+    default:
+    {
+        g_context->reference_Iq = 0;        // This is actually an error.
+        break;
+    }
     }
 }
 
@@ -506,28 +553,13 @@ void handleMainIRQ(Const period)
 
             if (g_state == State::Running)
             {
-                // Updating the dynamic parameters from the observer
                 g_context->angular_velocity = g_context->observer.getAngularVelocity();
 
                 Const angle_slip = g_context->observer.getAngularVelocity() * period;
                 g_context->angular_position =
                     constrainAngularPosition(g_context->observer.getAngularPosition() + angle_slip);
 
-                // Setpoint update
-                if (g_control_mode == ControlMode::RatiometricCurrent)
-                {
-                    static constexpr math::Range<> UnityLimits(-1.0F, 1.0F);
-
-                    g_context->reference_Iq = g_context->current_limit.max * UnityLimits.constrain(g_setpoint);
-                }
-                else if (g_control_mode == ControlMode::Current)
-                {
-                    g_context->reference_Iq = g_context->current_limit.constrain(g_setpoint);
-                }
-                else
-                {
-                    g_context->reference_Iq = 0;        // This is actually an error.
-                }
+                updateSetpointFromCriticalSection(period);
 
                 // Stopping if the angular velocity is too low
                 if (std::abs(g_context->angular_velocity) < (g_motor_params.min_electrical_ang_vel * 0.25F))

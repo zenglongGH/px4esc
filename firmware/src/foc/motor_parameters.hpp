@@ -45,6 +45,8 @@ struct MotorParameters
     Scalar max_current = 0;             ///< Max phase current, Ampere
     Scalar spinup_current = 0;          ///< Initial current applied at spinup, Ampere
 
+    Scalar current_ramp_amp_per_s = 0;  ///< Current setpoint slope, Ampere/second.
+
     Scalar phi = 0;                     ///< Magnetic field flux linkage, Weber
     Scalar r_ab = 0;                    ///< Phase-to-phase resistance, Ohm
     Scalar l_ab = 0;                    ///< Phase-to-phase inductance, Henry
@@ -80,6 +82,7 @@ struct MotorParameters
                is_positive(min_current)                 &&
                is_positive(max_current)                 &&
                is_positive(spinup_current)              &&
+               is_positive(current_ramp_amp_per_s)      &&
                getPhiLimits().contains(phi)             &&
                getRabLimits().contains(r_ab)            &&
                getLabLimits().contains(l_ab)            &&
@@ -112,6 +115,7 @@ struct MotorParameters
                                     "Imin : %-7.1f A\n"
                                     "Imax : %-7.1f A\n"
                                     "Ispup: %-7.1f A\n"
+                                    "Iramp: %-7.1f A/s\n"
                                     "Phi  : %-7.3f mWb\n"
                                     "Rab  : %-7.3f Ohm\n"
                                     "Lab  : %-7.3f uH\n"
@@ -123,6 +127,7 @@ struct MotorParameters
                                     double(min_current),
                                     double(max_current),
                                     double(spinup_current),
+                                    double(current_ramp_amp_per_s),
                                     double(phi) * 1e3,
                                     double(r_ab),
                                     double(l_ab) * 1e6,
