@@ -134,11 +134,11 @@ struct BeepCommand
 
 struct Context
 {
-    const math::Range<> current_limit;
-
     Observer observer;
 
     ThreePhaseVoltageModulator<IdqMovingAverageLength> modulator;
+
+    CurrentSetpointController current_controller;
 
     Scalar angular_velocity = 0;                                ///< Radian per second, read in the fast IRQ
     Scalar angular_position = 0;                                ///< Radians [0, Pi*2]; extrapolated in the fast IRQ
@@ -153,9 +153,10 @@ struct Context
             Const stator_phase_inductance,
             Const stator_phase_resistance,
             Const max_current,
+            Const min_current,
+            Const current_ramp,
             Const pwm_period,
             Const pwm_dead_time) :
-        current_limit(-max_current, max_current),
         observer(observer_params,
                  field_flux,
                  stator_phase_inductance,
@@ -166,7 +167,10 @@ struct Context
                   max_current,
                   pwm_period,
                   pwm_dead_time,
-                  modulator.DeadTimeCompensationPolicy::Disabled)
+                  modulator.DeadTimeCompensationPolicy::Disabled),
+        current_controller(max_current,
+                           min_current,
+                           current_ramp)
     { }
 };
 
@@ -186,6 +190,8 @@ void initializeContext()
                                               Ls,
                                               Rs,
                                               g_motor_params.max_current,
+                                              g_motor_params.min_current,
+                                              g_motor_params.current_ramp_amp_per_s,
                                               board::motor::getPWMPeriod(),
                                               board::motor::getPWMDeadTime());
 }
@@ -203,52 +209,6 @@ void doStop()
     {
         g_context->~Context();
         g_context = nullptr;
-    }
-}
-
-
-void updateSetpointFromCriticalSection(Const period)
-{
-    assert(g_context != nullptr);
-
-    switch (g_control_mode)
-    {
-    case ControlMode::RatiometricCurrent:
-    case ControlMode::Current:
-    {
-        // Computing the new setpoint
-        Scalar new_setpoint = g_setpoint;
-        if (g_control_mode == ControlMode::RatiometricCurrent)
-        {
-            new_setpoint *= g_context->current_limit.max;
-        }
-        new_setpoint = g_context->current_limit.constrain(new_setpoint);
-
-        // Applying the ramp
-        if (new_setpoint > g_context->reference_Iq)
-        {
-            g_context->reference_Iq += g_motor_params.current_ramp_amp_per_s * period;
-        }
-        else
-        {
-            g_context->reference_Iq -= g_motor_params.current_ramp_amp_per_s * period;
-        }
-
-        // Constraining the minimums, only if the new setpoint and the reference are of the same sign
-        if ((new_setpoint > 0) == (g_context->reference_Iq > 0))
-        {
-            Const magnitude = std::max(g_motor_params.min_current, std::abs(g_context->reference_Iq));
-
-            g_context->reference_Iq = std::copysign(magnitude, g_context->reference_Iq);
-        }
-        break;
-    }
-
-    default:
-    {
-        g_context->reference_Iq = 0;        // This is actually an error.
-        break;
-    }
     }
 }
 
@@ -559,7 +519,12 @@ void handleMainIRQ(Const period)
                 g_context->angular_position =
                     constrainAngularPosition(g_context->observer.getAngularPosition() + angle_slip);
 
-                updateSetpointFromCriticalSection(period);
+                g_context->reference_Iq =
+                    g_context->current_controller.update(period,
+                                                         g_setpoint,
+                                                         g_control_mode,
+                                                         g_context->reference_Iq,
+                                                         g_context->angular_velocity);
 
                 // Stopping if the angular velocity is too low
                 if (std::abs(g_context->angular_velocity) < (g_motor_params.min_electrical_ang_vel * 0.25F))
@@ -628,8 +593,7 @@ void handleMainIRQ(Const period)
                 }
 
                 // Fault detection
-                if (!g_context->current_limit.contains(g_context->reference_Iq) ||
-                    (std::abs(g_context->reference_Iq) < g_motor_params.min_current))
+                if (std::abs(g_context->reference_Iq) < g_motor_params.min_current)
                 {
                     g_setpoint = 0;     // Stopping
                 }

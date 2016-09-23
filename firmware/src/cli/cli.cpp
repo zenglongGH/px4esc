@@ -390,6 +390,7 @@ class SetpointCommand : public os::shell::ICommandHandler
             }
             break;
         }
+
         case foc::ControlMode::Current:
         {
             const auto Imax = foc::getMotorParameters().max_current;
@@ -403,6 +404,15 @@ class SetpointCommand : public os::shell::ICommandHandler
             }
             break;
         }
+
+        case foc::ControlMode::RatiometricMRPM:
+        case foc::ControlMode::MRPM:
+        {
+            sp = 0;
+            ios.puts("ERROR: CONTROL MODE NOT IMPLEMENTED YET");
+            break;
+        }
+
         default:
         {
             assert(false);

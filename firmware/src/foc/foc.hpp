@@ -26,6 +26,7 @@
 
 #include "motor_parameters.hpp"
 #include "motor_parameters_estimator.hpp"
+#include "current_setpoint_controller.hpp"
 #include "hardware_tester.hpp"
 #include "observer.hpp"
 #include <math/math.hpp>
@@ -129,16 +130,6 @@ enum class State
  * @ref State.
  */
 State getState();
-
-/**
- * Various control modes.
- * See the function definitions below for usages.
- */
-enum class ControlMode
-{
-    RatiometricCurrent,         ///< Abstract units in [-1, 1]
-    Current                     ///< Ampere
-};
 
 /**
  * Assigns new setpoint; the units depend on the selected control mode.
