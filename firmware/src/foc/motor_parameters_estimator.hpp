@@ -94,11 +94,11 @@ class MotorParametersEstimator
             accumulator_ += x;
         }
 
-        Scalar getAverage() const
+        Accumulator getAverage() const
         {
             if (num_samples_ > 0)
             {
-                return Scalar(accumulator_ / Accumulator(num_samples_));
+                return accumulator_ / Accumulator(num_samples_);
             }
             else
             {
@@ -328,7 +328,7 @@ public:
             {
                 if (averagers_[0].getNumSamples() > 100)
                 {
-                    result_.r_ab = averagers_[0].getAverage() * 2.0F;
+                    result_.r_ab = Scalar(averagers_[0].getAverage() * 2.0);
                 }
                 else
                 {
@@ -364,9 +364,6 @@ public:
 
         case State::LsMeasurement:
         {
-            auto& avg_Ud_rms = averagers_[0];
-            auto& avg_Uq_rms = averagers_[1];
-
             Const w = Ls_current_frequency_ * (math::Pi * 2.0F);
 
             const auto output = voltage_modulator_wrapper_.access().onNextPWMPeriod(phase_currents_ab,
@@ -381,8 +378,8 @@ public:
             state_variables_[0] = output.extrapolated_angular_position;
             pwm_vector = output.pwm_setpoint;
 
-            avg_Ud_rms.addSample(output.reference_Udq[0] * output.reference_Udq[0]);
-            avg_Uq_rms.addSample(output.reference_Udq[1] * output.reference_Udq[1]);
+            averagers_[0].addSample(output.reference_Udq[0]);
+            averagers_[1].addSample(output.reference_Udq[1]);
 
             // Saving internal states into the state variables to make them observable from outside, for debugging.
             state_variables_[1] = output.reference_Udq[0];
@@ -392,12 +389,14 @@ public:
             if ((getTimeSinceStateSwitch() > LsMeasurementDuration) && !Udq_was_constrained)
             {
                 // We're crunching very large numbers here, so we use double to avoid degradation of precision
-                Const RoverL = Scalar(std::sqrt((double(avg_Uq_rms.getAverage()) * double(w) * double(w)) /
-                                                double(avg_Ud_rms.getAverage())));
+                static const auto square_double = [](double x) { return double(x) * double(x); };
 
-                Const Ls = (result_.r_ab / 2.0F) / RoverL;
+                const double Ud_square = square_double(averagers_[0].getAverage());
+                const double Uq_square = square_double(averagers_[1].getAverage());
 
-                result_.l_ab = Ls * 2.0F;
+                Const RoverL = Scalar(std::sqrt((Uq_square * double(w) * double(w)) / Ud_square));
+
+                result_.l_ab = result_.r_ab / RoverL;
 
                 if ((mode_ == MotorIdentificationMode::Static) ||
                     !MotorParameters::getLabLimits().contains(result_.l_ab))
