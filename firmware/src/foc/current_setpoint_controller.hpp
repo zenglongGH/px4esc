@@ -84,31 +84,31 @@ public:
         case ControlMode::Current:
         {
             // Computing the new setpoint
-            Scalar new_setpoint = target_setpoint;
+            Scalar new_current = target_setpoint;
             if (control_mode == ControlMode::RatiometricCurrent)
             {
-                new_setpoint *= max_current_;
+                new_current *= max_current_;
             }
-            new_setpoint = math::Range<>(-max_current_, max_current_).constrain(new_setpoint);
+            new_current = math::Range<>(-max_current_, max_current_).constrain(new_current);
 
             // Applying the ramp
-            if (new_setpoint > reference_current)
+            if (new_current > reference_current)
             {
-                new_setpoint = reference_current + current_ramp_amp_s_ * period;
+                new_current = reference_current + current_ramp_amp_s_ * period;
             }
             else
             {
-                new_setpoint = reference_current - current_ramp_amp_s_ * period;
+                new_current = reference_current - current_ramp_amp_s_ * period;
             }
 
             // Constraining the minimums, only if the new setpoint and the reference are of the same sign
-            if ((new_setpoint > 0) == (reference_current > 0))
+            if ((new_current > 0) == (target_setpoint > 0))
             {
-                new_setpoint = std::copysign(std::max(min_current_, std::abs(new_setpoint)),
-                                             new_setpoint);
+                new_current = std::copysign(std::max(min_current_, std::abs(new_current)),
+                                             new_current);
             }
 
-            return new_setpoint;
+            return new_current;
         }
 
         case ControlMode::RatiometricMRPM:
