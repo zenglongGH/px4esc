@@ -35,6 +35,7 @@
 
 #include <foc/foc.hpp>
 #include <foc/transforms.hpp>
+#include <foc/irq_debug_output.hpp>
 #include <motor_database/motor_database.hpp>
 
 #include <cstdlib>
@@ -766,7 +767,9 @@ class CLIThread : public chibios_rt::BaseStaticThread<2048>
         while (!os::isRebootRequested())
         {
             os::shell::BaseChannelWrapper wrapper(os::getStdIOStream());
-            shell_.runFor(wrapper, 1000);
+            shell_.runFor(wrapper, 100);
+
+            foc::IRQDebugOutputBuffer::getInstance().printIfNeeded();
         }
 
         os::lowsyslog("CLI: Stopped\n");

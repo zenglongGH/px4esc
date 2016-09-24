@@ -26,6 +26,7 @@
 #include "pid.hpp"
 #include "transforms.hpp"
 #include "voltage_modulator.hpp"
+#include "irq_debug_output.hpp"
 #include "common.hpp"
 
 #include <zubax_chibios/config/config.hpp>
@@ -454,6 +455,7 @@ void printStatusInfo()
 void plotRealTimeValues()
 {
     g_debug_tracer.print();
+    IRQDebugOutputBuffer::getInstance().printIfNeeded();
 }
 
 }
