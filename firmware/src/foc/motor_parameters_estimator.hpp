@@ -381,8 +381,10 @@ public:
             state_variables_[0] = output.extrapolated_angular_position;
             pwm_vector = output.pwm_setpoint;
 
-            averagers_[0].addSample(output.reference_Udq[0]);
-            averagers_[1].addSample(output.reference_Udq[1]);
+            Const dead_time_compensation_mult = 1.0F + pwm_dead_time_ / pwm_period_;
+
+            averagers_[0].addSample(output.reference_Udq[0] * dead_time_compensation_mult);
+            averagers_[1].addSample(output.reference_Udq[1] * dead_time_compensation_mult);
 
             // Saving internal states into the state variables to make them observable from outside, for debugging.
             state_variables_[1] = output.reference_Udq[0];
