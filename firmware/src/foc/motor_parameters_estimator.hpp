@@ -181,7 +181,7 @@ class MotorParametersEstimator
     Scalar time_ = 0;
     Scalar state_switched_at_ = 0;
 
-    std::array<Averager, 2> averagers_;
+    std::array<Averager, 1> averagers_;
     std::array<Scalar, 4> state_variables_{};
 
     math::SimpleMovingAverageFilter<500, Vector<2>> currents_filter_;
@@ -381,10 +381,9 @@ public:
             state_variables_[0] = output.extrapolated_angular_position;
             pwm_vector = output.pwm_setpoint;
 
-            Const dead_time_compensation_mult = 1.0F + pwm_dead_time_ / pwm_period_;
+            Const dead_time_compensation_mult = 1.0F - pwm_dead_time_ / pwm_period_;
 
             averagers_[0].addSample(output.reference_Udq[0] * dead_time_compensation_mult);
-            averagers_[1].addSample(output.reference_Udq[1] * dead_time_compensation_mult);
 
             // Saving internal states into the state variables to make them observable from outside, for debugging.
             state_variables_[1] = output.reference_Udq[0];
@@ -397,20 +396,13 @@ public:
                 static const auto square_double = [](double x) { return double(x) * double(x); };
 
                 const double Ud_square = square_double(averagers_[0].getAverage());
-                const double Uq_square = square_double(averagers_[1].getAverage());
                 const double Iq_square = square_double(estimation_current_);
-
-                Const RsHF = Scalar(std::sqrt(Uq_square / Iq_square));
 
                 Const LsHF = Scalar(std::sqrt(Ud_square / (Iq_square * double(w) * double(w))));
 
-                Const RoverL = Scalar(std::sqrt((Uq_square * double(w) * double(w)) / Ud_square));
+                result_.l_ab = LsHF * 2.0F;
 
-                IRQDebugOutputBuffer::setVariableFromIRQ<0>(RsHF);
-                IRQDebugOutputBuffer::setVariableFromIRQ<1>(LsHF);
-                IRQDebugOutputBuffer::setVariableFromIRQ<2>(RoverL);
-
-                result_.l_ab = result_.r_ab / RoverL;
+                IRQDebugOutputBuffer::setVariableFromIRQ<0>(result_.l_ab);
 
                 if ((mode_ == MotorIdentificationMode::Static) ||
                     !MotorParameters::getLabLimits().contains(result_.l_ab))
@@ -480,7 +472,9 @@ public:
             }
             else if (state_ == State::PhiMeasurement)
             {
-                Const Uq = state_variables_[IdxVoltage];
+                Const dead_time_compensation_mult = 1.0F - pwm_dead_time_ / pwm_period_;
+
+                Const Uq = state_variables_[IdxVoltage] * dead_time_compensation_mult;
                 Const I  = state_variables_[IdxI];
                 Const w  = state_variables_[IdxAngVel];
                 Const Rs = result_.r_ab / 2.0F;
