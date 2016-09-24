@@ -769,7 +769,7 @@ class CLIThread : public chibios_rt::BaseStaticThread<2048>
             os::shell::BaseChannelWrapper wrapper(os::getStdIOStream());
             shell_.runFor(wrapper, 100);
 
-            foc::IRQDebugOutputBuffer::getInstance().printIfNeeded();
+            foc::IRQDebugOutputBuffer::printIfNeeded();
         }
 
         os::lowsyslog("CLI: Stopped\n");

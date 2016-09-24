@@ -455,7 +455,7 @@ void printStatusInfo()
 void plotRealTimeValues()
 {
     g_debug_tracer.print();
-    IRQDebugOutputBuffer::getInstance().printIfNeeded();
+    IRQDebugOutputBuffer::printIfNeeded();
 }
 
 }

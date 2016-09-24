@@ -336,7 +336,7 @@ public:
                     result_.r_ab = 0;        // Failed
                 }
 
-                IRQDebugOutputBuffer::getInstance().setVariableFromIRQ<0>(result_.r_ab);
+                IRQDebugOutputBuffer::setVariableFromIRQ<0>(result_.r_ab);
 
                 if (MotorParameters::getRabLimits().contains(result_.r_ab))
                 {

@@ -26,7 +26,6 @@
 
 #include "common.hpp"
 #include <array>
-#include <limits>
 
 
 namespace foc
@@ -39,24 +38,29 @@ class IRQDebugOutputBuffer
     std::array<Scalar, NumVariables> vars_{};
     std::array<bool, NumVariables> update_flags_{};
 
+
+    IRQDebugOutputBuffer(const IRQDebugOutputBuffer&) = delete;
+    IRQDebugOutputBuffer& operator=(const IRQDebugOutputBuffer&) = delete;
+
     IRQDebugOutputBuffer() { }
 
-public:
     static IRQDebugOutputBuffer& getInstance()
     {
         static IRQDebugOutputBuffer inst;
         return inst;
     }
 
+public:
     /**
      * This function can be called from IRQ that wishes to display a value.
      */
-    template <unsigned Index>
-    void setVariableFromIRQ(Const value)
+    template <unsigned Index, typename Value>
+    static void setVariableFromIRQ(const Value value)
     {
         static_assert(Index < NumVariables, "Index out of range");
-        vars_[Index] = value;
-        update_flags_[Index] = true;
+        auto& self = getInstance();
+        self.vars_[Index] = Scalar(value);
+        self.update_flags_[Index] = true;
     }
 
     /**
@@ -64,16 +68,17 @@ public:
      * Note that the method uses no locking, this is intentional.
      * There are corner cases where it may skip a value due to race condition, but this is acceptable.
      */
-    void printIfNeeded()
+    static void printIfNeeded()
     {
-        if (std::any_of(update_flags_.begin(), update_flags_.end(), [](bool x) { return x; }))
+        auto& self = getInstance();
+        if (std::any_of(self.update_flags_.begin(), self.update_flags_.end(), [](bool x) { return x; }))
         {
             std::printf("IRQ Vars:");
             for (unsigned i = 0; i < NumVariables; i++)
             {
-                const bool updated = update_flags_[i];
-                const auto value = vars_[i];
-                update_flags_[i] = false;
+                const bool updated = self.update_flags_[i];
+                const auto value = self.vars_[i];
+                self.update_flags_[i] = false;
 
                 std::printf("   %u/%s: %g", i, updated ? "new" : "old", double(value));
             }
