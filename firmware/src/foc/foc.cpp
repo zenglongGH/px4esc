@@ -149,6 +149,8 @@ struct Context
 
     Scalar reference_Iq = 0;                                    ///< Ampere, read in the fast IRQ
 
+    Scalar inverter_power = 0;                                 ///< Watt, updated from the main IRQ
+
     Context(const ObserverParameters& observer_params,
             Const field_flux,
             Const stator_phase_inductance,
@@ -503,9 +505,6 @@ void handleMainIRQ(Const period)
 
         g_context->observer.update(period, Idq, Udq);
 
-        g_debug_tracer.set<5>(g_context->observer.getAngularVelocity());
-        g_debug_tracer.set<6>(g_context->angular_velocity);
-
         /*
          * Updating the state estimate.
          * Critical section is required because at this point we're no longer synchronized with the fast IRQ.
@@ -603,6 +602,14 @@ void handleMainIRQ(Const period)
         }
 
         /*
+         * Stuff that does not require synchronization with the fast IRQ
+         */
+        g_context->inverter_power = 1.5F * (Idq[0] * Udq[0] + Idq[1] * Udq[1]);
+
+        g_debug_tracer.set<5>(g_context->observer.getAngularVelocity());
+        g_debug_tracer.set<6>(g_context->inverter_power / board::motor::getInverterVoltage());
+
+        /*
          * Updating setpoint and handling termination condition.
          */
         g_setpoint_remaining_ttl -= period;
@@ -671,11 +678,11 @@ void handleFastIRQ(Const period,
 
         g_context->angular_position = output.extrapolated_angular_position;
 
-        g_debug_tracer.set<0>(g_context->reference_Udq[0] * 1e3F);
-        g_debug_tracer.set<1>(g_context->reference_Udq[1] * 1e3F);
-        g_debug_tracer.set<2>(g_context->estimated_Idq[0] * 1e3F);
-        g_debug_tracer.set<3>(g_context->estimated_Idq[1] * 1e3F);
-        g_debug_tracer.set<4>(g_context->reference_Iq     * 1e3F);
+        g_debug_tracer.set<0>(g_context->reference_Udq[0]);
+        g_debug_tracer.set<1>(g_context->reference_Udq[1]);
+        g_debug_tracer.set<2>(g_context->estimated_Idq[0]);
+        g_debug_tracer.set<3>(g_context->estimated_Idq[1]);
+        g_debug_tracer.set<4>(g_context->reference_Iq);
     }
 
     /*
