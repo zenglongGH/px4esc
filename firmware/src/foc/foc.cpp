@@ -604,7 +604,7 @@ void handleMainIRQ(Const period)
         /*
          * Stuff that does not require synchronization with the fast IRQ
          */
-        g_context->inverter_power = 1.5F * (Idq[0] * Udq[0] + Idq[1] * Udq[1]);
+        g_context->inverter_power = (Udq.transpose() * Idq)[0] * 1.5F;
 
         g_debug_tracer.set<5>(g_context->observer.getAngularVelocity());
         g_debug_tracer.set<6>(g_context->inverter_power / board::motor::getInverterVoltage());
