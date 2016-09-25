@@ -204,7 +204,7 @@ public:
             os::lowsyslog("Motor HW Driver: Detected Pixhawk ESC v1.6 compatible board\n");
 
             inverter_voltage_gain_ = 1.0F / computeResistorDividerGain(5100 * 2, 330 * 2);
-            current_shunt_resistance_ = 10 * 1e-3F;
+            current_shunt_resistance_ = 1 * 1e-3F;
 
             palWritePad(GPIOB, GPIOB_GAIN, true);
             current_amplifier_pin_state_ = true;
