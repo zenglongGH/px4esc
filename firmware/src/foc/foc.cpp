@@ -729,6 +729,7 @@ void handleFastIRQ(Const period,
             }
 
             g_debug_tracer.set(estimator->getDebugValues());
+            g_debug_tracer.set<6>(board::motor::getStatus().current_sensor_gain);
         }
         else
         {

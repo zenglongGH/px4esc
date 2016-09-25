@@ -586,6 +586,12 @@ public:
             state_variables_[3]
         };
 
+        if (state_ == State::PreRsMeasurement ||
+            state_ == State::RsMeasurement)
+        {
+            out[4] = currents_filter_.getValue().sum();
+        }
+
         if (state_ == State::LsMeasurement)
         {
             out[4] = Scalar(voltage_modulator_wrapper_.access().getUdqNormalizationCounter().get());

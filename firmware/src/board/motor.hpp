@@ -135,6 +135,7 @@ struct Status
     float inverter_voltage = 0.0F;              ///< Volt
 
     math::Vector<2> phase_current_zero_offset;  ///< Volt
+    float current_sensor_gain = 0.0F;           ///< Volt/Volt
 
     bool power_ok = false;                      ///< PWRGD
     bool overload = false;                      ///< OCTW
@@ -151,12 +152,14 @@ struct Status
         return os::heapless::format("Inverter Temperature: %.0f C\n"
                                     "Inverter Voltage    : %.1f\n"
                                     "Current ADC Z-Offset: %s\n"
+                                    "Current Sensor Gain : %.1f\n"
                                     "Power OK            : %u\n"
                                     "Overload            : %u\n"
                                     "Fault               : %u",
                                     double(math::convertKelvinToCelsius(inverter_temperature)),
                                     double(inverter_voltage),
                                     math::toString(phase_current_zero_offset).c_str(),
+                                    double(current_sensor_gain),
                                     power_ok,
                                     overload,
                                     fault);

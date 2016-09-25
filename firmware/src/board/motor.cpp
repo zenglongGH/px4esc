@@ -166,13 +166,20 @@ Calibrator* volatile g_calibrator = nullptr;
  * This class is not a good architectural solution, but we chose this way for performance reasons.
  *
  * TODO: REVISIT LATER, NEEDS REFACTORING.
+ * TODO: Everything is hard-coded for DRV8302, make the logic more generic
  */
 static class BoardFeatures final
 {
+    static constexpr float MaxUnipolarVoltageAtCurrentSensorOutput = 1.5F;      ///< Volt
+
+    static constexpr float MaxRecentAbsoluteCurrentDecayPerCycle = 0.001F;      ///< Ampere per cycle
+
     float inverter_voltage_gain_ = 0.0F;
 
     float current_shunt_resistance_ = 0.0F;
-    float current_amplifier_gain_ = 0.0F;
+    bool current_amplifier_pin_state_ = false;
+
+    float max_recent_absolute_current_ = 0.0F;
 
     std::function<float (float)> temperature_transfer_function_ = [](float x) { return x; };
 
@@ -197,10 +204,10 @@ public:
             os::lowsyslog("Motor HW Driver: Detected Pixhawk ESC v1.6 compatible board\n");
 
             inverter_voltage_gain_ = 1.0F / computeResistorDividerGain(5100 * 2, 330 * 2);
-            current_shunt_resistance_ = 1 * 1e-3F;
+            current_shunt_resistance_ = 10 * 1e-3F;
 
             palWritePad(GPIOB, GPIOB_GAIN, true);
-            current_amplifier_gain_ = 1.0F / (40.0F * current_shunt_resistance_);
+            current_amplifier_pin_state_ = true;
 
             temperature_transfer_function_ = &BoardFeatures::temperatureTransferFunctionMCP9700;
         }
@@ -213,9 +220,26 @@ public:
 
     void adjustCurrentGain(const math::Vector<2>& v)
     {
-        const float max_current = v.maxCoeff();
-        (void)max_current;
-        // TODO: Automatic Gain Control
+        max_recent_absolute_current_ = std::max(max_recent_absolute_current_ - MaxRecentAbsoluteCurrentDecayPerCycle,
+                                                v.lpNorm<Eigen::Infinity>());
+
+        // Refer to the datasheet of the DRV8302 for the formulas
+        const float threshold = (MaxUnipolarVoltageAtCurrentSensorOutput / 40.0F) / current_shunt_resistance_;
+
+        if (max_recent_absolute_current_ > threshold)
+        {
+            palWritePad(GPIOB, GPIOB_GAIN, false);
+            current_amplifier_pin_state_ = false;
+        }
+        else if (max_recent_absolute_current_ < (threshold * 0.5F))
+        {
+            palWritePad(GPIOB, GPIOB_GAIN, true);
+            current_amplifier_pin_state_ = true;
+        }
+        else
+        {
+            ;   // Hysteresis, no change
+        }
     }
 
     float convertADCVoltageToInverterVoltage(float voltage) const
@@ -223,9 +247,14 @@ public:
         return voltage * inverter_voltage_gain_;
     }
 
+    float getCurrentGain() const
+    {
+        return current_amplifier_pin_state_ ? 40.0F : 10.0F;
+    }
+
     math::Vector<2> convertADCVoltagesToPhaseCurrents(const math::Vector<2>& voltages_without_zero_offset) const
     {
-        return voltages_without_zero_offset * current_amplifier_gain_;
+        return voltages_without_zero_offset / (current_shunt_resistance_ * getCurrentGain());
     }
 
     float convertADCVoltageToInverterTemperature(float voltage) const
@@ -784,6 +813,7 @@ Status getStatus()
     s.inverter_voltage = g_inverter_voltage;
 
     s.phase_current_zero_offset = g_phase_current_zero_offset;
+    s.current_sensor_gain = g_board_features.getCurrentGain();
 
     s.power_ok  =  palReadPad(GPIOC, GPIOC_POWER_GOOD);
     s.overload  = !palReadPad(GPIOC, GPIOC_OVER_TEMP_WARNING_INVERSE);
