@@ -803,7 +803,7 @@ void handleFastIRQ(Const period,
             g_debug_tracer.set<3>(filtered_currents[0]);
             g_debug_tracer.set<4>(filtered_currents[1]);
             g_debug_tracer.set<5>(math::convertKelvinToCelsius(board::motor::getInverterTemperature()));
-            g_debug_tracer.set<6>(0);
+            g_debug_tracer.set<6>(board::motor::getStatus().current_sensor_gain);
         }
         else
         {
