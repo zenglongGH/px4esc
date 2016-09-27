@@ -177,9 +177,9 @@ Calibrator* volatile g_calibrator = nullptr;
  */
 static class BoardFeatures final
 {
-    static constexpr float MaxRecentAbsoluteCurrentDecayPerCycle = 0.001F;      ///< Ampere per cycle
-    static constexpr float MaxUnipolarVoltageAtCurrentSensorOutput = (ADCReferenceVoltage / 2.0F) * 0.9F;
-    static constexpr float CurrentGainAdjustmentHysteresisCoeff = 0.5;
+    static constexpr float MaxUnipolarVoltageAtCurrentSensorOutput  = (ADCReferenceVoltage / 2.0F) * 0.9F;  ///< Volt
+    static constexpr float MinCurrentGainSwitchInterval             = 0.01F;                                ///< Second
+    static constexpr float CurrentGainAdjustmentHysteresisCoeff     = 0.9F;
 
     struct BoardConfig
     {
@@ -190,7 +190,7 @@ static class BoardFeatures final
     } board_config_;
 
     bool current_amplifier_high_gain_selected_ = false;
-    float max_recent_absolute_current_ = 0.0F;
+    float time_since_current_was_above_high_gain_threshold_ = 0.0F;
 
     /// Transfer function [Voltage] --> [Kelvin] for temperature sensors MCP9700/MCP9700A
     static float temperatureTransferFunctionMCP9700(float voltage)
@@ -238,28 +238,37 @@ public:
         return voltage * board_config_.inverter_voltage_gain;
     }
 
-    void adjustCurrentGain(const math::Vector<2>& currents)
+    void adjustCurrentGain(const float period,
+                           const math::Vector<2>& currents)
     {
-        max_recent_absolute_current_ = std::max(max_recent_absolute_current_ - MaxRecentAbsoluteCurrentDecayPerCycle,
-                                                currents.lpNorm<Eigen::Infinity>());
+        const float upper_threshold = MaxUnipolarVoltageAtCurrentSensorOutput /
+                                      board_config_.current_amplifier_low_high_gains[1] /
+                                      board_config_.current_shunt_resistance;
 
-        const float threshold = MaxUnipolarVoltageAtCurrentSensorOutput /
-                                board_config_.current_amplifier_low_high_gains[1] /
-                                board_config_.current_shunt_resistance;
+        const float lower_threshold = upper_threshold * CurrentGainAdjustmentHysteresisCoeff;
 
-        if (max_recent_absolute_current_ > threshold)
+        const float peak = currents.lpNorm<Eigen::Infinity>();
+
+        if (peak > (current_amplifier_high_gain_selected_ ? upper_threshold : lower_threshold))
         {
+            // Current above threshold, selecting low gain
             palWritePad(GPIOB, GPIOB_GAIN, false);
             current_amplifier_high_gain_selected_ = false;
-        }
-        else if (max_recent_absolute_current_ < (threshold * CurrentGainAdjustmentHysteresisCoeff))
-        {
-            palWritePad(GPIOB, GPIOB_GAIN, true);
-            current_amplifier_high_gain_selected_ = true;
+
+            time_since_current_was_above_high_gain_threshold_ = 0.0F;
         }
         else
         {
-            ;   // Hysteresis, no change
+            // Current below threshold, checking if we're allowed to switch
+            if (time_since_current_was_above_high_gain_threshold_ > MinCurrentGainSwitchInterval)
+            {
+                palWritePad(GPIOB, GPIOB_GAIN, true);
+                current_amplifier_high_gain_selected_ = true;
+            }
+            else
+            {
+                time_since_current_was_above_high_gain_threshold_ += period;
+            }
         }
     }
 
@@ -898,7 +907,7 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
     /*
      * Current AGC, calibration, that kind of stuff goes here because it's not very time-critical.
      */
-    g_board_features.adjustCurrentGain(phase_currents);
+    g_board_features.adjustCurrentGain(g_pwm_period, phase_currents);
 
     if (g_calibrator != nullptr)
     {
