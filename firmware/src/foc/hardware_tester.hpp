@@ -84,7 +84,7 @@ public:
     };
 
 private:
-    static constexpr Scalar TestingVoltage      = 1.0F;
+    static constexpr Scalar TestingVoltage      = 0.7F;
     static constexpr Scalar ThresholdCurrent    = 0.15F;
     static constexpr Scalar StabilizationTime   = 0.3F;
 
