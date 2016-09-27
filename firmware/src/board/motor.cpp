@@ -599,6 +599,11 @@ inline void setRawPWM(const std::uint16_t a, const std::uint16_t b, const std::u
      * normal operation this requirement should be met automatically, because this function will be invoked
      * (very indirectly) from the ADC interrupt handler, which in turn is synchronized with timer update event.
      */
+    while (TIM1->CNT < 10)      // TODO: Use a proper well-defined constant here.
+    {
+        ;       // Do nothing. We will skip right through this loop during normal operation.
+    }
+
     TIM1->CCR1 = a;
     TIM1->CCR2 = b;
     TIM1->CCR3 = c;
