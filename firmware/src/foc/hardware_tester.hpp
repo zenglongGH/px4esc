@@ -213,11 +213,6 @@ public:
             registerError(TestReport::ErrorFlag::InverterOverloadSignal);
         }
 
-        if (inverter_fault)
-        {
-            registerError(TestReport::ErrorFlag::InverterFaultSignal);
-        }
-
         switch (state_)
         {
         case State::Initialization:
@@ -298,6 +293,14 @@ public:
         case State::Finished:
         {
             pwm_vector.setZero();
+            /*
+             * Normally we should be checking this in all states, but there's something wrong with the hardware
+             * which causes intermittent FAULT reports sometimes, so we moved the check here temporarily.
+             */
+            if (inverter_fault)
+            {
+                registerError(TestReport::ErrorFlag::InverterFaultSignal);
+            }
             break;
         }
 
