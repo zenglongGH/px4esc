@@ -60,6 +60,14 @@ constexpr float TemperatureInnovationWeight     = 0.001F;       ///< The input i
 
 constexpr float CalibrationDuration = 1.0F;
 
+/**
+ * If both current sensors output voltages lower than this, we assume that the current amplifiers are
+ * not yet activated.
+ * This heuristic helps to avoid unnecessary gain switching shortly after power stage activation.
+ * The condition when both channels report that low voltages should never appear during normal operation.
+ */
+constexpr float MinCurrentSensorsOutputVoltage  = 0.008F;
+
 static_assert(FastIRQPriority < MainIRQPriority, "Fast IRQ must be able to preempt the main IRQ");
 static_assert(MainIRQPriority < CORTEX_PRIORITY_SVCALL, "Main IRQ must be able to preempt the RTOS");
 
@@ -868,8 +876,11 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
     };
 
     // While EN_GATE is low, the current amplifiers are shut down, so we're measuring garbage
-    const auto phase_currents =
-        (PWMHandle::getTotalNumberOfActiveHandles() > 0) ?
+    // Also, both voltages near zero means that the current amplifiers are not activated yet
+    const bool currents_valid = (PWMHandle::getTotalNumberOfActiveHandles() > 0) &&
+                                (phase_currents_adc_voltages.mean() > MinCurrentSensorsOutputVoltage);
+
+    const auto phase_currents = currents_valid ?
         g_board_features.convertADCVoltagesToPhaseCurrents(phase_currents_adc_voltages - g_phase_current_zero_offset) :
         math::Vector<2>::Zero();
 
