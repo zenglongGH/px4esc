@@ -766,14 +766,14 @@ void handleFastIRQ(Const period,
                 hardware_tester = new (hardware_tester_storage) HardwareTester(period);
             }
 
+            const auto hw_status = board::motor::getStatus();
+
             if (board::motor::isCalibrationInProgress())
             {
                 g_pwm_handle.release(); // Nothing to do, waiting for the calibration to end before continuing
             }
             else
             {
-                const auto hw_status = board::motor::getStatus();
-
                 const auto pwm_vector = hardware_tester->onNextPWMPeriod(phase_currents_ab,
                                                                          inverter_voltage,
                                                                          hw_status.inverter_temperature,
@@ -806,8 +806,8 @@ void handleFastIRQ(Const period,
             g_debug_tracer.set<2>(inverter_voltage);
             g_debug_tracer.set<3>(filtered_currents[0]);
             g_debug_tracer.set<4>(filtered_currents[1]);
-            g_debug_tracer.set<5>(math::convertKelvinToCelsius(board::motor::getInverterTemperature()));
-            g_debug_tracer.set<6>(board::motor::getStatus().current_sensor_gain);
+            g_debug_tracer.set<5>(math::convertKelvinToCelsius(hw_status.inverter_temperature));
+            g_debug_tracer.set<6>(hw_status.current_sensor_gain);
         }
         else
         {
