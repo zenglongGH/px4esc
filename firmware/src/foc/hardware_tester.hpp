@@ -53,7 +53,9 @@ public:
             PhaseAError,
             PhaseBError,
             PhaseCError,
-            MotorNotConnected
+            MotorNotConnected,
+            InverterOverloadSignal,
+            InverterFaultSignal
         };
 
         static constexpr std::uint32_t flag2mask(const ErrorFlag f) { return 1U << unsigned(f); }
@@ -77,8 +79,9 @@ public:
 
         auto toString() const
         {
-            return os::heapless::format("NumErrors: %u, Code: 0b%s",
+            return os::heapless::format("NumErrors: %u, Code: 0x%04x 0b%s",
                                         getNumberOfErrors(),
+                                        unsigned(mask_),
                                         os::heapless::intToString<2>(mask_).c_str());
         }
     };
@@ -181,7 +184,9 @@ public:
      */
     Vector<3> onNextPWMPeriod(const Vector<2>& raw_phase_currents_ab,
                               Const inverter_voltage,
-                              Const inverter_temperature)
+                              Const inverter_temperature,
+                              const bool inverter_overload,
+                              const bool inverter_fault)
     {
         time_ += pwm_period_;
 
@@ -201,6 +206,16 @@ public:
         if (!inverter_temperature_range_.contains(inverter_temperature))
         {
             registerError(TestReport::ErrorFlag::InverterTemperatureSensorError);
+        }
+
+        if (inverter_overload)
+        {
+            registerError(TestReport::ErrorFlag::InverterOverloadSignal);
+        }
+
+        if (inverter_fault)
+        {
+            registerError(TestReport::ErrorFlag::InverterFaultSignal);
         }
 
         switch (state_)

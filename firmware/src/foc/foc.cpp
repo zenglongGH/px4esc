@@ -772,9 +772,13 @@ void handleFastIRQ(Const period,
             }
             else
             {
+                const auto hw_status = board::motor::getStatus();
+
                 const auto pwm_vector = hardware_tester->onNextPWMPeriod(phase_currents_ab,
                                                                          inverter_voltage,
-                                                                         board::motor::getInverterTemperature());
+                                                                         hw_status.inverter_temperature,
+                                                                         hw_status.overload,
+                                                                         hw_status.fault);
 
                 g_pwm_handle.setPWM(pwm_vector);
 
