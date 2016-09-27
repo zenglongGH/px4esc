@@ -708,35 +708,55 @@ void handleFastIRQ(Const period,
                                              board::motor::getPWMDeadTime());
             }
 
+            const auto hw_status = board::motor::getStatus();
+
             if (board::motor::isCalibrationInProgress())
             {
                 g_pwm_handle.release(); // Nothing to do, waiting for the calibration to end before continuing
             }
             else
             {
-                const auto pwm_vector = estimator->onNextPWMPeriod(phase_currents_ab, inverter_voltage);
+                // TODO: We can't check the general hardware status because FAULT tends to go up randomly.
+                //       There might be a hardware bug somewhere. Investigate it later.
+                //const bool hw_ok = hw_status.isOkay();
+                const bool hw_ok = hw_status.power_ok && !hw_status.overload;
 
-                g_pwm_handle.setPWM(pwm_vector);
-
-                if (estimator->isFinished())
+                if (hw_ok)
                 {
+                    const auto pwm_vector = estimator->onNextPWMPeriod(phase_currents_ab, inverter_voltage);
+
+                    g_pwm_handle.setPWM(pwm_vector);
+
+                    if (estimator->isFinished())
+                    {
+                        g_pwm_handle.release();
+
+                        g_motor_params = estimator->getEstimatedMotorParameters();
+
+                        if (g_motor_params.isValid())
+                        {
+                            g_state = State::Idle;
+                        }
+                        else
+                        {
+                            g_state = State::Fault;
+                        }
+                    }
+                }
+                else
+                {
+                    // Hardware error; aborting and switching into the fault state
                     g_pwm_handle.release();
+                    g_state = State::Fault;
 
-                    g_motor_params = estimator->getEstimatedMotorParameters();
-
-                    if (g_motor_params.isValid())
-                    {
-                        g_state = State::Idle;
-                    }
-                    else
-                    {
-                        g_state = State::Fault;
-                    }
+                    IRQDebugOutputBuffer::setVariableFromIRQ<0>(hw_status.power_ok);
+                    IRQDebugOutputBuffer::setVariableFromIRQ<1>(hw_status.overload);
+                    IRQDebugOutputBuffer::setVariableFromIRQ<2>(hw_status.fault);
                 }
             }
 
             g_debug_tracer.set(estimator->getDebugValues());
-            g_debug_tracer.set<6>(board::motor::getStatus().current_sensor_gain);
+            g_debug_tracer.set<6>(hw_status.current_sensor_gain);
         }
         else
         {
