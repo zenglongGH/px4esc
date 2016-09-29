@@ -58,7 +58,7 @@ constexpr float MainIRQMinPeriod = 40e-6F;
 constexpr float InverterVoltageInnovationWeight = 0.1F;         ///< Has to account for possible aliasing effect
 constexpr float TemperatureInnovationWeight     = 0.001F;       ///< The input is noisy, high damping is necessary
 
-constexpr float CalibrationDuration = 1.0F;
+constexpr float CurrentOffsetCalibrationDuration = 1.0F;
 
 /**
  * If both current sensors output voltages lower than this, we assume that the current amplifiers are
@@ -118,62 +118,12 @@ float g_inverter_voltage;
 /// Raw output voltage of the temperature sensor (not converted to Kelvin) (ideally it should be volatile)
 float g_inverter_temperature_sensor_voltage;
 
-/// True ADC zero offset on the current channels.
-math::Vector<2> g_phase_current_zero_offset = math::Vector<2>::Ones() * (ADCReferenceVoltage / 2.0F);
-
-
-/**
- * This is used for current zero offset calibration.
- * It is instantiated from @ref beginCalibration(), which may be invoked from IRQ context,
- * and destroyed in the local IRQ handler.
- */
-class Calibrator
-{
-    math::Vector<2> phase_current_adc_voltages_accumulator_ = {0.0F, 0.0F};
-    unsigned num_samples_collected_ = 0;
-
-    const unsigned num_samples_needed_;
-
-    PWMHandle pwm_handle_;
-
-public:
-    Calibrator(unsigned num_samples_required) :
-        num_samples_needed_(num_samples_required)
-    {
-        pwm_handle_.setPWM(math::Vector<3>::Zero());
-    }
-
-    void addSample(const math::Vector<2>& phase_current_adc_voltages)
-    {
-        phase_current_adc_voltages_accumulator_ += phase_current_adc_voltages;
-        num_samples_collected_++;
-    }
-
-    bool isComplete() const { return num_samples_collected_ >= num_samples_needed_; }
-
-    math::Vector<2> getPhaseCurrentZeroOffset() const
-    {
-        if (num_samples_collected_ > 0)
-        {
-            return phase_current_adc_voltages_accumulator_ / float(num_samples_collected_);
-        }
-        else
-        {
-            return math::Vector<2>::Zero();
-        }
-    }
-};
-
-Calibrator* volatile g_calibrator = nullptr;
-
 /**
  * This class holds parameters specific to the board we're running on.
  * At some point we'll need to add support for other hardware revisions with different voltage dividers,
  * different current shunt measurement circuits, etc. In that case this class will need to be modified accordingly.
  *
  * This class is not a good architectural solution, but we chose this way for performance reasons.
- *
- * TODO: REVISIT LATER, NEEDS REFACTORING.
  */
 static class BoardFeatures final
 {
@@ -183,14 +133,27 @@ static class BoardFeatures final
 
     struct BoardConfig
     {
+        const char* name = "<UNKNOWN>";
         float inverter_voltage_gain = 0.0F;
         float current_shunt_resistance = 0.0F;
         std::array<float, 2> current_amplifier_low_high_gains{};
         std::function<float (float)> temperature_transfer_function = [](float x) { return x; };
-    } board_config_;
+    };
 
-    bool current_amplifier_high_gain_selected_ = false;
+    // Board-dependent constants
+    const BoardConfig board_config_;
+
+    // State variables
+    std::array<math::Vector<2>, 2> current_zero_offsets_{};             ///< Per gain level
+    bool current_amplifier_high_gain_selected_ = true;
     float time_since_current_was_above_high_gain_threshold_ = 0.0F;
+
+
+    const math::Vector<2>& getCurrentZeroOffsets() const
+    {
+        return current_zero_offsets_[int(current_amplifier_high_gain_selected_)];
+    }
+
 
     /// Transfer function [Voltage] --> [Kelvin] for temperature sensors MCP9700/MCP9700A
     static float temperatureTransferFunctionMCP9700(float voltage)
@@ -198,40 +161,40 @@ static class BoardFeatures final
         return (100.0F * (voltage - 0.5F)) + 273.15F;
     }
 
-    static constexpr float computeResistorDividerGain(float upper, float lower)
+    static BoardConfig detectBoardConfig()
     {
-        return lower / (lower + upper);
+        static const auto compute_resistor_divider_gain = [](float up, float low) { return (low + up) / low; };
+
+        const auto hwver = board::detectHardwareVersion();
+
+        if (hwver.major == 1 &&
+            hwver.minor == 0)
+        {
+            return {
+                "Pixhawk ESC v1.6",
+                compute_resistor_divider_gain(5100 * 2, 330 * 2),
+                1 * 1e-3F,
+                { 10.0F, 40.0F },
+                &BoardFeatures::temperatureTransferFunctionMCP9700
+            };
+        }
+
+        chSysHalt("UNSUPPORTED HARDWARE");
+        return BoardConfig();
     }
 
 public:
-    void init()
+    BoardFeatures() :
+        board_config_(detectBoardConfig())
     {
-        /*
-         * Board-agnostic initialization
-         */
+        std::fill(current_zero_offsets_.begin(), current_zero_offsets_.end(),
+                  math::Vector<2>::Ones() * (ADCReferenceVoltage * 0.5F));
+
         palWritePad(GPIOB, GPIOB_GAIN, true);
         current_amplifier_high_gain_selected_ = true;
-
-        /*
-         * Board-specific initialization
-         */
-        const auto hwver = board::detectHardwareVersion();
-
-        if (hwver.major == 1 && hwver.minor == 0)
-        {
-            os::lowsyslog("Motor HW Driver: Detected Pixhawk ESC v1.6 compatible board\n");
-
-            board_config_.inverter_voltage_gain = 1.0F / computeResistorDividerGain(5100 * 2, 330 * 2);
-            board_config_.current_shunt_resistance = 1 * 1e-3F;
-            board_config_.current_amplifier_low_high_gains = { 10.0F, 40.0F };       // DRV8302
-            board_config_.temperature_transfer_function = &BoardFeatures::temperatureTransferFunctionMCP9700;
-        }
-        else
-        {
-            assert(false);
-            os::lowsyslog("Motor HW Driver: UNSUPPORTED HARDWARE VERSION %u.%u\n", hwver.major, hwver.minor);
-        }
     }
+
+    const char* getBoardName() const { return board_config_.name; }
 
     float convertADCVoltageToInverterVoltage(float voltage) const
     {
@@ -277,16 +240,16 @@ public:
         return board_config_.current_amplifier_low_high_gains[int(current_amplifier_high_gain_selected_)];
     }
 
-    math::Vector<2> convertADCVoltagesToPhaseCurrents(const math::Vector<2>& voltages_without_zero_offset) const
+    math::Vector<2> convertADCVoltagesToPhaseCurrents(const math::Vector<2>& raw_voltages) const
     {
-        return voltages_without_zero_offset / (board_config_.current_shunt_resistance * getCurrentGain());
+        return (raw_voltages - getCurrentZeroOffsets()) / (board_config_.current_shunt_resistance * getCurrentGain());
     }
 
     float convertADCVoltageToInverterTemperature(float voltage) const
     {
         return board_config_.temperature_transfer_function(voltage);
     }
-} g_board_features;
+} * g_board_features = nullptr;
 
 
 void initPWM(const double pwm_frequency,
@@ -671,7 +634,11 @@ void init()
 
     // TODO: Set up an interrupt to trigger when PWRGD goes down. Call an external handler on it, or just halt the OS.
 
-    g_board_features.init();
+    DEBUG_LOG("Constructing BoardFeatures...\n");
+    static BoardFeatures board_features;
+    g_board_features = &board_features;
+
+    os::lowsyslog("Motor HW Driver: Detected board: %s\n", g_board_features->getBoardName());
 
     /*
      * Initializing the MCU peripherals.
@@ -723,8 +690,6 @@ void PWMHandle::setPWM(const math::Vector<3>& abc)
         total_number_of_active_handles_++;
     }
 
-    assert(g_calibrator == nullptr);
-
     static constexpr math::Range<> Lim(0, 1);
 
     assert(Lim.contains(abc[0]) &&
@@ -773,29 +738,12 @@ bool PWMHandle::isUnique() const
 
 void beginCalibration()
 {
-    /*
-     * There is no race condition here. The pointer to the calibrator instance can be only cleared to nullptr
-     * from the IRQ, so if it was already zeroed at the moment of this check, it is guaranteed to stay this way
-     * until we assigned it again later in this function.
-     */
-    if (g_calibrator != nullptr)
-    {
-        return;         // Already in progress, or just finished - exiting
-    }
-
-    __DMB();            // Preventing memory access reordering relative to the previous check
-    __DSB();
-
-    const unsigned num_samples_needed = std::max(1000U, unsigned(CalibrationDuration / g_pwm_period + 0.5F));
-
-    alignas(16) static std::uint8_t storage[sizeof(Calibrator)];
-
-    g_calibrator = new (&storage[0]) Calibrator(num_samples_needed);
+    // TODO: CALIBRATION
 }
 
 bool isCalibrationInProgress()
 {
-    return g_calibrator != nullptr;
+    return false;
 }
 
 float getPWMPeriod()
@@ -815,7 +763,7 @@ float getInverterVoltage()
 
 float getInverterTemperature()
 {
-    return g_board_features.convertADCVoltageToInverterTemperature(g_inverter_temperature_sensor_voltage);
+    return g_board_features->convertADCVoltageToInverterTemperature(g_inverter_temperature_sensor_voltage);
 }
 
 void emergency()
@@ -839,11 +787,10 @@ Status getStatus()
     Status s;
 
     s.inverter_temperature =
-        g_board_features.convertADCVoltageToInverterTemperature(g_inverter_temperature_sensor_voltage);
+        g_board_features->convertADCVoltageToInverterTemperature(g_inverter_temperature_sensor_voltage);
     s.inverter_voltage = g_inverter_voltage;
 
-    s.phase_current_zero_offset = g_phase_current_zero_offset;
-    s.current_sensor_gain = g_board_features.getCurrentGain();
+    s.current_sensor_gain = g_board_features->getCurrentGain();
 
     s.power_ok  =  palReadPad(GPIOC, GPIOC_POWER_GOOD);
     s.overload  = !palReadPad(GPIOC, GPIOC_OVER_TEMP_WARNING_INVERSE);
@@ -895,11 +842,11 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
                                 (phase_currents_adc_voltages.mean() > MinCurrentSensorsOutputVoltage);
 
     const auto phase_currents = currents_valid ?
-        g_board_features.convertADCVoltagesToPhaseCurrents(phase_currents_adc_voltages - g_phase_current_zero_offset) :
+        g_board_features->convertADCVoltagesToPhaseCurrents(phase_currents_adc_voltages) :
         math::Vector<2>::Zero();
 
     {
-        const float new_inverter_voltage = g_board_features.convertADCVoltageToInverterVoltage(
+        const float new_inverter_voltage = g_board_features->convertADCVoltageToInverterVoltage(
             convertADCSamplesToVoltage(g_dma_buffer_inverter_voltage));
 
         g_inverter_voltage += InverterVoltageInnovationWeight * (new_inverter_voltage - g_inverter_voltage);
@@ -912,20 +859,9 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
     /*
      * Current AGC, calibration, that kind of stuff goes here because it's not very time-critical.
      */
-    g_board_features.adjustCurrentGain(g_pwm_period, phase_currents);
+    g_board_features->adjustCurrentGain(g_pwm_period, phase_currents);
 
-    if (g_calibrator != nullptr)
-    {
-        g_calibrator->addSample(phase_currents_adc_voltages);
-
-        if (g_calibrator->isComplete())
-        {
-            g_phase_current_zero_offset = g_calibrator->getPhaseCurrentZeroOffset();
-
-            g_calibrator->~Calibrator();
-            g_calibrator = nullptr;
-        }
-    }
+    // TODO: CALIBRATION
 
     /*
      * Triggering the main IRQ when necessary.
