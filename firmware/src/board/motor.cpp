@@ -155,15 +155,12 @@ static class BoardFeatures final
     }
 
 
-    /// Transfer function [Voltage] --> [Kelvin] for temperature sensors MCP9700/MCP9700A
-    static float temperatureTransferFunctionMCP9700(float voltage)
-    {
-        return (100.0F * (voltage - 0.5F)) + 273.15F;
-    }
-
     static BoardConfig detectBoardConfig()
     {
         static const auto compute_resistor_divider_gain = [](float up, float low) { return (low + up) / low; };
+
+        /// Transfer function [Voltage] --> [Kelvin] for temperature sensors MCP9700/MCP9700A
+        static const auto temp_tf_MCP9700 = [](float v) { return (100.0F * (v - 0.5F)) + 273.15F; };
 
         const auto hwver = board::detectHardwareVersion();
         DEBUG_LOG("HW version %s\n", hwver.toString().c_str());
@@ -176,7 +173,7 @@ static class BoardFeatures final
                 compute_resistor_divider_gain(5100 * 2, 330 * 2),
                 1 * 1e-3F,
                 { 10.0F, 40.0F },
-                &BoardFeatures::temperatureTransferFunctionMCP9700
+                temp_tf_MCP9700
             };
         }
 
