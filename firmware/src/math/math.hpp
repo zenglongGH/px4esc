@@ -164,6 +164,47 @@ public:
 };
 
 /**
+ * Copmutes average over the entire collected dataset.
+ * Useful for calibration and other batch measurements, e.g. motor identification.
+ */
+template <typename T = double>
+class CumulativeAverageComputer
+{
+    std::uint32_t num_samples_ = 0;
+    T accumulator_{};
+
+public:
+    CumulativeAverageComputer() :
+        accumulator_()
+    { }
+
+    explicit CumulativeAverageComputer(const T& init) :
+        accumulator_(init)
+    { }
+
+    void addSample(const T& x)
+    {
+        num_samples_++;
+        accumulator_ += x;
+    }
+
+    T getAverage() const
+    {
+        if (num_samples_ > 0)
+        {
+            return T(accumulator_ / double(num_samples_));
+        }
+        else
+        {
+            assert(false);
+            return 0;
+        }
+    }
+
+    auto getNumSamples() const { return num_samples_; }
+};
+
+/**
  * Wrappers over the CMSIS DSP library.
  * Note that the CMSIS math headers MUST NOT be included, because they dump a pile of garbage into the global scope.
  * @{

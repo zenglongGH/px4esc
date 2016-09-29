@@ -81,35 +81,7 @@ class MotorParametersEstimator
      */
     static constexpr Scalar PWMLimit = 0.8F;
 
-    class Averager
-    {
-        using Accumulator = double;
-
-        std::uint32_t num_samples_ = 0;
-        Accumulator accumulator_ = 0;
-
-    public:
-        void addSample(Accumulator x)
-        {
-            num_samples_++;
-            accumulator_ += x;
-        }
-
-        Accumulator getAverage() const
-        {
-            if (num_samples_ > 0)
-            {
-                return accumulator_ / Accumulator(num_samples_);
-            }
-            else
-            {
-                assert(false);
-                return 0;
-            }
-        }
-
-        auto getNumSamples() const { return num_samples_; }
-    };
+    using Averager = math::CumulativeAverageComputer<>;
 
     class VoltageModulatorWrapper       // This is such a massive reinvented wheel. Do something about it.
     {
