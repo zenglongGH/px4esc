@@ -28,6 +28,7 @@
 #include <array>
 #include <zubax_chibios/os.hpp>
 #include <hal.h>
+#include <zubax_chibios/util/heapless.hpp>
 
 #include "motor.hpp"
 
@@ -75,6 +76,11 @@ struct HardwareVersion
 {
     std::uint8_t major;
     std::uint8_t minor;
+
+    auto toString() const
+    {
+        return os::heapless::format("%u.%u", major, minor);
+    }
 };
 
 /**

@@ -166,6 +166,7 @@ static class BoardFeatures final
         static const auto compute_resistor_divider_gain = [](float up, float low) { return (low + up) / low; };
 
         const auto hwver = board::detectHardwareVersion();
+        DEBUG_LOG("HW version %s\n", hwver.toString().c_str());
 
         if (hwver.major == 1 &&
             hwver.minor == 0)
