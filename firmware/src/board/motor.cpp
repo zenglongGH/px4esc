@@ -122,8 +122,6 @@ float g_inverter_temperature_sensor_voltage;
  * This class holds parameters specific to the board we're running on.
  * At some point we'll need to add support for other hardware revisions with different voltage dividers,
  * different current shunt measurement circuits, etc. In that case this class will need to be modified accordingly.
- *
- * This class is not a good architectural solution, but we chose this way for performance reasons.
  */
 static class BoardFeatures final
 {
@@ -131,27 +129,59 @@ static class BoardFeatures final
     static constexpr float MinCurrentGainSwitchInterval             = 0.01F;                                ///< Second
     static constexpr float CurrentGainAdjustmentHysteresisCoeff     = 0.9F;
 
+
+    struct CurrentZeroOffsetCalibrator
+    {
+        PWMHandle pwm_handle;
+        float duration = 0;
+        math::CumulativeAverageComputer<math::Vector<2>> averager;
+        bool in_progress = false;
+
+        void reset()
+        {
+            pwm_handle.release();
+            in_progress = false;
+            resetDurationAndAverage();
+        }
+
+        void resetDurationAndAverage()
+        {
+            duration = 0;
+            averager = math::CumulativeAverageComputer<math::Vector<2>>(math::Vector<2>::Zero());
+        }
+
+        CurrentZeroOffsetCalibrator() { reset(); }
+    };
+
     struct BoardConfig
     {
         const char* name = "<UNKNOWN>";
         float inverter_voltage_gain = 0.0F;
         float current_shunt_resistance = 0.0F;
         std::array<float, 2> current_amplifier_low_high_gains{};
-        std::function<float (float)> temperature_transfer_function = [](float x) { return x; };
+        std::function<float (float)> temperature_transfer_function = [](float) { return 0; };
     };
 
     // Board-dependent constants
     const BoardConfig board_config_;
 
     // State variables
-    std::array<math::Vector<2>, 2> current_zero_offsets_{};             ///< Per gain level
+    std::array<math::Vector<2>, 2> current_zero_offsets_low_high_{};             ///< Per gain level
     bool current_amplifier_high_gain_selected_ = true;
     float time_since_current_was_above_high_gain_threshold_ = 0.0F;
+
+    CurrentZeroOffsetCalibrator current_zero_offset_calibrator_;
 
 
     const math::Vector<2>& getCurrentZeroOffsets() const
     {
-        return current_zero_offsets_[int(current_amplifier_high_gain_selected_)];
+        return current_zero_offsets_low_high_[int(current_amplifier_high_gain_selected_)];
+    }
+
+    void setCurrentAmplifierGain(bool high)
+    {
+        palWritePad(GPIOB, GPIOB_GAIN, high);
+        current_amplifier_high_gain_selected_ = high;
     }
 
 
@@ -185,7 +215,7 @@ public:
     BoardFeatures() :
         board_config_(detectBoardConfig())
     {
-        std::fill(current_zero_offsets_.begin(), current_zero_offsets_.end(),
+        std::fill(current_zero_offsets_low_high_.begin(), current_zero_offsets_low_high_.end(),
                   math::Vector<2>::Ones() * (ADCReferenceVoltage * 0.5F));
 
         palWritePad(GPIOB, GPIOB_GAIN, true);
@@ -202,6 +232,8 @@ public:
     void adjustCurrentGain(const float period,
                            const math::Vector<2>& currents)
     {
+        assert(!isCalibrationInProgress());
+
         const float upper_threshold = MaxUnipolarVoltageAtCurrentSensorOutput /
                                       board_config_.current_amplifier_low_high_gains[1] /
                                       board_config_.current_shunt_resistance;
@@ -213,8 +245,7 @@ public:
         if (peak > (current_amplifier_high_gain_selected_ ? upper_threshold : lower_threshold))
         {
             // Current above threshold, selecting low gain
-            palWritePad(GPIOB, GPIOB_GAIN, false);
-            current_amplifier_high_gain_selected_ = false;
+            setCurrentAmplifierGain(false);
 
             time_since_current_was_above_high_gain_threshold_ = 0.0F;
         }
@@ -223,8 +254,7 @@ public:
             // Current below threshold, checking if we're allowed to switch
             if (time_since_current_was_above_high_gain_threshold_ > MinCurrentGainSwitchInterval)
             {
-                palWritePad(GPIOB, GPIOB_GAIN, true);
-                current_amplifier_high_gain_selected_ = true;
+                setCurrentAmplifierGain(true);
             }
             else
             {
@@ -246,6 +276,53 @@ public:
     float convertADCVoltageToInverterTemperature(float voltage) const
     {
         return board_config_.temperature_transfer_function(voltage);
+    }
+
+    void beginCalibration()
+    {
+        AbsoluteCriticalSectionLocker locker;
+
+        if (!current_zero_offset_calibrator_.in_progress)
+        {
+            setCurrentAmplifierGain(false);
+
+            current_zero_offset_calibrator_.reset();
+            current_zero_offset_calibrator_.in_progress = true;
+            current_zero_offset_calibrator_.pwm_handle.setPWM(math::Vector<3>::Zero());
+
+            assert(current_zero_offset_calibrator_.pwm_handle.isUnique());
+        }
+    }
+
+    bool isCalibrationInProgress() const
+    {
+        return current_zero_offset_calibrator_.in_progress;
+    }
+
+    void processCalibration(const float period,
+                            const math::Vector<2> current_sensors_output_voltages)
+    {
+        assert(isCalibrationInProgress());
+
+        current_zero_offset_calibrator_.pwm_handle.setPWM(math::Vector<3>::Zero());     // Paranoia
+
+        current_zero_offset_calibrator_.averager.addSample(current_sensors_output_voltages);
+        current_zero_offset_calibrator_.duration += period;
+
+        if (current_zero_offset_calibrator_.duration > CurrentOffsetCalibrationDuration)
+        {
+            if (current_amplifier_high_gain_selected_)
+            {
+                current_zero_offsets_low_high_[1] = current_zero_offset_calibrator_.averager.getAverage();
+                current_zero_offset_calibrator_.reset();
+            }
+            else
+            {
+                current_zero_offsets_low_high_[0] = current_zero_offset_calibrator_.averager.getAverage();
+                setCurrentAmplifierGain(true);
+                current_zero_offset_calibrator_.resetDurationAndAverage();
+            }
+        }
     }
 } * g_board_features = nullptr;
 
@@ -662,7 +739,7 @@ void init()
         nvicEnableVector(TIM8_CC_IRQn, MainIRQPriority);        // Triggered by software
     }
 
-    os::lowsyslog("Motor HW Driver: Fast IRQ period: %.1f us, Main IRQ period: %.1f us, ratio %u\n",
+    os::lowsyslog("Motor HW Driver: Fast IRQ period: %g us, Main IRQ period: %g us, ratio %u\n",
                   double(g_pwm_period) * 1e6,
                   double(g_pwm_period) * double(g_fast_irq_to_main_irq_period_ratio) * 1e6,
                   g_fast_irq_to_main_irq_period_ratio);
@@ -736,12 +813,12 @@ bool PWMHandle::isUnique() const
 
 void beginCalibration()
 {
-    // TODO: CALIBRATION
+    g_board_features->beginCalibration();
 }
 
 bool isCalibrationInProgress()
 {
-    return false;
+    return g_board_features->isCalibrationInProgress();
 }
 
 float getPWMPeriod()
@@ -857,9 +934,14 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
     /*
      * Current AGC, calibration, that kind of stuff goes here because it's not very time-critical.
      */
-    g_board_features->adjustCurrentGain(g_pwm_period, phase_currents);
-
-    // TODO: CALIBRATION
+    if (g_board_features->isCalibrationInProgress())
+    {
+        g_board_features->processCalibration(g_pwm_period, phase_currents_adc_voltages);
+    }
+    else
+    {
+        g_board_features->adjustCurrentGain(g_pwm_period, phase_currents);
+    }
 
     /*
      * Triggering the main IRQ when necessary.

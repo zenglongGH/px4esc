@@ -204,26 +204,24 @@ extern void handleMainIRQ(const float period);
 /**
  * This critical section disables ALL maskable IRQ, including the motor control ones.
  * This is unlike os::CriticalSectionLocker, which keeps them enabled.
- * WARNING: This locker does not restore the last state, it just blindly enables/disables.
  * RTFM: http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0553a/CHDBIBGJ.html
  */
 typedef class AbsoluteCriticalSectionLockerImpl_
 {
+    const bool irq_was_enabled_ = __get_PRIMASK() == 0;
+
 public:
     AbsoluteCriticalSectionLockerImpl_()
     {
-        /*
-         * Making sure there's no nesting going on.
-         * Nesting is not allowed because motor critical sections are extremely expensive.
-         */
-        assert(__get_PRIMASK() == 0);
-
         __disable_irq();
     }
 
     ~AbsoluteCriticalSectionLockerImpl_()
     {
-        __enable_irq();
+        if (irq_was_enabled_)
+        {
+            __enable_irq();
+        }
     }
 } volatile AbsoluteCriticalSectionLocker;
 

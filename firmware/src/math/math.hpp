@@ -28,6 +28,7 @@
 #include <algorithm>
 #include <utility>
 #include <cassert>
+#include <type_traits>
 #include <cmath>
 #include <zubax_chibios/util/heapless.hpp>
 
@@ -173,6 +174,8 @@ class CumulativeAverageComputer
     std::uint32_t num_samples_ = 0;
     T accumulator_{};
 
+    using FloatingPointScalar = typename std::conditional<std::is_floating_point<T>::value, T, Scalar>::type;
+
 public:
     CumulativeAverageComputer() :
         accumulator_()
@@ -192,12 +195,12 @@ public:
     {
         if (num_samples_ > 0)
         {
-            return T(accumulator_ / double(num_samples_));
+            return T(accumulator_ / FloatingPointScalar(num_samples_));
         }
         else
         {
             assert(false);
-            return 0;
+            return T();
         }
     }
 
