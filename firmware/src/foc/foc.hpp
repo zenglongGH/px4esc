@@ -167,6 +167,11 @@ Scalar getInstantCurrent();
 Scalar getInstantDemandFactor();
 
 /**
+ * Returns the current mechanical angular velocity of the rotor in RPM.
+ */
+Scalar getInstantMechanicalRPM();
+
+/**
  * Generate sound using the motor windings.
  * The request MAY be ignored if the controller is in not in the Idle state.
  * Units are SI (Hertz, seconds).

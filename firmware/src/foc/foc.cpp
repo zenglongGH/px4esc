@@ -388,6 +388,30 @@ Scalar getInstantDemandFactor()
     return 0;
 }
 
+Scalar getInstantMechanicalRPM()
+{
+    Scalar electrical_rad_sec = 0;
+
+    {
+        AbsoluteCriticalSectionLocker locker;
+        if (g_context != nullptr)
+        {
+            electrical_rad_sec = g_context->angular_velocity;
+        }
+    }
+
+    const auto num_poles = g_motor_params.num_poles;
+
+    if ((num_poles >= 2) &&
+        (num_poles % 2 == 0))
+    {
+        return convertRotationRateElectricalToMechanical(convertAngularVelocityToRPM(electrical_rad_sec),
+                                                         num_poles);
+    }
+
+    return 0;
+}
+
 
 void beep(Const frequency,
           Const duration)

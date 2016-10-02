@@ -107,7 +107,7 @@ void cbTimer(const uavcan::TimerEvent& event)
 
     status.current = foc::getInstantCurrent();
 
-    status.rpm = 0;     // TODO
+    status.rpm = static_cast<std::int32_t>(std::round(foc::getInstantMechanicalRPM()));
 
     status.power_rating_pct = std::uint8_t(foc::getInstantDemandFactor() * 100.0F + 0.5F);
 
