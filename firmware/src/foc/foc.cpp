@@ -360,7 +360,7 @@ Scalar getInstantCurrent()
 {
     const auto status = board::motor::getStatus();
 
-    if (!os::float_eq::closeToZero(status.inverter_voltage))
+    if (os::float_eq::positive(status.inverter_voltage))
     {
         AbsoluteCriticalSectionLocker locker;
         if (g_context != nullptr)
@@ -376,8 +376,7 @@ Scalar getInstantDemandFactor()
 {
     Const max_current = g_motor_params.max_current;
 
-    if (!os::float_eq::closeToZero(max_current) &&
-        (max_current > 0))
+    if (os::float_eq::positive(max_current))
     {
         AbsoluteCriticalSectionLocker locker;
         if (g_context != nullptr)
@@ -633,7 +632,7 @@ void handleMainIRQ(Const period)
          */
         g_setpoint_remaining_ttl -= period;
 
-        if (os::float_eq::closeToZero(Scalar(g_setpoint)) ||
+        if (os::float_eq::closeToZero(g_setpoint) ||
             (g_setpoint_remaining_ttl <= 0.0F))
         {
             doStop();
@@ -651,7 +650,7 @@ void handleMainIRQ(Const period)
             g_state = State::Fault;
         }
 
-        if (!os::float_eq::closeToZero(Scalar(g_setpoint)))
+        if (!os::float_eq::closeToZero(g_setpoint))
         {
             initializeContext();
 
