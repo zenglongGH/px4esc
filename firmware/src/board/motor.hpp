@@ -110,6 +110,11 @@ float getPWMPeriod();
 float getPWMDeadTime();
 
 /**
+ * Returns the power stage voltage, aka VBAT, in volts.
+ */
+float getInverterVoltage();
+
+/**
  * Immediately deactivates the PWM outputs (shuts down the carrier).
  * Further use of the driver may not be possible.
  * This function can be called from ANY context, e.g. from Hard Fault handler.

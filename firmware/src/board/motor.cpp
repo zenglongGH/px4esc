@@ -602,6 +602,11 @@ float getPWMDeadTime()
     return g_dead_time;
 }
 
+float getInverterVoltage()
+{
+    return g_inverter_voltage;
+}
+
 void emergency()
 {
     // Absolute critical section must not be used here, because this function can be invoked from ANY context.

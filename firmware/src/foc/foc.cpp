@@ -358,14 +358,14 @@ void stop()
 
 Scalar getInstantCurrent()
 {
-    const auto status = board::motor::getStatus();
+    Const voltage = board::motor::getInverterVoltage();
 
-    if (os::float_eq::positive(status.inverter_voltage))
+    if (os::float_eq::positive(voltage))
     {
         AbsoluteCriticalSectionLocker locker;
         if (g_context != nullptr)
         {
-            return g_context->inverter_power / status.inverter_voltage;
+            return g_context->inverter_power / voltage;
         }
     }
 
@@ -625,7 +625,7 @@ void handleMainIRQ(Const period)
         g_context->inverter_power = (Udq.transpose() * Idq)[0] * 1.5F;
 
         g_debug_tracer.set<5>(g_context->observer.getAngularVelocity());
-        g_debug_tracer.set<6>(g_context->inverter_power / board::motor::getStatus().inverter_voltage);
+        g_debug_tracer.set<6>(g_context->inverter_power / board::motor::getInverterVoltage());
 
         /*
          * Updating setpoint and handling termination condition.
