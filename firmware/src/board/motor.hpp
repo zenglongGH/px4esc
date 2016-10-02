@@ -127,6 +127,11 @@ float getInverterTemperature();
 void emergency();
 
 /**
+ * Prints extended status information into stdout.
+ */
+void printStatus();
+
+/**
  * @ref getStatus().
  */
 struct Status

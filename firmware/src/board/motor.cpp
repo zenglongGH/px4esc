@@ -628,6 +628,17 @@ void emergency()
     TIM8->CR2 = 0;
 }
 
+void printStatus()
+{
+    std::puts(getStatus().toString().c_str());
+
+    std::printf("Current sensors zero offsets, gains low to high:\n");
+    for (auto& ofs : g_board_features->getCurrentSensorsZeroOffsets())
+    {
+        std::printf("\t%s\n", math::toString(ofs).c_str());
+    }
+}
+
 Status getStatus()
 {
     Status s;

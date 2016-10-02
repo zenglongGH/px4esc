@@ -223,6 +223,8 @@ os::watchdog::Timer init()
     // Initializing to Idle
     foc::stop();
 
+    board::motor::printStatus();
+
     /*
      * CLI initialization
      */

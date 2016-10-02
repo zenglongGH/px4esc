@@ -194,6 +194,8 @@ public:
         return board_config_.current_amplifier_low_high_gains[int(current_amplifier_high_gain_selected_)];
     }
 
+    auto getCurrentSensorsZeroOffsets() const { return current_zero_offsets_low_high_; }
+
     math::Vector<2> convertADCVoltagesToPhaseCurrents(const math::Vector<2>& raw_voltages) const
     {
         return (raw_voltages - getCurrentZeroOffsets()) / (board_config_.current_shunt_resistance * getCurrentGain());
