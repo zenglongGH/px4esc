@@ -29,6 +29,7 @@
 #include <functional>
 #include <numeric>
 #include <cassert>
+#include "motor_board_features.hpp"
 
 
 namespace board
@@ -50,6 +51,9 @@ constexpr unsigned InverterVoltageSampleBufferLength = 2 * SamplesPerADCPerIRQ;
 constexpr unsigned FastIRQPriority = 0;
 constexpr unsigned MainIRQPriority = 1;
 
+static_assert(FastIRQPriority < MainIRQPriority, "Fast IRQ must be able to preempt the main IRQ");
+static_assert(MainIRQPriority < CORTEX_PRIORITY_SVCALL, "Main IRQ must be able to preempt the RTOS");
+
 /**
  * The true period of the main IRQ will be as close as possible to this value, but never less than it.
  */
@@ -57,19 +61,6 @@ constexpr float MainIRQMinPeriod = 40e-6F;
 
 constexpr float InverterVoltageInnovationWeight = 0.1F;         ///< Has to account for possible aliasing effect
 constexpr float TemperatureInnovationWeight     = 0.001F;       ///< The input is noisy, high damping is necessary
-
-constexpr float CurrentOffsetCalibrationDuration = 1.0F;
-
-/**
- * If both current sensors output voltages lower than this, we assume that the current amplifiers are
- * not yet activated.
- * This heuristic helps to avoid unnecessary gain switching shortly after power stage activation.
- * The condition when both channels report that low voltages should never appear during normal operation.
- */
-constexpr float MinCurrentSensorsOutputVoltage  = 0.008F;
-
-static_assert(FastIRQPriority < MainIRQPriority, "Fast IRQ must be able to preempt the main IRQ");
-static_assert(MainIRQPriority < CORTEX_PRIORITY_SVCALL, "Main IRQ must be able to preempt the RTOS");
 
 /*
  * Hardware-defined parameters
@@ -80,9 +71,6 @@ constexpr unsigned PhaseACurrentChannelIndex    = 13;
 constexpr unsigned PhaseBCurrentChannelIndex    = 12;
 constexpr unsigned InverterVoltageChannelIndex  = 11;
 constexpr unsigned TemperatureChannelIndex      = 10;
-
-constexpr float ADCReferenceVoltage = 3.3F;
-constexpr unsigned ADCResolutionBits = 12;
 
 /*
  * ADC DMA buffers. We're using the canaries to ensure that no data corruption is happening.
@@ -118,213 +106,7 @@ float g_inverter_voltage;
 /// Raw output voltage of the temperature sensor (not converted to Kelvin) (ideally it should be volatile)
 float g_inverter_temperature_sensor_voltage;
 
-/**
- * This class holds parameters specific to the board we're running on.
- * At some point we'll need to add support for other hardware revisions with different voltage dividers,
- * different current shunt measurement circuits, etc. In that case this class will need to be modified accordingly.
- */
-static class BoardFeatures final
-{
-    static constexpr float MaxUnipolarVoltageAtCurrentSensorOutput  = (ADCReferenceVoltage / 2.0F) * 0.9F;  ///< Volt
-    static constexpr float MinCurrentGainSwitchInterval             = 0.01F;                                ///< Second
-    static constexpr float CurrentGainAdjustmentHysteresisCoeff     = 0.9F;
-
-
-    struct CurrentZeroOffsetCalibrator
-    {
-        PWMHandle pwm_handle;
-        float duration = 0;
-        math::CumulativeAverageComputer<math::Vector<2>> averager;
-        bool in_progress = false;
-
-        void reset()
-        {
-            pwm_handle.release();
-            in_progress = false;
-            resetDurationAndAverage();
-        }
-
-        void resetDurationAndAverage()
-        {
-            duration = 0;
-            averager = math::CumulativeAverageComputer<math::Vector<2>>(math::Vector<2>::Zero());
-        }
-
-        CurrentZeroOffsetCalibrator() { reset(); }
-    };
-
-    struct BoardConfig
-    {
-        const char* name = "<UNKNOWN>";
-        float inverter_voltage_gain = 0.0F;
-        float current_shunt_resistance = 0.0F;
-        std::array<float, 2> current_amplifier_low_high_gains{};
-        std::function<float (float)> temperature_transfer_function = [](float) { return 0; };
-    };
-
-    // Board-dependent constants
-    const BoardConfig board_config_;
-
-    // State variables
-    std::array<math::Vector<2>, 2> current_zero_offsets_low_high_{};             ///< Per gain level
-    bool current_amplifier_high_gain_selected_ = true;
-    float time_since_current_was_above_high_gain_threshold_ = 0.0F;
-
-    CurrentZeroOffsetCalibrator current_zero_offset_calibrator_;
-
-
-    const math::Vector<2>& getCurrentZeroOffsets() const
-    {
-        return current_zero_offsets_low_high_[int(current_amplifier_high_gain_selected_)];
-    }
-
-    void setCurrentAmplifierGain(bool high)
-    {
-        palWritePad(GPIOB, GPIOB_GAIN, high);
-        current_amplifier_high_gain_selected_ = high;
-    }
-
-
-    static BoardConfig detectBoardConfig()
-    {
-        static const auto compute_resistor_divider_gain = [](float up, float low) { return (low + up) / low; };
-
-        /// Transfer function [Voltage] --> [Kelvin] for temperature sensors MCP9700/MCP9700A
-        static const auto temp_tf_MCP9700 = [](float v) { return (100.0F * (v - 0.5F)) + 273.15F; };
-
-        const auto hwver = board::detectHardwareVersion();
-        DEBUG_LOG("HW version %s\n", hwver.toString().c_str());
-
-        if (hwver.major == 1 &&
-            hwver.minor == 0)
-        {
-            return {
-                "Pixhawk ESC v1.6",
-                compute_resistor_divider_gain(5100 * 2, 330 * 2),
-                1 * 1e-3F,
-                { 10.0F, 40.0F },
-                temp_tf_MCP9700
-            };
-        }
-
-        chSysHalt("UNSUPPORTED HARDWARE");
-        return BoardConfig();
-    }
-
-public:
-    BoardFeatures() :
-        board_config_(detectBoardConfig())
-    {
-        std::fill(current_zero_offsets_low_high_.begin(), current_zero_offsets_low_high_.end(),
-                  math::Vector<2>::Ones() * (ADCReferenceVoltage * 0.5F));
-
-        palWritePad(GPIOB, GPIOB_GAIN, true);
-        current_amplifier_high_gain_selected_ = true;
-    }
-
-    const char* getBoardName() const { return board_config_.name; }
-
-    float convertADCVoltageToInverterVoltage(float voltage) const
-    {
-        return voltage * board_config_.inverter_voltage_gain;
-    }
-
-    void adjustCurrentGain(const float period,
-                           const math::Vector<2>& currents)
-    {
-        assert(!isCalibrationInProgress());
-
-        const float upper_threshold = MaxUnipolarVoltageAtCurrentSensorOutput /
-                                      board_config_.current_amplifier_low_high_gains[1] /
-                                      board_config_.current_shunt_resistance;
-
-        const float lower_threshold = upper_threshold * CurrentGainAdjustmentHysteresisCoeff;
-
-        const float peak = currents.lpNorm<Eigen::Infinity>();
-
-        if (peak > (current_amplifier_high_gain_selected_ ? upper_threshold : lower_threshold))
-        {
-            // Current above threshold, selecting low gain
-            setCurrentAmplifierGain(false);
-
-            time_since_current_was_above_high_gain_threshold_ = 0.0F;
-        }
-        else
-        {
-            // Current below threshold, checking if we're allowed to switch
-            if (time_since_current_was_above_high_gain_threshold_ > MinCurrentGainSwitchInterval)
-            {
-                setCurrentAmplifierGain(true);
-            }
-            else
-            {
-                time_since_current_was_above_high_gain_threshold_ += period;
-            }
-        }
-    }
-
-    float getCurrentGain() const
-    {
-        return board_config_.current_amplifier_low_high_gains[int(current_amplifier_high_gain_selected_)];
-    }
-
-    math::Vector<2> convertADCVoltagesToPhaseCurrents(const math::Vector<2>& raw_voltages) const
-    {
-        return (raw_voltages - getCurrentZeroOffsets()) / (board_config_.current_shunt_resistance * getCurrentGain());
-    }
-
-    float convertADCVoltageToInverterTemperature(float voltage) const
-    {
-        return board_config_.temperature_transfer_function(voltage);
-    }
-
-    void beginCalibration()
-    {
-        AbsoluteCriticalSectionLocker locker;
-
-        if (!current_zero_offset_calibrator_.in_progress)
-        {
-            setCurrentAmplifierGain(false);
-
-            current_zero_offset_calibrator_.reset();
-            current_zero_offset_calibrator_.in_progress = true;
-            current_zero_offset_calibrator_.pwm_handle.setPWM(math::Vector<3>::Zero());
-
-            assert(current_zero_offset_calibrator_.pwm_handle.isUnique());
-        }
-    }
-
-    bool isCalibrationInProgress() const
-    {
-        return current_zero_offset_calibrator_.in_progress;
-    }
-
-    void processCalibration(const float period,
-                            const math::Vector<2> current_sensors_output_voltages)
-    {
-        assert(isCalibrationInProgress());
-
-        current_zero_offset_calibrator_.pwm_handle.setPWM(math::Vector<3>::Zero());     // Paranoia
-
-        current_zero_offset_calibrator_.averager.addSample(current_sensors_output_voltages);
-        current_zero_offset_calibrator_.duration += period;
-
-        if (current_zero_offset_calibrator_.duration > CurrentOffsetCalibrationDuration)
-        {
-            if (current_amplifier_high_gain_selected_)
-            {
-                current_zero_offsets_low_high_[1] = current_zero_offset_calibrator_.averager.getAverage();
-                current_zero_offset_calibrator_.reset();
-            }
-            else
-            {
-                current_zero_offsets_low_high_[0] = current_zero_offset_calibrator_.averager.getAverage();
-                setCurrentAmplifierGain(true);
-                current_zero_offset_calibrator_.resetDurationAndAverage();
-            }
-        }
-    }
-} * g_board_features = nullptr;
+BoardFeatures* g_board_features = nullptr;
 
 
 void initPWM(const double pwm_frequency,
@@ -648,17 +430,6 @@ inline void setRawPWM(const std::uint16_t a, const std::uint16_t b, const std::u
 }
 
 
-template <unsigned NumSamples>
-inline float convertADCSamplesToVoltage(const std::uint16_t (&x)[NumSamples])
-{
-    constexpr double VoltsPerLSB = double(ADCReferenceVoltage) / double((1 << ADCResolutionBits) - 1);
-
-    constexpr float ConversionMultiplier = float(VoltsPerLSB / double(NumSamples));
-
-    return float(std::accumulate(std::begin(x), std::end(x), 0U)) * ConversionMultiplier;
-}
-
-
 inline void checkInvariants()
 {
     assert((ADC->CSR & (ADC_CSR_DOVR1 | ADC_CSR_DOVR2 | ADC_CSR_DOVR3)) == 0);                  // ADC overrun
@@ -907,14 +678,14 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
      */
     const math::Vector<2> phase_currents_adc_voltages
     {
-        convertADCSamplesToVoltage(g_dma_buffer_phase_a_current),
-        convertADCSamplesToVoltage(g_dma_buffer_phase_b_current)
+        g_board_features->convertADCSamplesToVoltage(g_dma_buffer_phase_a_current),
+        g_board_features->convertADCSamplesToVoltage(g_dma_buffer_phase_b_current)
     };
 
     // While EN_GATE is low, the current amplifiers are shut down, so we're measuring garbage
     // Also, both voltages near zero means that the current amplifiers are not activated yet
     const bool currents_valid = (PWMHandle::getTotalNumberOfActiveHandles() > 0) &&
-                                (phase_currents_adc_voltages.mean() > MinCurrentSensorsOutputVoltage);
+                                g_board_features->areCurrentSensorOutputsValid(phase_currents_adc_voltages);
 
     const auto phase_currents = currents_valid ?
         g_board_features->convertADCVoltagesToPhaseCurrents(phase_currents_adc_voltages) :
@@ -922,7 +693,7 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
 
     {
         const float new_inverter_voltage = g_board_features->convertADCVoltageToInverterVoltage(
-            convertADCSamplesToVoltage(g_dma_buffer_inverter_voltage));
+            g_board_features->convertADCSamplesToVoltage(g_dma_buffer_inverter_voltage));
 
         g_inverter_voltage += InverterVoltageInnovationWeight * (new_inverter_voltage - g_inverter_voltage);
     }
@@ -992,7 +763,7 @@ CH_FAST_IRQ_HANDLER(STM32_TIM8_CC_HANDLER)
      */
     {
         const std::uint16_t temperature_sample[1] = { std::uint16_t(ADC1->JDR1) };
-        const float new_temperature = convertADCSamplesToVoltage(temperature_sample);
+        const float new_temperature = g_board_features->convertADCSamplesToVoltage(temperature_sample);
         g_inverter_temperature_sensor_voltage +=
             TemperatureInnovationWeight * (new_temperature - g_inverter_temperature_sensor_voltage);
     }
