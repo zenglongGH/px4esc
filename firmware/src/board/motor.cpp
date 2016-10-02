@@ -602,16 +602,6 @@ float getPWMDeadTime()
     return g_dead_time;
 }
 
-float getInverterVoltage()
-{
-    return g_inverter_voltage;          // Atomic read, no need to lock
-}
-
-float getInverterTemperature()
-{
-    return g_board_features->convertADCVoltageToInverterTemperature(g_inverter_temperature_sensor_voltage);
-}
-
 void emergency()
 {
     // Absolute critical section must not be used here, because this function can be invoked from ANY context.
@@ -641,6 +631,7 @@ void printStatus()
 
 Status getStatus()
 {
+    AbsoluteCriticalSectionLocker locker;
     Status s;
 
     s.inverter_temperature =

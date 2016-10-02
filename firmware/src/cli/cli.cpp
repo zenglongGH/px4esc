@@ -286,8 +286,8 @@ class SpinCommand : public os::shell::ICommandHandler
 
         float min_setpoint = 1.0F;
         float max_setpoint = 0.0F;
-        float min_inverter_voltage = board::motor::getInverterVoltage();
-        float max_inverter_voltage = board::motor::getInverterVoltage();
+        float min_inverter_voltage = board::motor::getStatus().inverter_voltage;
+        float max_inverter_voltage = min_inverter_voltage;
 
         while (ios.getChar(1) <= 0)
         {
@@ -309,17 +309,18 @@ class SpinCommand : public os::shell::ICommandHandler
 
             const auto alpha = math::cos(angle) * voltage;
             const auto beta  = math::sin(angle) * voltage;
-            const auto inverter_voltage = board::motor::getInverterVoltage();
 
-            const auto setpoint = foc::performSpaceVectorTransform({alpha, beta}, inverter_voltage).first;
+            const auto status = board::motor::getStatus();
+
+            const auto setpoint = foc::performSpaceVectorTransform({alpha, beta}, status.inverter_voltage).first;
 
             pwm_handle.setPWM(setpoint);
 
             // Collecting statistics
             min_setpoint = std::min(min_setpoint, setpoint[0]);
             max_setpoint = std::max(max_setpoint, setpoint[0]);
-            min_inverter_voltage = std::min(min_inverter_voltage, inverter_voltage);
-            max_inverter_voltage = std::max(max_inverter_voltage, inverter_voltage);
+            min_inverter_voltage = std::min(min_inverter_voltage, status.inverter_voltage);
+            max_inverter_voltage = std::max(max_inverter_voltage, status.inverter_voltage);
 
             // This line allows to monitor the setpoint values using the serial plotting script
             //ios.print("$%.3f,%.3f,%.3f\n", double(setpoint[0]), double(setpoint[1]), double(setpoint[2]));

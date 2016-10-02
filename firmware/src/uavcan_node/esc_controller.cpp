@@ -101,8 +101,9 @@ void cbTimer(const uavcan::TimerEvent& event)
 
     status.esc_index = g_self_index;
 
-    status.voltage     = board::motor::getInverterVoltage();
-    status.temperature = board::motor::getInverterTemperature();
+    const auto hw_status = board::motor::getStatus();
+    status.voltage     = hw_status.inverter_voltage;
+    status.temperature = hw_status.inverter_temperature;
 
     status.current = foc::getInstantCurrent();
 
