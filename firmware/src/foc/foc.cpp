@@ -358,19 +358,34 @@ void stop()
 
 Scalar getInstantCurrent()
 {
-    AbsoluteCriticalSectionLocker locker;
+    const auto status = board::motor::getStatus();
+
+    if (!os::float_eq::closeToZero(status.inverter_voltage))
+    {
+        AbsoluteCriticalSectionLocker locker;
+        if (g_context != nullptr)
+        {
+            return g_context->inverter_power / status.inverter_voltage;
+        }
+    }
+
     return 0;
 }
 
-Scalar getInstantPower()
+Scalar getInstantDemandFactor()
 {
-    AbsoluteCriticalSectionLocker locker;
-    return 0;
-}
+    Const max_current = g_motor_params.max_current;
 
-Scalar getMaximumPower()
-{
-    AbsoluteCriticalSectionLocker locker;
+    if (!os::float_eq::closeToZero(max_current) &&
+        (max_current > 0))
+    {
+        AbsoluteCriticalSectionLocker locker;
+        if (g_context != nullptr)
+        {
+            return g_context->reference_Iq / max_current;
+        }
+    }
+
     return 0;
 }
 
@@ -405,6 +420,7 @@ void printStatusInfo()
     Vector<2> estimated_Idq = Vector<2>::Zero();
     Vector<2> reference_Udq = Vector<2>::Zero();
     Scalar reference_Iq = 0;
+    Scalar inverter_power = 0;
 
     {
         AbsoluteCriticalSectionLocker locker;
@@ -421,6 +437,7 @@ void printStatusInfo()
             estimated_Idq       = g_context->estimated_Idq;
             reference_Udq       = g_context->reference_Udq;
             reference_Iq        = g_context->reference_Iq;
+            inverter_power      = g_context->inverter_power;
         }
     }
 
@@ -445,12 +462,14 @@ void printStatusInfo()
                 "Mech. RPM    : %.1f MRPM\n"
                 "Estimated Idq: %s\n"
                 "Reference Udq: %s\n"
-                "Reference Iq : %.1f\n",
+                "Reference Iq : %.1f\n"
+                "Inverter Pwr : %.1f\n",
                 double(angular_velocity),
                 double(mrpm),
                 math::toString(estimated_Idq).c_str(),
                 math::toString(reference_Udq).c_str(),
-                double(reference_Iq));
+                double(reference_Iq),
+                double(inverter_power));
 }
 
 

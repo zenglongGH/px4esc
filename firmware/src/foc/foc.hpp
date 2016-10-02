@@ -162,16 +162,9 @@ void stop();
 Scalar getInstantCurrent();
 
 /**
- * Returns the instant motor power in Watts.
+ * Returns the instant relative power in percent of the maximum.
  */
-Scalar getInstantPower();
-
-/**
- * Returns the maximum power that can be delivered to the motor.
- * This value is defined either by the ESC hardware or by the motor's specification.
- * In conjunction with @ref getInstantPower(), this value can be used to determine the instant power rating in percent.
- */
-Scalar getMaximumPower();
+Scalar getInstantDemandFactor();
 
 /**
  * Generate sound using the motor windings.

@@ -109,14 +109,7 @@ void cbTimer(const uavcan::TimerEvent& event)
 
     status.rpm = 0;     // TODO
 
-    const auto max_power = foc::getMaximumPower();
-    const auto instant_power = foc::getInstantPower();
-
-    if (max_power > 0 &&
-        instant_power > 0)
-    {
-        status.power_rating_pct = std::uint8_t(instant_power / max_power + 0.5F);
-    }
+    status.power_rating_pct = std::uint8_t(foc::getInstantDemandFactor() * 100.0F + 0.5F);
 
     (void) g_pub_status->broadcast(status);
 }
