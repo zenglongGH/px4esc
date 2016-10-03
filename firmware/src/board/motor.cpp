@@ -623,6 +623,26 @@ void emergency()
     TIM8->CR2 = 0;
 }
 
+bool suspend()
+{
+    AbsoluteCriticalSectionLocker locker;
+
+    if (PWMHandle::getTotalNumberOfActiveHandles() == 0)
+    {
+        NVIC_DisableIRQ(ADC_IRQn);
+        return true;
+    }
+
+    return false;
+}
+
+void unsuspend()
+{
+    AbsoluteCriticalSectionLocker locker;
+    NVIC_ClearPendingIRQ(ADC_IRQn);
+    NVIC_EnableIRQ(ADC_IRQn);
+}
+
 void printStatus()
 {
     std::puts(getStatus().toString().c_str());

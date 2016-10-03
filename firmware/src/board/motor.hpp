@@ -122,6 +122,18 @@ float getInverterVoltage();
 void emergency();
 
 /**
+ * Temporarily disables IRQ.
+ * This function must NEVER be called if any processing is underway, including calibration.
+ *
+ * This function is implemented in order to permit modification of the embedded flash memory.
+ * Flash modification takes at least 0.5 seconds, which is eternity compared to the time scales we work here with.
+ *
+ * @return True if suspended, False if the current state does not permit suspension.
+ */
+bool suspend();
+void unsuspend();
+
+/**
  * Prints extended status information into stdout.
  */
 void printStatus();
