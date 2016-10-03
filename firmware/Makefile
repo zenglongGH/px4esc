@@ -82,7 +82,6 @@ UDEFS += -DGIT_HASH=0x$(GIT_HASH)
 #
 
 BUILD_CONFIG = 1
-BUILD_CHIBIOS_SHELL = 1
 
 # 32K bootloader + 16K configuration storage
 APPLICATION_OFFSET = 49152
