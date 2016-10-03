@@ -29,6 +29,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <zubax_chibios/os.hpp>
+#include <zubax_chibios/platform/stm32/config_storage.hpp>
 
 #include "board/board.hpp"
 #include "bootloader_interface/bootloader_interface.hpp"
@@ -91,6 +92,61 @@ os::config::Param<float> g_param_P0_11("foc.obs.p0_11",      0.1F,  1e-6F,  1e+6
 os::config::Param<float> g_param_P0_22("foc.obs.p0_22",      0.1F,  1e-6F,  1e+6F);
 os::config::Param<float> g_param_P0_33("foc.obs.p0_33",      0.1F,  1e-6F,  1e+6F);
 os::config::Param<float> g_param_P0_44("foc.obs.p0_44",      0.1F,  1e-6F,  1e+6F);
+
+
+/**
+ * This wrapper prohibits flash access when normal operation cannot be interrupted.
+ */
+class CustomConfigStorageBackend : public os::stm32::ConfigStorageBackend
+{
+    static bool codeExecutionCanBeInterruptedNow()
+    {
+        const auto state = foc::getState();
+
+        return (state == foc::State::Idle ||
+                state == foc::State::Fault) &&
+               (board::motor::PWMHandle::getTotalNumberOfActiveHandles() == 0) &&
+               !board::motor::isCalibrationInProgress();
+    }
+
+    int write(std::size_t offset, const void* data, std::size_t len) override
+    {
+        if (codeExecutionCanBeInterruptedNow())
+        {
+            DEBUG_LOG("Main: FLASH WRITE PERMITTED\n");
+            const int res = os::stm32::ConfigStorageBackend::write(offset, data, len);
+            DEBUG_LOG("Main: Result %d\n", res);
+            return res;
+        }
+        else
+        {
+            os::lowsyslog("Main: FLASH WRITE DENIED\n");
+            return -EACCES;
+        }
+    }
+
+    int erase() override
+    {
+        if (codeExecutionCanBeInterruptedNow())
+        {
+            DEBUG_LOG("Main: FLASH ERASE PERMITTED\n");
+            const int res = os::stm32::ConfigStorageBackend::erase();
+            DEBUG_LOG("Main: Result %d\n", res);
+            return res;
+        }
+        else
+        {
+            os::lowsyslog("Main: FLASH ERASE DENIED\n");
+            return -EACCES;
+        }
+    }
+
+public:
+    CustomConfigStorageBackend() :
+        os::stm32::ConfigStorageBackend(reinterpret_cast<void*>(0x08008000),
+                                        0x4000)
+    { }
+} g_config_storage_backend;
 
 
 /**
@@ -166,7 +222,7 @@ os::watchdog::Timer init()
     /*
      * Board initialization
      */
-    auto watchdog = board::init(WatchdogTimeoutMSec);
+    auto watchdog = board::init(WatchdogTimeoutMSec, g_config_storage_backend);
 
     const auto fw_version = bootloader_interface::getFirmwareVersion();
 

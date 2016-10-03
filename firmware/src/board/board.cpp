@@ -111,7 +111,8 @@ static void initLEDPWM()
 
 }
 
-os::watchdog::Timer init(unsigned watchdog_timeout_msec)
+os::watchdog::Timer init(unsigned watchdog_timeout_msec,
+                         os::config::IStorageBackend& cfg_backend)
 {
     /*
      * OS initialization first
@@ -139,7 +140,7 @@ os::watchdog::Timer init(unsigned watchdog_timeout_msec)
     /*
      * Configuration manager
      */
-    const int config_init_res = os::config::init();
+    const int config_init_res = os::config::init(&cfg_backend);
     if (config_init_res < 0)
     {
         die(config_init_res);
@@ -253,19 +254,4 @@ void boardInit(void)
 {
 }
 
-}
-
-/*
- * Config storage parameters
- */
-namespace os
-{
-namespace config
-{
-
-extern const unsigned StorageAddress      = 0x08008000;
-extern const unsigned StorageSize         = 0x4000;
-extern const unsigned StorageSectorNumber = 2;
-
-}
 }

@@ -29,6 +29,7 @@
 #include <zubax_chibios/os.hpp>
 #include <hal.h>
 #include <zubax_chibios/util/heapless.hpp>
+#include <zubax_chibios/config/config.hpp>
 
 #include "motor.hpp"
 
@@ -40,7 +41,8 @@ namespace board
  * It initializes a watchdog timer instance ASAP, which ensures that the application
  * will not stuck forever if initialization fails.
  */
-os::watchdog::Timer init(unsigned watchdog_timeout_msec);
+os::watchdog::Timer init(unsigned watchdog_timeout_msec,
+                         os::config::IStorageBackend& cfg_backend);
 
 /**
  * Triggers an OS panic with the specified reason code printed into the serial console.
