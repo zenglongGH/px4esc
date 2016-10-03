@@ -192,4 +192,14 @@ void printStatusInfo();
  */
 void plotRealTimeValues();
 
+/**
+ * Named debug values.
+ * This is suitable for e.g. reporting via UAVCAN.
+ */
+using DebugKeyType = os::heapless::String<3>;
+using DebugKeyValueType = std::pair<DebugKeyType, Scalar>;
+constexpr unsigned NumDebugKeyValuePairs = 4;
+
+std::array<DebugKeyValueType, NumDebugKeyValuePairs> getDebugKeyValuePairs();
+
 }

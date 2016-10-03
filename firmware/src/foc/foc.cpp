@@ -144,8 +144,8 @@ struct Context
     Scalar angular_velocity = 0;                                ///< Radian per second, read in the fast IRQ
     Scalar angular_position = 0;                                ///< Radians [0, Pi*2]; extrapolated in the fast IRQ
 
-    math::Vector<2> estimated_Idq = math::Vector<2>::Zero();    ///< Ampere, updated from the fast IRQ
-    math::Vector<2> reference_Udq = math::Vector<2>::Zero();    ///< Volt, updated from the fast IRQ
+    Vector<2> estimated_Idq = Vector<2>::Zero();                ///< Ampere, updated from the fast IRQ
+    Vector<2> reference_Udq = Vector<2>::Zero();                ///< Volt, updated from the fast IRQ
 
     Scalar reference_Iq = 0;                                    ///< Ampere, read in the fast IRQ
 
@@ -500,6 +500,29 @@ void plotRealTimeValues()
 {
     g_debug_tracer.print();
     IRQDebugOutputBuffer::printIfNeeded();
+}
+
+
+std::array<DebugKeyValueType, NumDebugKeyValuePairs> getDebugKeyValuePairs()
+{
+    Vector<2> Idq = Vector<2>::Zero();
+    Vector<2> Udq = Vector<2>::Zero();
+
+    {
+        AbsoluteCriticalSectionLocker locker;
+        if (g_context != nullptr)
+        {
+            Idq = g_context->estimated_Idq;
+            Udq = g_context->reference_Udq;
+        }
+    }
+
+    return {
+        DebugKeyValueType("Id", Idq[0]),
+        DebugKeyValueType("Iq", Idq[1]),
+        DebugKeyValueType("Ud", Udq[0]),
+        DebugKeyValueType("Uq", Udq[1])
+    };
 }
 
 }

@@ -26,6 +26,7 @@
 #include <uavcan/equipment/esc/RPMCommand.hpp>
 #include <uavcan/equipment/esc/RawCommand.hpp>
 #include <uavcan/equipment/esc/Status.hpp>
+#include <uavcan/protocol/debug/KeyValue.hpp>
 #include <zubax_chibios/os.hpp>
 #include <foc/foc.hpp>
 #include <cstdint>
@@ -48,6 +49,7 @@ os::config::Param<float>        g_param_esc_status_interval_passive("uavcan.esc_
 
 
 uavcan::LazyConstructor<uavcan::Publisher<uavcan::equipment::esc::Status>> g_pub_status;
+uavcan::LazyConstructor<uavcan::Publisher<uavcan::protocol::debug::KeyValue>> g_pub_key_value;
 uavcan::LazyConstructor<uavcan::Timer> g_timer;
 
 std::uint8_t g_self_index;
@@ -97,21 +99,34 @@ void cbTimer(const uavcan::TimerEvent& event)
     /*
      * Publishing status
      */
-    uavcan::equipment::esc::Status status;
+    {
+        uavcan::equipment::esc::Status status;
+        const auto hw_status = board::motor::getStatus();
 
-    status.esc_index = g_self_index;
+        status.esc_index = g_self_index;
+        status.voltage     = hw_status.inverter_voltage;
+        status.temperature = hw_status.inverter_temperature;
+        status.current = foc::getInstantCurrent();
+        status.rpm = static_cast<std::int32_t>(std::round(foc::getInstantMechanicalRPM()));
+        status.power_rating_pct = std::uint8_t(foc::getInstantDemandFactor() * 100.0F + 0.5F);
 
-    const auto hw_status = board::motor::getStatus();
-    status.voltage     = hw_status.inverter_voltage;
-    status.temperature = hw_status.inverter_temperature;
+        (void) g_pub_status->broadcast(status);
+    }
 
-    status.current = foc::getInstantCurrent();
+    /*
+     * Publishing debug parameters, only in debug builds
+     */
+#if defined(DEBUG_BUILD) && DEBUG_BUILD
 
-    status.rpm = static_cast<std::int32_t>(std::round(foc::getInstantMechanicalRPM()));
+    for (auto& kv : foc::getDebugKeyValuePairs())
+    {
+        uavcan::protocol::debug::KeyValue msg;
+        msg.key = kv.first.c_str();
+        msg.value = kv.second;
+        (void) g_pub_key_value->broadcast(msg);
+    }
 
-    status.power_rating_pct = std::uint8_t(foc::getInstantDemandFactor() * 100.0F + 0.5F);
-
-    (void) g_pub_status->broadcast(status);
+#endif
 }
 
 } // namespace
@@ -132,7 +147,14 @@ int init(uavcan::INode& node)
      * Publishers
      */
     g_pub_status.construct<uavcan::INode&>(node);
-    const int pub_init_res = g_pub_status->init(StatusTransferPriority);
+    int pub_init_res = g_pub_status->init(StatusTransferPriority);
+    if (pub_init_res < 0)
+    {
+        return pub_init_res;
+    }
+
+    g_pub_key_value.construct<uavcan::INode&>(node);
+    pub_init_res = g_pub_key_value->init(uavcan::TransferPriority::OneHigherThanLowest);
     if (pub_init_res < 0)
     {
         return pub_init_res;
