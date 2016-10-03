@@ -254,3 +254,18 @@ void boardInit(void)
 }
 
 }
+
+/*
+ * Config storage parameters
+ */
+namespace os
+{
+namespace config
+{
+
+extern const unsigned StorageAddress      = 0x08008000;
+extern const unsigned StorageSize         = 0x4000;
+extern const unsigned StorageSectorNumber = 2;
+
+}
+}
