@@ -35,6 +35,8 @@ namespace foc
 using math::Scalar;
 using math::Const;
 using math::Vector;
+using math::Matrix;
+using math::DiagonalMatrix;
 using board::motor::AbsoluteCriticalSectionLocker;
 
 

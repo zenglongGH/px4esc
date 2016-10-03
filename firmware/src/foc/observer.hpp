@@ -24,9 +24,9 @@
 
 #pragma once
 
-#include <math/math.hpp>
 #include <cassert>
 #include <zubax_chibios/util/heapless.hpp>
+#include "common.hpp"
 
 
 namespace foc
@@ -38,20 +38,20 @@ namespace foc
  */
 struct ObserverParameters
 {
-    math::DiagonalMatrix<4> Q  = math::makeDiagonalMatrix(100.0F,
-                                                          100.0F,
-                                                          5.0F,
-                                                          1.0F);
+    DiagonalMatrix<4> Q  = math::makeDiagonalMatrix(100.0F,
+                                                    100.0F,
+                                                    5.0F,
+                                                    1.0F);
 
-    math::DiagonalMatrix<2> R  = math::makeDiagonalMatrix(2.0F,
-                                                          2.0F);
+    DiagonalMatrix<2> R  = math::makeDiagonalMatrix(2.0F,
+                                                    2.0F);
 
-    math::DiagonalMatrix<4> P0 = math::makeDiagonalMatrix(1000.0F,
-                                                          1000.0F,
-                                                          0.1F,      // We know that initial angular velocity is zero
-                                                          5000.0F);  // We don't know initial angular position
+    DiagonalMatrix<4> P0 = math::makeDiagonalMatrix(1000.0F,
+                                                    1000.0F,
+                                                    0.1F,      // We know that initial angular velocity is zero
+                                                    5000.0F);  // We don't know initial angular position
 
-    math::Scalar cross_coupling_compensation = 0.8F;
+    Scalar cross_coupling_compensation = 0.8F;
 
     auto toString() const
     {
@@ -82,45 +82,45 @@ public:
     };
 
 private:
-    math::Const phi_;
-    math::Const ld_;
-    math::Const lq_;
-    math::Const r_;
+    Const phi_;
+    Const ld_;
+    Const lq_;
+    Const r_;
 
     static constexpr unsigned StateIndexAngularVelocity = 2;
     static constexpr unsigned StateIndexAngularPosition = 3;
 
-    math::Const cross_coupling_comp_;
+    Const cross_coupling_comp_;
 
-    const math::Matrix<4, 4> Q_;
-    const math::Matrix<2, 2> R_;
+    const Matrix<4, 4> Q_;
+    const Matrix<2, 2> R_;
 
-    const math::Matrix<2, 4> C_;
+    const Matrix<2, 4> C_;
 
     DirectionConstraint direction_constraint_ = DirectionConstraint::None;
 
     // Filter states
-    math::Vector<4> x_ = math::Vector<4>::Zero();
-    math::Matrix<4, 4> P_;
+    Vector<4> x_ = Vector<4>::Zero();
+    Matrix<4, 4> P_;
 
 public:
     Observer(const ObserverParameters& parameters,
-             math::Const field_flux,
-             math::Const stator_phase_inductance_direct,
-             math::Const stator_phase_inductance_quadrature,
-             math::Const stator_phase_resistance);
+             Const field_flux,
+             Const stator_phase_inductance_direct,
+             Const stator_phase_inductance_quadrature,
+             Const stator_phase_resistance);
 
-    void update(math::Const dt,
-                const math::Vector<2>& idq,
-                const math::Vector<2>& udq);
+    void update(Const dt,
+                const Vector<2>& idq,
+                const Vector<2>& udq);
 
     void setDirectionConstraint(DirectionConstraint dc) { direction_constraint_ = dc; }
 
-    math::Vector<2> getIdq() const { return x_.block<2, 1>(0, 0); }
+    Vector<2> getIdq() const { return x_.block<2, 1>(0, 0); }
 
-    math::Scalar getAngularVelocity() const { return x_[StateIndexAngularVelocity]; }
+    Scalar getAngularVelocity() const { return x_[StateIndexAngularVelocity]; }
 
-    math::Scalar getAngularPosition() const { return x_[StateIndexAngularPosition]; }
+    Scalar getAngularPosition() const { return x_[StateIndexAngularPosition]; }
 };
 
 }

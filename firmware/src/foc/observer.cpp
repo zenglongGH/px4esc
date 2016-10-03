@@ -37,9 +37,6 @@ namespace
 using math::makeMatrix;
 using math::makeDiagonalMatrix;
 using math::makeRow;
-using math::Const;
-using math::Vector;
-using math::Matrix;
 
 
 Observer::Observer(const ObserverParameters& parameters,
