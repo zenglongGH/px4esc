@@ -64,12 +64,13 @@ volatile Scalar g_setpoint;
 
 volatile Scalar g_setpoint_remaining_ttl;       ///< Seconds left before the setpoint will be zeroed, unless updated
 
+volatile std::uint32_t g_num_successive_rotor_stalls = 0;
+
 board::motor::PWMHandle g_pwm_handle;
 
 MotorIdentificationMode g_requested_motor_identification_mode;
 
 HardwareTester::TestReport g_last_hardware_test_report;
-
 
 EventCounter g_fast_irq_cycle_counter;
 
@@ -220,7 +221,8 @@ bool isStatusOk()
 {
     return g_last_hardware_test_report.isSuccessful() &&
            g_motor_params.isValid() &&
-           board::motor::getStatus().isOkay();
+           board::motor::getStatus().isOkay() &&
+           (g_num_successive_rotor_stalls < g_motor_params.num_stalls_to_latch);
 }
 
 } // namespace
@@ -335,10 +337,10 @@ void setSetpoint(ControlMode control_mode,
 
     case State::Fault:
     {
-        // When setting zero setpoint at the fault state, reset the state to idle.
+        // When setting zero setpoint at the fault state, reset the rotor stall counter
         if (std::abs(value) < 1e-3F)
         {
-            g_state = State::Idle;
+            g_num_successive_rotor_stalls = 0;
         }
         break;
     }
@@ -444,6 +446,7 @@ void printStatusInfo()
     State state = State();
     ControlMode control_mode = ControlMode();
     Scalar setpoint = 0;
+    std::uint32_t num_successive_rotor_stalls = 0;
 
     EventCounter Udq_normalizations;
 
@@ -460,6 +463,8 @@ void printStatusInfo()
         control_mode    = g_control_mode;
         setpoint        = g_setpoint;
 
+        num_successive_rotor_stalls = g_num_successive_rotor_stalls;
+
         if (g_context != nullptr)
         {
             Udq_normalizations = g_context->modulator.getUdqNormalizationCounter();
@@ -474,8 +479,12 @@ void printStatusInfo()
 
     std::printf("State        : %d\n"
                 "Control Mode : %d\n"
-                "Setpoint     : %.3f\n",
-                int(state), int(control_mode), double(setpoint));
+                "Setpoint     : %.3f\n"
+                "Succ. Stalls : %u\n",
+                int(state),
+                int(control_mode),
+                double(setpoint),
+                unsigned(num_successive_rotor_stalls));
 
     std::printf("Udq Norm. Cnt: %s\n",
                 Udq_normalizations.toString().c_str());
@@ -603,6 +612,7 @@ void handleMainIRQ(Const period)
                 // Stopping if the angular velocity is too low
                 if (std::abs(g_context->angular_velocity) < (g_motor_params.min_electrical_ang_vel * 0.25F))
                 {
+                    g_num_successive_rotor_stalls++;
                     g_state = State::Spinup;    // Dropping into the spinup mode to change direction if necessary
                 }
             }
@@ -669,6 +679,7 @@ void handleMainIRQ(Const period)
                 // Fault detection
                 if (std::abs(g_context->reference_Iq) < g_motor_params.min_current)
                 {
+                    g_num_successive_rotor_stalls++;
                     g_setpoint = 0;     // Stopping
                 }
             }
@@ -707,10 +718,16 @@ void handleMainIRQ(Const period)
         if (!os::float_eq::closeToZero(g_setpoint))
         {
             initializeContext();
-
             g_context->reference_Iq = 0;
-
             g_state = State::Spinup;
+        }
+    }
+
+    if (g_state == State::Fault)
+    {
+        if (isStatusOk())
+        {
+            g_state = State::Idle;
         }
     }
 }

@@ -53,6 +53,8 @@ struct MotorParameters
 
     std::uint_fast8_t num_poles = 0;    ///< Number of magnetic poles (not pairs!); must be a positive even number
 
+    std::uint32_t num_stalls_to_latch = 0; ///< If the rotor stalled this many times in a row, latch into FAULT state
+
 
     static math::Range<> getPhiLimits()
     {
@@ -88,6 +90,7 @@ struct MotorParameters
                getLabLimits().contains(l_ab)            &&
                (num_poles >= 2)                         &&
                (num_poles % 2 == 0)                     &&
+               (num_stalls_to_latch >= 1)               &&
                (max_current > min_current)              &&
                (max_current >= spinup_current)          &&
                (spinup_current > min_current);
@@ -110,30 +113,33 @@ struct MotorParameters
                                                                  num_poles);
         }
 
-        return os::heapless::format("Tspup: %-7.1f s\n"
-                                    "Wmin : %-7.1f Rad/s, %.1f MRPM\n"
-                                    "Imin : %-7.1f A\n"
-                                    "Imax : %-7.1f A\n"
-                                    "Ispup: %-7.1f A\n"
-                                    "Iramp: %-7.1f A/s\n"
-                                    "Phi  : %-7.3f mWb\n"
-                                    "Rab  : %-7.3f Ohm\n"
-                                    "Lab  : %-7.3f uH\n"
-                                    "Npols: %u, %.1f MRPM/V\n"
-                                    "Valid: %s",
-                                    double(nominal_spinup_duration),
-                                    double(min_electrical_ang_vel),
-                                    double(min_mrpm),
-                                    double(min_current),
-                                    double(max_current),
-                                    double(spinup_current),
-                                    double(current_ramp_amp_per_s),
-                                    double(phi) * 1e3,
-                                    double(r_ab),
-                                    double(l_ab) * 1e6,
-                                    unsigned(num_poles),
-                                    double(kv),
-                                    isValid() ? "YES" : "NO");
+        return os::heapless::String<220>(
+            "Tspup: %-7.1f s\n"
+            "Wmin : %-7.1f Rad/s, %.1f MRPM\n"
+            "Imin : %-7.1f A\n"
+            "Imax : %-7.1f A\n"
+            "Ispup: %-7.1f A\n"
+            "Iramp: %-7.1f A/s\n"
+            "Phi  : %-7.3f mWb\n"
+            "Rab  : %-7.3f Ohm\n"
+            "Lab  : %-7.3f uH\n"
+            "Npols: %u, %.1f MRPM/V\n"
+            "Nstlt: %u\n"
+            "Valid: %s").format(
+            double(nominal_spinup_duration),
+            double(min_electrical_ang_vel),
+            double(min_mrpm),
+            double(min_current),
+            double(max_current),
+            double(spinup_current),
+            double(current_ramp_amp_per_s),
+            double(phi) * 1e3,
+            double(r_ab),
+            double(l_ab) * 1e6,
+            unsigned(num_poles),
+            double(kv),
+            unsigned(num_stalls_to_latch),
+            isValid() ? "YES" : "NO");
     }
 };
 
