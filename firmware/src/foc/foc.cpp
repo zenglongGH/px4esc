@@ -215,6 +215,14 @@ void doStop()
     }
 }
 
+
+bool isStatusOk()
+{
+    return g_last_hardware_test_report.isSuccessful() &&
+           g_motor_params.isValid() &&
+           board::motor::getStatus().isOkay();
+}
+
 } // namespace
 
 
@@ -690,8 +698,7 @@ void handleMainIRQ(Const period)
     if (g_state == State::Idle)
     {
         // Retaining the Fault state if there's something wrong
-        if (!g_motor_params.isValid() ||
-            !g_last_hardware_test_report.isSuccessful())
+        if (!isStatusOk())
         {
             g_setpoint = 0;             // No way
             g_state = State::Fault;
