@@ -193,29 +193,14 @@ class ParamManager : public uavcan::IParamManager
         }
     }
 
-    static bool isControllerIdle()
-    {
-        const auto state = foc::getState();
-        return state == foc::State::Idle ||
-               state == foc::State::Fault;
-    }
-
     int saveAllParams() override
     {
-        if (isControllerIdle())         // This should be managed on a lower level
-        {
-            return configSave();
-        }
-        return false;
+        return configSave();
     }
 
     int eraseAllParams() override
     {
-        if (isControllerIdle())
-        {
-            return configErase();
-        }
-        return false;
+        return configErase();
     }
 } g_param_manager;
 

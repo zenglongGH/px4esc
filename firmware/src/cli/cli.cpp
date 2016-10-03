@@ -109,19 +109,9 @@ class ConfigCommand : public os::shell::ICommandHandler
 {
     const char* getName() const override { return "cfg"; }
 
-    void execute(os::shell::BaseChannelWrapper& ios, int argc, char** argv) override
+    void execute(os::shell::BaseChannelWrapper&, int argc, char** argv) override
     {
-        const auto state = foc::getState();
-
-        if (state == foc::State::Idle ||
-            state == foc::State::Fault)
-        {
-            (void) os::config::executeCLICommand(argc - 1, &argv[1]);
-        }
-        else
-        {
-            ios.puts("ERROR: CONFIGURATION ACCESS DENIED, CONTROLLER NOT IDLE");
-        }
+        (void) os::config::executeCLICommand(argc - 1, &argv[1]);
     }
 } static cmd_cfg;
 
