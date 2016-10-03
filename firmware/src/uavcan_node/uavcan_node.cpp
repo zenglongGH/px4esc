@@ -35,6 +35,7 @@
 #include <uavcan/protocol/restart_request_server.hpp>
 
 #include <board/board.hpp>
+#include <foc/foc.hpp>
 
 #include <unistd.h>
 
@@ -192,14 +193,29 @@ class ParamManager : public uavcan::IParamManager
         }
     }
 
+    static bool isControllerIdle()
+    {
+        const auto state = foc::getState();
+        return state == foc::State::Idle ||
+               state == foc::State::Fault;
+    }
+
     int saveAllParams() override
     {
-        return configSave();
+        if (isControllerIdle())         // This should be managed on a lower level
+        {
+            return configSave();
+        }
+        return false;
     }
 
     int eraseAllParams() override
     {
-        return configErase();
+        if (isControllerIdle())
+        {
+            return configErase();
+        }
+        return false;
     }
 } g_param_manager;
 
