@@ -273,23 +273,7 @@ class SpinCommand : public os::shell::ICommandHandler
         /*
          * Spinning until keyhit
          */
-        struct PriorityAdjustmentExpert
-        {
-            const ::tprio_t good_old_priority = chThdGetPriorityX();
-
-            PriorityAdjustmentExpert()
-            {
-                constexpr ::tprio_t TargetPriority = HIGHPRIO - 5;
-                DEBUG_LOG("Raising priority %d --> %d\n", int(good_old_priority), int(TargetPriority));
-                chibios_rt::BaseThread::setPriority(TargetPriority);
-            }
-
-            ~PriorityAdjustmentExpert()
-            {
-                chibios_rt::BaseThread::setPriority(good_old_priority);
-                DEBUG_LOG("Priority restored to %d\n", int(good_old_priority));
-            }
-        } priority_adjustment_expert;
+        os::TemporaryPriorityChanger priority_adjustment_expert(HIGHPRIO - 5);
 
         ios.print("Spinning at %.1f rad/s, %.1f V. Type any character to stop.\n",
                   double(angular_velocity), double(voltage));
