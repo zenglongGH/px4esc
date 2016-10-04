@@ -72,13 +72,15 @@ class CustomConfigStorageBackend : public os::stm32::ConfigStorageBackend
 
     int write(std::size_t offset, const void* data, std::size_t len) override
     {
+        // Raising priority allows to prevent race condition when accessing the inverter driver
+        os::TemporaryPriorityChanger priority_adjustment_expert(HIGHPRIO);
+
         if (codeExecutionCanBeInterruptedNow() &&
             board::motor::suspend())
         {
-            DEBUG_LOG("Main: FLASH WRITE PERMITTED\n");
             const int res = os::stm32::ConfigStorageBackend::write(offset, data, len);
             board::motor::unsuspend();
-            DEBUG_LOG("Main: Result %d\n", res);
+            DEBUG_LOG("Main: Flash write result: %d\n", res);
             return res;
         }
         else
@@ -90,13 +92,14 @@ class CustomConfigStorageBackend : public os::stm32::ConfigStorageBackend
 
     int erase() override
     {
+        os::TemporaryPriorityChanger priority_adjustment_expert(HIGHPRIO);
+
         if (codeExecutionCanBeInterruptedNow() &&
             board::motor::suspend())
         {
-            DEBUG_LOG("Main: FLASH ERASE PERMITTED\n");
             const int res = os::stm32::ConfigStorageBackend::erase();
             board::motor::unsuspend();
-            DEBUG_LOG("Main: Result %d\n", res);
+            DEBUG_LOG("Main: Flash erase result: %d\n", res);
             return res;
         }
         else

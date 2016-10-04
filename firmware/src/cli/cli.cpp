@@ -758,6 +758,8 @@ class CLIThread : public chibios_rt::BaseStaticThread<2048>
 
     void main() override
     {
+        setName("cli");
+
         /*
          * TODO: Add USB support in the future. At the moment this is not possible, because USB requires 48 MHz
          *       clock, and the application requires 180 MHz core clock; both can be obtained only if SAI is
