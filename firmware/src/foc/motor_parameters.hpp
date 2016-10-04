@@ -75,6 +75,15 @@ struct MotorParameters
     }
 
 
+    void deduceMissingParameters()
+    {
+        if (!os::float_eq::positive(spinup_current) &&
+            os::float_eq::positive(max_current))
+        {
+            spinup_current = max_current * 0.5F;
+        }
+    }
+
     bool isValid() const
     {
         static const auto is_positive = [](Const x) { return (x > 0) && std::isfinite(x); };

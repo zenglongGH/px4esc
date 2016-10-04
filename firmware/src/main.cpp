@@ -37,6 +37,7 @@
 #include "cli/cli.hpp"
 #include "foc/foc.hpp"
 #include "motor_database/motor_database.hpp"
+#include "params.hpp"
 
 #if __GNUC__ < 5
 # error "GCC version 5.x or newer is required"
@@ -50,48 +51,8 @@ namespace
 
 constexpr unsigned WatchdogTimeoutMSec = 1500;
 
-/*
- * Configuration parameters.                             Name                Default     Min       Max
- */
-/*
- * Motor profile parameters.
- * All of these values should be provided by the motor manufacturer.
- * If not, automatic identification can be used (see below).
- * Note that most of the parameters are by default assigned invalid values.
- */
-os::config::Param<float> g_config_motor_start_current   ("mot.min_curr",        2.0F,    0.1F,    50.0F);  // Ampere
-os::config::Param<float> g_config_motor_max_current     ("mot.max_curr",      100.0F,   10.0F,   200.0F);  // Ampere
-os::config::Param<float> g_config_motor_field_flux      ("mot.phi",             0.0F,    0.0F,    10.0F);  // Weber
-os::config::Param<float> g_config_motor_resistance_ab   ("mot.r_ab",            0.0F,    0.0F,   100.0F);  // Ohm
-os::config::Param<float> g_config_motor_inductance_ab   ("mot.l_ab",            0.0F,    0.0F,     1.0F);  // Henry
-os::config::Param<unsigned> g_config_motor_num_poles    ("mot.num_poles",          0,       0,      200);
 
-/*
- * Auto identification settings.
- * If automatic identification is selected, it will be performed once, and the identified parameters will be stored
- * as the appropriate configuration parameters. Once Auto ID is complete, the auto ID level configuration parameter
- * will be reset to zero automatically.
- */
-os::config::Param<unsigned> g_config_motor_auto_id_level("mot.auto_id_lvl",        0,       0,        2);
-
-/*
- * FOC observer parameters.
- */
-// Cross-coupling compensation constant
-os::config::Param<float> g_param_cross_coupling_compensation("foc.obs.cc_comp", 0.5F, 0.0F, 10.0F);
-// Kalman filter Q matrix (process noise covariance)
-os::config::Param<float> g_param_Q_11("foc.obs.q_11",      100.0F,  1e-6F,  1e+6F);
-os::config::Param<float> g_param_Q_22("foc.obs.q_22",      100.0F,  1e-6F,  1e+6F);
-os::config::Param<float> g_param_Q_33("foc.obs.q_33",     5000.0F,  1e-6F,  1e+6F);
-os::config::Param<float> g_param_Q_44("foc.obs.q_44",        5.0F,  1e-6F,  1e+6F);
-// Kalman filter R matrix (measurement noise)
-os::config::Param<float> g_param_R_11("foc.obs.r_11",        2.0F,  1e-6F,  1e+6F);
-os::config::Param<float> g_param_R_22("foc.obs.r_22",        2.0F,  1e-6F,  1e+6F);
-// Kalman filter initial value of the P matrix (state estimate covariance)
-os::config::Param<float> g_param_P0_11("foc.obs.p0_11",      0.1F,  1e-6F,  1e+6F);
-os::config::Param<float> g_param_P0_22("foc.obs.p0_22",      0.1F,  1e-6F,  1e+6F);
-os::config::Param<float> g_param_P0_33("foc.obs.p0_33",      0.1F,  1e-6F,  1e+6F);
-os::config::Param<float> g_param_P0_44("foc.obs.p0_44",      0.1F,  1e-6F,  1e+6F);
+os::config::Param<int> g_param_motor_db_entry("motor_db.entry",    -1,     -1, 10000);
 
 
 /**
@@ -262,23 +223,34 @@ os::watchdog::Timer init()
 
     os::lowsyslog("Hardware test result:\n%s\n\n", foc::getLastHardwareTestReport().toString().c_str());
 
-    // TODO Motor parameter initialization should go here
+    // Motor parameters initialization
     {
-        foc::MotorParameters motor_params = motor_database::getByName("XAircraft 650").parameters;
+        if (g_param_motor_db_entry.get() >= 0)
+        {
+            unsigned index = unsigned(g_param_motor_db_entry.get());
+            const auto entry = motor_database::getByIndex(index);
+
+            os::lowsyslog("Main: Overwriting motor params from the selected Motor DB entry %u '%s'...\n",
+                          index, entry.name.c_str());
+
+            params::writeMotorParameters(entry.parameters);
+        }
+
+        os::lowsyslog("Main: Restoring motor params...\n");
+        const auto motor_params = params::readMotorParameters();
+        os::lowsyslog("%s\n\n", motor_params.toString().c_str());
 
         foc::setMotorParameters(motor_params);
     }
 
-    os::lowsyslog("Motor params:\n%s\n\n", foc::getMotorParameters().toString().c_str());
-
-    // TODO Observer parameter initialization should go here
+    // Observer parameters initialization
     {
-        foc::ObserverParameters observer_params;
+        os::lowsyslog("Params: Restoring observer params...\n");
+        const auto observer_params = params::readObserverParameters();
+        os::lowsyslog("%s\n\n", observer_params.toString().c_str());
 
         foc::setObserverParameters(observer_params);
     }
-
-    os::lowsyslog("Observer params:\n%s\n\n", foc::getObserverParameters().toString().c_str());
 
     // Initializing to Idle
     foc::stop();
