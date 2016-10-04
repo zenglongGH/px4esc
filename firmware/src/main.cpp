@@ -234,6 +234,11 @@ os::watchdog::Timer init()
                           index, entry.name.c_str());
 
             params::writeMotorParameters(entry.parameters);
+
+            // Resetting the DB entry index - parameters are now stored in the custom configuration
+            g_param_motor_db_entry.set(int(g_param_motor_db_entry.default_));
+            os::lowsyslog("Main: Parameter '%s' has been reset back to %d\n",
+                          g_param_motor_db_entry.name, int(g_param_motor_db_entry.default_));
         }
 
         os::lowsyslog("Main: Restoring motor params...\n");
