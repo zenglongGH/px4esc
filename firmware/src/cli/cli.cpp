@@ -765,6 +765,48 @@ class PlotCommand : public os::shell::ICommandHandler
 } static cmd_plot;
 
 
+class ThreadsCommand : public os::shell::ICommandHandler
+{
+    const char* getName() const override { return "threads"; }
+
+    void execute(os::shell::BaseChannelWrapper& ios, int, char**) override
+    {
+        static const char* const ThreadStateNames[] = { CH_STATE_NAMES };
+
+        static const auto gauge_free_stack = [](const ::thread_t* tp)
+        {
+            const std::uint8_t* limit = reinterpret_cast<std::uint8_t*>(tp->p_stklimit);
+            const unsigned current = reinterpret_cast<unsigned>(tp->p_ctx.r13);
+            unsigned num_bytes = 0;
+            while ((*limit++ == CH_DBG_STACK_FILL_VALUE) &&
+                   (reinterpret_cast<unsigned>(limit) < current))
+            {
+                num_bytes++;
+            }
+            return num_bytes;
+        };
+
+        ios.puts("Name             State     FStk Prio");
+        ios.puts("-------------------------------------");
+        ::thread_t* tp = chRegFirstThread();
+        do
+        {
+            ios.print("%-16s %-9s %-4u %-4u\n",
+                      tp->p_name,
+                      ThreadStateNames[tp->p_state],
+                      gauge_free_stack(tp),
+                      static_cast<unsigned>(tp->p_prio));
+            tp = chRegNextThread(tp);
+        }
+        while (tp != nullptr);
+
+        ios.puts("");
+
+        ios.print("Stack reserved for IRQ handlers: %u\n", PORT_INT_REQUIRED_STACK);
+    }
+} static cmd_threads;
+
+
 class CLIThread : public chibios_rt::BaseStaticThread<2048>
 {
     os::shell::Shell<20> shell_;
@@ -809,6 +851,7 @@ public:
         (void) shell_.addCommandHandler(&cmd_hardware_test);
         (void) shell_.addCommandHandler(&cmd_motor_database);
         (void) shell_.addCommandHandler(&cmd_plot);
+        (void) shell_.addCommandHandler(&cmd_threads);
     }
 
     virtual ~CLIThread() { }
