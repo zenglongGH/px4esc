@@ -122,7 +122,7 @@ struct MotorParameters
                                                                  num_poles);
         }
 
-        return os::heapless::String<220>(
+        return os::heapless::String<240>(
             "Tspup: %-7.1f s\n"
             "Wmin : %-7.1f Rad/s, %.1f MRPM\n"
             "Imin : %-7.1f A\n"

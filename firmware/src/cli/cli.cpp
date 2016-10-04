@@ -37,6 +37,7 @@
 #include <foc/transforms.hpp>
 #include <foc/irq_debug_output.hpp>
 #include <motor_database/motor_database.hpp>
+#include <params.hpp>
 
 #include <cstdlib>
 #include <unistd.h>
@@ -552,7 +553,19 @@ class MotorIdentificationCommand : public os::shell::ICommandHandler
             ios.puts(" Done.");
         }
 
-        ios.puts(foc::getMotorParameters().toString().c_str());
+        // Handling the result
+        const auto params = foc::getMotorParameters();
+        ios.puts(params.toString().c_str());
+
+        if (params.isValid())
+        {
+            ios.puts("Overwriting custom motor params with identified values");
+            params::writeMotorParameters(params);
+        }
+        else
+        {
+            ios.puts("Params are incomplete or identification failed, custom params are left unchanged");
+        }
     }
 } static cmd_motor_identification;
 
