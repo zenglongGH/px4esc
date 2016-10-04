@@ -112,9 +112,9 @@ foc::MotorParameters readMotorParameters()
     out.max_current             = g_max_current.get();
     out.spinup_current          = g_spinup_current.get();
     out.current_ramp_amp_per_s  = g_current_ramp.get();
-    out.phi                     = g_field_flux.get();
+    out.phi                     = g_field_flux.get() * 1e-3F;
     out.r_ab                    = g_resistance_ab.get();
-    out.l_ab                    = g_inductance_ab.get();
+    out.l_ab                    = g_inductance_ab.get() * 1e-6F;
     out.num_poles               = g_num_poles.get();
     out.num_stalls_to_latch     = g_num_attempts.get();
 
@@ -136,9 +136,9 @@ void writeMotorParameters(const foc::MotorParameters& obj)
     assign(g_max_current,        obj.max_current);
     assign(g_spinup_current,     obj.spinup_current);
     assign(g_current_ramp,       obj.current_ramp_amp_per_s);
-    assign(g_field_flux,         obj.phi);
+    assign(g_field_flux,         obj.phi * 1e3F);
     assign(g_resistance_ab,      obj.r_ab);
-    assign(g_inductance_ab,      obj.l_ab);
+    assign(g_inductance_ab,      obj.l_ab * 1e6F);
     assign(g_num_poles,          obj.num_poles);
     assign(g_num_attempts,       obj.num_stalls_to_latch);
 }
