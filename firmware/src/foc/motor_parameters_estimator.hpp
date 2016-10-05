@@ -510,10 +510,7 @@ public:
                                                                  math::sin(state_variables_[IdxAngPos]),
                                                                  math::cos(state_variables_[IdxAngPos]));
 
-                    const auto uncompensated = performSpaceVectorTransform(Uab, inverter_voltage).first;
-
-                    // Compensation is not used because it underperforms at low currents
-                    pwm_vector = uncompensated;
+                    pwm_vector = performSpaceVectorTransform(Uab, inverter_voltage).first;
                 }
                 else
                 {
@@ -573,6 +570,13 @@ public:
         if (state_ == State::LsMeasurement)
         {
             out[4] = Scalar(voltage_modulator_wrapper_.access().getUdqNormalizationCounter().get());
+        }
+
+        if (state_ == State::PhiMeasurementInitialization ||
+            state_ == State::PhiMeasurementAcceleration ||
+            state_ == State::PhiMeasurement)
+        {
+            out[4] = result_.phi;
         }
 
         return out;
