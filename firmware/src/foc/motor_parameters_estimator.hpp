@@ -576,7 +576,7 @@ public:
             state_ == State::PhiMeasurementAcceleration ||
             state_ == State::PhiMeasurement)
         {
-            out[4] = result_.phi;
+            out[4] = result_.phi * 1e3F;
         }
 
         return out;
