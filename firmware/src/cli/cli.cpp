@@ -230,10 +230,11 @@ class SpinCommand : public os::shell::ICommandHandler
 
         if (argc <= 1)
         {
-            ios.print("Spin the motor by means of blind rotation of the voltage vector.\n"
-                      "This command is inteneded for testing and debugging purposes. Usage:\n");
-            ios.print("\t%s <angular velocity, rad/sec electrical> [voltage magnitude]\n"
-                      "Voltage magnitude defaults to %.fV. Press any key to stop rotation.\n",
+            ios.puts("Spin the motor by means of blind rotation of the voltage vector.\n"
+                     "This command is inteneded for testing and debugging purposes. Usage:");
+            ios.print("\t%s <angular velocity, rad/sec electrical> [voltage magnitude] [-p]\n"
+                      "Voltage magnitude defaults to %.fV. Press any key to stop rotation.\n"
+                      "Option -p will plot the real time values.\n",
                       argv[0], double(DefaultVoltage));
             return;
         }
@@ -250,14 +251,26 @@ class SpinCommand : public os::shell::ICommandHandler
         }
 
         float voltage = DefaultVoltage;
-        if (argc > 2)
+        bool do_plot = false;
+
+        for (int i = 2; i < argc; i++)
         {
-            voltage = strtof(argv[2], nullptr);
-            if (voltage <= 0)
+            const os::heapless::String<> arg(argv[i]);
+
+            if (arg == "-p")
             {
-                ios.print("ERROR: Invalid voltage\n");
-                return;
+                do_plot = true;
             }
+            else
+            {
+                voltage = strtof(arg.c_str(), nullptr);
+            }
+        }
+
+        if (voltage <= 0)
+        {
+            ios.print("ERROR: Invalid voltage\n");
+            return;
         }
 
         /*
@@ -292,7 +305,7 @@ class SpinCommand : public os::shell::ICommandHandler
         float min_inverter_voltage = board::motor::getStatus().inverter_voltage;
         float max_inverter_voltage = min_inverter_voltage;
 
-        while (ios.getChar(1) <= 0)
+        while (ios.getChar(do_plot ? 0 : 1) <= 0)
         {
             // Computing dt (it may be very small or even zero but that's alright)
             const auto new_ts = chVTGetSystemTimeX();
@@ -325,8 +338,13 @@ class SpinCommand : public os::shell::ICommandHandler
             min_inverter_voltage = std::min(min_inverter_voltage, status.inverter_voltage);
             max_inverter_voltage = std::max(max_inverter_voltage, status.inverter_voltage);
 
-            // This line allows to monitor the setpoint values using the serial plotting script
-            //ios.print("$%.3f,%.3f,%.3f\n", double(setpoint[0]), double(setpoint[1]), double(setpoint[2]));
+            if (do_plot)
+            {
+                // This line allows to monitor the setpoint values using the serial plotting script
+                ios.print("$%.4f,%.3f,%.3f,%.3f\n",
+                          double(ST2US(std::uint64_t(chVTGetSystemTimeX()))) * 1e-6,
+                          double(setpoint[0]), double(setpoint[1]), double(setpoint[2]));
+            }
         }
 
         pwm_handle.setPWM(math::Vector<3>::Zero());
