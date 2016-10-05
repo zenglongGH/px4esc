@@ -317,17 +317,16 @@ int main()
     /*
      * Main loop
      */
-    std::uint8_t counter = 0;
+    constexpr unsigned LoopPeriodMSec = 100;
+
+    auto next_step_at = chVTGetSystemTime();
 
     while (!os::isRebootRequested())
     {
         watchdog.reset();
 
-        // Flying colors for testing
-        board::setLEDRGB(counter, std::uint8_t(counter + 85 * 1), std::uint8_t(counter + 85 * 2));
-
-        ::usleep(10000);
-        counter++;
+        next_step_at += MS2ST(LoopPeriodMSec);
+        os::sleepUntilChTime(next_step_at);
     }
 
     /*
