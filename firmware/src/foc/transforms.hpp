@@ -111,7 +111,7 @@ performSpaceVectorTransform(const Vector<2>& alpha_beta_voltage,
 
     const Vector<3> raw_voltages { ta, ta + z, ta + y };
 
-    const Vector<3> output = (raw_voltages / inverter_voltage).array() + 0.5F;
+    const Vector<3> output = (SquareRootOf3 * raw_voltages / inverter_voltage).array() + 0.5F;
 
     return {output, sector_index};
 }

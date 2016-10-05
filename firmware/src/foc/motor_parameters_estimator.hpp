@@ -459,14 +459,7 @@ public:
 
                 Const new_phi = (Uq - I * Rs) / w;
 
-                if (result_.phi > 0)
-                {
-                    result_.phi = std::min(result_.phi, new_phi);
-                }
-                else
-                {
-                    result_.phi = new_phi;
-                }
+                result_.phi = std::max(result_.phi, new_phi);
 
                 Const dIdt = (state_variables_[IdxI] - prev_I) / pwm_period_;
 
