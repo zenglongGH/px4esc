@@ -253,7 +253,7 @@ os::watchdog::Timer init()
 
     // Observer parameters initialization
     {
-        os::lowsyslog("Params: Restoring observer params...\n");
+        os::lowsyslog("Main: Restoring observer params...\n");
         const auto observer_params = params::readObserverParameters();
         os::lowsyslog("%s\n\n", observer_params.toString().c_str());
 
