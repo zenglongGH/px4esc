@@ -220,8 +220,6 @@ public:
     Vector<3> onNextPWMPeriod(const Vector<2>& phase_currents_ab,
                               Const inverter_voltage)
     {
-        static constexpr int PhaseIndexC = 2;
-
         Vector<3> pwm_vector = Vector<3>::Ones() * 0.5F;
 
         time_ += pwm_period_;
@@ -250,7 +248,7 @@ public:
             currents_filter_.update(phase_currents_ab);
 
             // Slowly increasing the voltage until we've reached the required current.
-            if (currents_filter_.getValue().sum() < estimation_current_)
+            if ((-currents_filter_.getValue().sum()) < estimation_current_)
             {
                 constexpr Scalar OhmPerSec = 0.1F;
 
@@ -259,6 +257,7 @@ public:
             }
             else
             {
+                IRQDebugOutputBuffer::setVariableFromIRQ<3>(result_.r_ab);
                 switchState(State::RsMeasurement);
             }
 
@@ -268,7 +267,11 @@ public:
             if ((relative_voltage < (PWMLimit - 0.5F)) &&
                 MotorParameters::getRabLimits().contains(result_.r_ab))
             {
-                pwm_vector[PhaseIndexC] -= relative_voltage;
+                pwm_vector = {
+                    0,
+                    0,
+                    relative_voltage
+                };
             }
             else
             {
@@ -288,20 +291,23 @@ public:
              * We're using the rough measurement in order to maintain the requested current, more or less.
              */
             Const voltage = computeLineVoltageForResistanceMeasurement(estimation_current_, result_.r_ab);
-            pwm_vector[PhaseIndexC] -= computeRelativePhaseVoltage(voltage, inverter_voltage);
+            pwm_vector = {
+                0,
+                0,
+                computeRelativePhaseVoltage(voltage, inverter_voltage)
+            };
 
-            Const phase_c_current = phase_currents_ab.sum();
-
-            if (phase_c_current > ValidCurrentThreshold)
+            if (phase_currents_ab.maxCoeff() < -ValidCurrentThreshold)
             {
-                averagers_[0].addSample(double(voltage / phase_c_current) * (2.0 / 3.0));
+                averagers_[0].addSample(
+                    (voltage / 3.0F) * ((1.0F / -phase_currents_ab[0]) + (1.0F / -phase_currents_ab[1])));
             }
 
             if (getTimeSinceStateSwitch() > RsMeasurementDuration)
             {
                 if (averagers_[0].getNumSamples() > 100)
                 {
-                    result_.r_ab = Scalar(averagers_[0].getAverage() * 2.0);
+                    result_.r_ab = Scalar(averagers_[0].getAverage());
                 }
                 else
                 {
