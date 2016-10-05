@@ -341,9 +341,10 @@ class SpinCommand : public os::shell::ICommandHandler
             if (do_plot)
             {
                 // This line allows to monitor the setpoint values using the serial plotting script
-                ios.print("$%.4f,%.3f,%.3f,%.3f\n",
+                ios.print("$%.4f,%.3f,%.3f,%.3f,%.3f\n",
                           double(ST2US(std::uint64_t(chVTGetSystemTimeX()))) * 1e-6,
-                          double(setpoint[0]), double(setpoint[1]), double(setpoint[2]));
+                          double(setpoint[0]), double(setpoint[1]), double(setpoint[2]),
+                          double(setpoint[0] - setpoint[1]));
             }
         }
 
