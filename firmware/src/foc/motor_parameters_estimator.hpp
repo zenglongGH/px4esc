@@ -43,14 +43,14 @@ enum class MotorIdentificationMode
 {
     /**
      * In this mode, the motor will not rotate, therefore it doesn't matter what load it is connected to.
-     * Estimated parameters: Rab, Lab.
+     * Estimated parameters: Rs, L.
      */
     Static,
 
     /**
      * In this mode, the motor WILL SPIN.
      * In order to achieve correct results, the motor MUST NOT BE CONNECTED TO ANY MECHANICAL LOAD.
-     * Estimated parameters: Rab, Lab, Phi.
+     * Estimated parameters: Rs, L, Phi.
      */
     RotationWithoutMechanicalLoad
 };
