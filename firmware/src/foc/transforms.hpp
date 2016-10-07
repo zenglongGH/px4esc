@@ -44,23 +44,35 @@ namespace foc
  *       sector = If[Y > 0, If[X > 0, 4, If[Z > 0, 3, 2]], If[X <= 0, 1, If[Z > 0, 5, 6]]];
  *       t1 = (-X - Y)/2; t2 = (X - Z)/2; t3 = (-Y - Z)/2;
  *       ta = {t1, t3, t2, t1, t3, t2}[[sector]]; tb = ta + Z; tc = ta + Y;
- *       ({ta, tb, tc} 2)/(inverterVoltage) + 0.5 // N];
+ *       Sqrt[3] {ta, tb, tc}/inverterVoltage + 0.5 // N];
  *
- *    inverterVoltage = 50;
- *    alphaBetaAmplitude = 50;
+ *    inverterVoltage = 100;
+ *    alphaBetaAmplitude = inverterVoltage/Sqrt[3];
  *    range = Range[0, 8, .01];
  *    refAlpha = Sin[#1]*alphaBetaAmplitude & /@ range;
  *    refBeta = Sin[#1 + Pi/2]*alphaBetaAmplitude & /@ range;
  *
  *    transforms = Map[performSVMTransform[#1, inverterVoltage] &, {refAlpha, refBeta}\[Transpose]];
  *    zero = Map[Total[#1]/3 &, transforms];
+ *    phaseDiffAB = Map[#1[[1]] inverterVoltage - #1[[2]] inverterVoltage &, transforms];
  *
  *    GraphicsGrid[{
- *      {ListLinePlot[{refAlpha, refBeta}, GridLines -> Automatic, PlotLabel -> "\[Alpha]\[Beta] Voltage"]},
- *      {ListLinePlot[{transforms\[Transpose][[1]], transforms\[Transpose][[2]], transforms\[Transpose][[3]], zero},
- *        PlotRange -> {Automatic, {0, 1}}, GridLines -> Automatic, PlotLabel -> "PWM Setpoint"],
- *       ListLinePlot[inverterVoltage {transforms\[Transpose][[1]] - zero, transforms\[Transpose][[2]] - zero,
- *          transforms\[Transpose][[3]] - zero}, GridLines -> Automatic, PlotLabel -> "Phase Voltage"]}}]
+ *      {ListLinePlot[{refAlpha, refBeta}, GridLines -> Automatic,
+ *        PlotRange -> {Automatic, {-inverterVoltage, inverterVoltage}},
+ *        PlotLabel -> "\[Alpha]\[Beta] Voltage"],
+ *       ListLinePlot[phaseDiffAB, GridLines -> Automatic,
+ *        PlotRange -> {Automatic, {-inverterVoltage, inverterVoltage}},
+ *        PlotLabel -> "Phase Difference A-B"]},
+ *      {ListLinePlot[{transforms\[Transpose][[1]],
+ *         transforms\[Transpose][[2]], transforms\[Transpose][[3]], zero},
+ *        PlotRange -> {Automatic, {0, 1}}, GridLines -> Automatic,
+ *        PlotLabel -> "PWM Setpoint"],
+ *       ListLinePlot[
+ *        inverterVoltage {transforms\[Transpose][[1]] - zero,
+ *          transforms\[Transpose][[2]] - zero,
+ *          transforms\[Transpose][[3]] - zero}, GridLines -> Automatic,
+ *        PlotRange -> {Automatic, {-inverterVoltage, inverterVoltage}},
+ *        PlotLabel -> "Phase Voltage"]}}]
  *
  * @param alpha_beta_voltage    Reference voltages alpha and beta.
  * @param inverter_voltage      Power stage supply voltage.
