@@ -332,10 +332,10 @@ public:
 
         case State::PreLqMeasurement:
         {
-            constexpr Scalar OneSizeFitsAllLab = 100.0e-6F;
+            constexpr Scalar OneSizeFitsAllLq = 50.0e-6F;
 
-            voltage_modulator_wrapper_.init(OneSizeFitsAllLab / 2.0F,
-                                            result_.rs / 2.0F,
+            voltage_modulator_wrapper_.init(OneSizeFitsAllLq,
+                                            result_.rs,
                                             estimation_current_,
                                             pwm_period_,
                                             pwm_dead_time_,
