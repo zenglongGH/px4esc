@@ -156,6 +156,17 @@ inline Vector<3> performDeadTimeCompensation(Vector<3> pwm_setpoint,
 }
 
 /**
+ * Computes the maximum voltage that can be generated without exceeding the PWM limit.
+ * Exceeding the PWM limit may cause the PWM modulation to obscure the ADC sampling intervals.
+ */
+inline Scalar computeLineVoltageLimit(Const inverter_voltage,
+                                      Const max_pwm_value)
+{
+    assert((max_pwm_value >= 0.5F) && (max_pwm_value < 1.0F));
+    return (inverter_voltage / SquareRootOf3) * max_pwm_value;
+}
+
+/**
  * Simplified Clarke transformation for balanced systems.
  * Overview: https://en.wikipedia.org/wiki/Alpha%E2%80%93beta_transformation
  *

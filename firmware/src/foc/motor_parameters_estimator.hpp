@@ -566,9 +566,11 @@ public:
                 state_ == State::PhiMeasurementAcceleration ||
                 state_ == State::PhiMeasurement)
             {
-                Const max_voltage = inverter_voltage * 0.8F;
+                constexpr Scalar MinVoltage = 0.1F;
 
-                const math::Range<> voltage_range(0.1F, max_voltage);
+                Const max_voltage = computeLineVoltageLimit(inverter_voltage, PWMLimit);
+
+                const math::Range<> voltage_range(MinVoltage, max_voltage);
 
                 if (voltage_range.contains(state_variables_[IdxVoltage]))
                 {

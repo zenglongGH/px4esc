@@ -162,7 +162,7 @@ public:
                                                       out.estimated_Idq[1],
                                                       inverter_voltage);
 
-        Const Udq_magnitude_limit = inverter_voltage * PWMLimit;
+        Const Udq_magnitude_limit = computeLineVoltageLimit(inverter_voltage, PWMLimit);
 
         if (out.reference_Udq.norm() > Udq_magnitude_limit)
         {
@@ -173,7 +173,6 @@ public:
 
         /*
          * Transforming back to the stationary reference frame, updating the PWM outputs
-         * TODO: Dead time compensation
          */
         auto reference_U_alpha_beta = performInverseParkTransform(out.reference_Udq, angle_sine, angle_cosine);
 
