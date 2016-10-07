@@ -153,7 +153,7 @@ class MotorParametersEstimator
     Scalar time_ = 0;
     Scalar state_switched_at_ = 0;
 
-    std::array<Averager, 1> averagers_;
+    std::array<Averager, 3> averagers_;
     std::array<Scalar, 5> state_variables_{};
 
     math::SimpleMovingAverageFilter<500, Vector<2>> currents_filter_;
@@ -364,23 +364,22 @@ public:
             Const dead_time_compensation_mult = 1.0F - pwm_dead_time_ / pwm_period_;
 
             averagers_[0].addSample(output.reference_Udq[0] * dead_time_compensation_mult);
+            averagers_[1].addSample(output.estimated_Idq[0]);
+            averagers_[2].addSample(output.estimated_Idq[1]);
 
             // Saving internal states into the state variables to make them observable from outside, for debugging.
             state_variables_[1] = output.reference_Udq[0];
             state_variables_[2] = output.reference_Udq[1];
-            state_variables_[3] = output.estimated_Idq[1];
+            state_variables_[3] = output.estimated_Idq[0];
+            state_variables_[4] = output.estimated_Idq[1];
 
             if ((getTimeSinceStateSwitch() > LqMeasurementDuration) && !Udq_was_constrained)
             {
-                // We're crunching very large numbers here, so we use double to avoid degradation of precision
-                static const auto square_double = [](double x) { return double(x) * double(x); };
+                Const Ud = Scalar(averagers_[0].getAverage());
+                Const Id = Scalar(averagers_[1].getAverage());
+                Const Iq = Scalar(averagers_[2].getAverage());
 
-                const double Ud_square = square_double(averagers_[0].getAverage());
-                const double Iq_square = square_double(estimation_current_);
-
-                Const LsHF = Scalar(std::sqrt(Ud_square / (Iq_square * double(w) * double(w))));
-
-                result_.lq = LsHF;
+                result_.lq = std::abs(Ud - result_.rs * Id) / (w * Iq);
 
                 IRQDebugOutputBuffer::setVariableFromIRQ<0>(result_.lq);
 
