@@ -72,4 +72,10 @@ Entry getByName(const Entry::Name& name)
     return Entry();
 }
 
+
+unsigned getMaxIndex()
+{
+    return (sizeof(g_entries) / sizeof(g_entries[0])) - 1U;
+}
+
 }

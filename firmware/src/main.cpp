@@ -52,7 +52,7 @@ namespace
 constexpr unsigned WatchdogTimeoutMSec = 1500;
 
 
-os::config::Param<int> g_param_motor_db_entry("motor_db.entry",    -1,     -1, 10000);
+os::config::Param<int> g_param_motor_db_entry("motor_db.entry",    -1,     -1, motor_database::getMaxIndex());
 
 
 /**

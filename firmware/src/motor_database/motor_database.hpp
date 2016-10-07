@@ -71,4 +71,6 @@ struct Entry
 Entry getByIndex(unsigned index);
 Entry getByName(const Entry::Name& name);
 
+unsigned getMaxIndex();
+
 }

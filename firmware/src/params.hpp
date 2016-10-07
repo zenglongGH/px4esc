@@ -24,7 +24,6 @@
 
 #pragma once
 
-#include <zubax_chibios/config/config.hpp>
 #include <foc/motor_parameters.hpp>
 #include <foc/observer.hpp>
 
