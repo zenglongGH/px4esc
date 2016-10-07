@@ -313,38 +313,32 @@ class SpinCommand : public os::shell::ICommandHandler
             prev_ts = new_ts;
 
             // Computing PWM settings
-            angle += angular_velocity * dt;
-            if (angle >= 2.0F * math::Pi)
-            {
-                angle = 0.0F;
-            }
-            if (angle <= -2.0F * math::Pi)
-            {
-                angle = 0.0F;
-            }
+            angle = foc::constrainAngularPosition(angle + angular_velocity * dt);
 
-            const auto alpha = math::cos(angle) * voltage;
-            const auto beta  = math::sin(angle) * voltage;
+            const auto inverter_voltage = board::motor::getInverterVoltage();
 
-            const auto status = board::motor::getStatus();
+            const auto Ualphabeta = foc::performInverseParkTransform({0.0F, voltage},
+                                                                     math::sin(angle),
+                                                                     math::cos(angle));
 
-            const auto setpoint = foc::performSpaceVectorTransform({alpha, beta}, status.inverter_voltage).first;
+            const auto setpoint = foc::performSpaceVectorTransform(Ualphabeta, inverter_voltage).first;
 
             pwm_handle.setPWM(setpoint);
 
             // Collecting statistics
             min_setpoint = std::min(min_setpoint, setpoint[0]);
             max_setpoint = std::max(max_setpoint, setpoint[0]);
-            min_inverter_voltage = std::min(min_inverter_voltage, status.inverter_voltage);
-            max_inverter_voltage = std::max(max_inverter_voltage, status.inverter_voltage);
+            min_inverter_voltage = std::min(min_inverter_voltage, inverter_voltage);
+            max_inverter_voltage = std::max(max_inverter_voltage, inverter_voltage);
 
             if (do_plot)
             {
-                // This line allows to monitor the setpoint values using the serial plotting script
-                ios.print("$%.4f,%.3f,%.3f,%.3f,%.3f\n",
+                const math::Vector<3> modulated = (setpoint.array() - setpoint.mean()) * inverter_voltage;
+
+                ios.print("$%.4f,%.3f,%.3f\n",
                           double(ST2US(std::uint64_t(chVTGetSystemTimeX()))) * 1e-6,
-                          double(setpoint[0]), double(setpoint[1]), double(setpoint[2]),
-                          double(setpoint[0] - setpoint[1]));
+                          double(modulated[0]),
+                          double(modulated[0] - modulated[1]));
             }
         }
 
