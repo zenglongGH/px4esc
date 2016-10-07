@@ -387,6 +387,23 @@ public:
 
         case State::PreLqMeasurement:
         {
+            /*
+             * STOP HERE STRANGER, AND READ THIS.
+             *
+             * The Lq identification process assumes that the rotor is aligned in the quadrature axis.
+             * Such alignment can be achieved by allowing the rotor to rotate freely while keeping any one phase
+             * powered (excited) and the two other grounded.
+             * Normally we would want to ensure the proper alignment here, by powering the phases in the right way,
+             * and providing the rotor with sufficient time to turn into the right position; however, this is not
+             * really necessary because the rotor will be already aligned as a side effect of the Rs measurement
+             * process performed in the previous step.
+             *
+             * Furthermore, the inductance measurement process needs to know the Rs parameter for the purpose of
+             * controlling the currents.
+             *
+             * Therefore, keep in mind that this operation is dependent on the Rs measurement procedure, and they
+             * should be viewed holistically rather than as independent operations.
+             */
             constexpr Scalar OneSizeFitsAllLq = 50.0e-6F;
 
             voltage_modulator_wrapper_.init(OneSizeFitsAllLq,
