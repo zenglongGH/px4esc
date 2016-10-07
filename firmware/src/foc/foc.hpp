@@ -126,6 +126,21 @@ enum class State
     Fault
 };
 
+inline const char* stateToString(const State s)
+{
+    switch (s)
+    {
+    case State::Idle:                return "Idle";
+    case State::MotorIdentification: return "MotorID";
+    case State::HardwareTesting:     return "HWTest";
+    case State::Spinup:              return "Spinup";
+    case State::Running:             return "Running";
+    case State::Fault:               return "Fault";
+    }
+
+    return "BADSTATE";
+}
+
 /**
  * @ref State.
  */

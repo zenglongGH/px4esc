@@ -846,8 +846,15 @@ class CLIThread : public chibios_rt::BaseStaticThread<2048>
         os::lowsyslog("CLI: Stopped\n");
     }
 
+    static auto renderPrompt()
+    {
+        return os::heapless::concatenate<decltype(shell_)::Prompt::Capacity>(
+            foc::stateToString(foc::getState()), "> ");
+    }
+
 public:
-    CLIThread()
+    CLIThread() :
+        shell_(renderPrompt)
     {
         (void) shell_.addCommandHandler(&cmd_reboot);
         (void) shell_.addCommandHandler(&cmd_zubax_id);
