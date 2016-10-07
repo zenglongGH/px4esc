@@ -417,7 +417,7 @@ public:
             constexpr int IdxI       = 3;
 
             // This is the maximum voltage we start from.
-            Const initial_voltage = estimation_current_ * (result_.r_ab / 2.0F) * (3.0F / 2.0F);
+            Const initial_voltage = estimation_current_ * (result_.r_ab / 2.0F);
 
             // Continuously maintaining the smoothed out current estimates throughout the whole process.
             const auto Idq = performParkTransform(performClarkeTransform(phase_currents_ab),
