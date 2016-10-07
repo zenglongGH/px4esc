@@ -44,15 +44,15 @@ class CurrentPIController
     Scalar ui_ = 0;
 
 public:
-    CurrentPIController(Const Ls,
+    CurrentPIController(Const Lq,
                         Const Rs,
                         Const max_current,
                         Const dt) :
         full_scale_current_(max_current * 3.0F),
-        kp_((math::Pi * 2.0F * Ls) / (20.0F * dt)),
-        ki_(dt * Rs / Ls)
+        kp_((math::Pi * 2.0F * Lq) / (20.0F * dt)),
+        ki_(dt * Rs / Lq)
     {
-        assert(Ls > 0);
+        assert(Lq > 0);
         assert(Rs > 0);
         assert(max_current > 0);
         assert(dt > 0);
@@ -117,8 +117,8 @@ public:
         math::Vector<3> pwm_setpoint{};
     };
 
-    ThreePhaseVoltageModulator(Const stator_phase_inductance,
-                               Const stator_phase_resistance,
+    ThreePhaseVoltageModulator(Const Lq,
+                               Const Rs,
                                Const max_current,
                                Const pwm_period,
                                Const pwm_dead_time,
@@ -126,8 +126,8 @@ public:
         dead_time_compensation_policy_(dtcomp_policy),
         pwm_period_(pwm_period),
         pwm_dead_time_(pwm_dead_time),
-        pid_Id_(stator_phase_inductance, stator_phase_resistance, max_current, pwm_period),
-        pid_Iq_(stator_phase_inductance, stator_phase_resistance, max_current, pwm_period),
+        pid_Id_(Lq, Rs, max_current, pwm_period),
+        pid_Iq_(Lq, Rs, max_current, pwm_period),
         estimated_Idq_filter_(Vector<2>::Zero())
     { }
 

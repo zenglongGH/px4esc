@@ -65,7 +65,7 @@ enum class MotorIdentificationMode
 class MotorParametersEstimator
 {
     static constexpr Scalar RsMeasurementDuration       = 15.0F;
-    static constexpr Scalar LsMeasurementDuration       = 15.0F;
+    static constexpr Scalar LqMeasurementDuration       = 15.0F;
 
     // Voltage reduction during the measurement phase shold be very slow in order to
     // reduce phase delay of the current filter.
@@ -129,7 +129,7 @@ class MotorParametersEstimator
 
     const MotorIdentificationMode mode_;
     Const estimation_current_;
-    Const Ls_current_frequency_;
+    Const Lq_current_frequency_;
     Const Phi_angular_velocity_;
     Const pwm_period_;
     Const pwm_dead_time_;
@@ -141,8 +141,8 @@ class MotorParametersEstimator
         Initialization,
         PreRsMeasurement,
         RsMeasurement,
-        PreLsMeasurement,
-        LsMeasurement,
+        PreLqMeasurement,
+        LqMeasurement,
         PhiMeasurementInitialization,
         PhiMeasurementAcceleration,
         PhiMeasurement,
@@ -189,21 +189,21 @@ class MotorParametersEstimator
     }
 
     static Scalar computeLineVoltageForResistanceMeasurement(Const desired_current,
-                                                             Const phase_to_phase_resistance)
+                                                             Const phase_resistance)
     {
-        return (desired_current * phase_to_phase_resistance / 2.0F) * Scalar(3.0 / 2.0);
+        return (desired_current * phase_resistance) * Scalar(3.0 / 2.0);
     }
 
 public:
     MotorParametersEstimator(MotorIdentificationMode mode,
                              const MotorParameters& initial_parameters,
-                             Const Ls_current_frequency,
+                             Const Lq_current_frequency,
                              Const Phi_angular_velocity,
                              Const pwm_period,
                              Const pwm_dead_time) :
         mode_(mode),
         estimation_current_(initial_parameters.max_current * 0.5F),
-        Ls_current_frequency_(Ls_current_frequency),
+        Lq_current_frequency_(Lq_current_frequency),
         Phi_angular_velocity_(Phi_angular_velocity),
         pwm_period_(pwm_period),
         pwm_dead_time_(pwm_dead_time),
@@ -229,8 +229,8 @@ public:
         case State::Initialization:
         {
             // Invalidating before measurement
-            result_.r_ab = 0;
-            result_.l_ab = 0;
+            result_.rs = 0;
+            result_.lq = 0;
 
             if (estimation_current_ > 0.1F)
             {
@@ -252,20 +252,20 @@ public:
             {
                 constexpr Scalar OhmPerSec = 0.1F;
 
-                result_.r_ab = std::max(MotorParameters::getRabLimits().min,
-                                        result_.r_ab + OhmPerSec * pwm_period_);    // Very coarse initial estimation
+                result_.rs = std::max(MotorParameters::getRsLimits().min,
+                                      result_.rs + OhmPerSec * pwm_period_);    // Very coarse initial estimation
             }
             else
             {
-                IRQDebugOutputBuffer::setVariableFromIRQ<3>(result_.r_ab);
+                IRQDebugOutputBuffer::setVariableFromIRQ<3>(result_.rs);
                 switchState(State::RsMeasurement);
             }
 
-            Const voltage = computeLineVoltageForResistanceMeasurement(estimation_current_, result_.r_ab);
+            Const voltage = computeLineVoltageForResistanceMeasurement(estimation_current_, result_.rs);
             Const relative_voltage = computeRelativePhaseVoltage(voltage, inverter_voltage);
 
             if ((relative_voltage < (PWMLimit - 0.5F)) &&
-                MotorParameters::getRabLimits().contains(result_.r_ab))
+                MotorParameters::getRsLimits().contains(result_.rs))
             {
                 pwm_vector = {
                     0,
@@ -276,7 +276,7 @@ public:
             else
             {
                 // Voltage or resistance is too high, aborting
-                result_.r_ab = 0;
+                result_.rs = 0;
                 switchState(State::Finalization);
             }
             break;
@@ -290,7 +290,7 @@ public:
              * Precise resistance measurement.
              * We're using the rough measurement in order to maintain the requested current, more or less.
              */
-            Const voltage = computeLineVoltageForResistanceMeasurement(estimation_current_, result_.r_ab);
+            Const voltage = computeLineVoltageForResistanceMeasurement(estimation_current_, result_.rs);
             pwm_vector = {
                 0,
                 0,
@@ -300,25 +300,25 @@ public:
             if (phase_currents_ab.maxCoeff() < -ValidCurrentThreshold)
             {
                 averagers_[0].addSample(
-                    (voltage / 3.0F) * ((1.0F / -phase_currents_ab[0]) + (1.0F / -phase_currents_ab[1])));
+                    ((voltage / 3.0F) * ((1.0F / -phase_currents_ab[0]) + (1.0F / -phase_currents_ab[1]))) / 2.0F);
             }
 
             if (getTimeSinceStateSwitch() > RsMeasurementDuration)
             {
                 if (averagers_[0].getNumSamples() > 100)
                 {
-                    result_.r_ab = Scalar(averagers_[0].getAverage());
+                    result_.rs = Scalar(averagers_[0].getAverage());
                 }
                 else
                 {
-                    result_.r_ab = 0;        // Failed
+                    result_.rs = 0;        // Failed
                 }
 
-                IRQDebugOutputBuffer::setVariableFromIRQ<0>(result_.r_ab);
+                IRQDebugOutputBuffer::setVariableFromIRQ<0>(result_.rs);
 
-                if (MotorParameters::getRabLimits().contains(result_.r_ab))
+                if (MotorParameters::getRsLimits().contains(result_.rs))
                 {
-                    switchState(State::PreLsMeasurement);
+                    switchState(State::PreLqMeasurement);
                 }
                 else
                 {
@@ -328,24 +328,24 @@ public:
             break;
         }
 
-        case State::PreLsMeasurement:
+        case State::PreLqMeasurement:
         {
             constexpr Scalar OneSizeFitsAllLab = 100.0e-6F;
 
             voltage_modulator_wrapper_.init(OneSizeFitsAllLab / 2.0F,
-                                            result_.r_ab / 2.0F,
+                                            result_.rs / 2.0F,
                                             estimation_current_,
                                             pwm_period_,
                                             pwm_dead_time_,
                                             VoltageModulatorWrapper::Modulator::DeadTimeCompensationPolicy::Disabled);
             // Ourowrapos - a wrapper that wraps itself.
-            switchState(State::LsMeasurement);
+            switchState(State::LqMeasurement);
             break;
         }
 
-        case State::LsMeasurement:
+        case State::LqMeasurement:
         {
-            Const w = Ls_current_frequency_ * (math::Pi * 2.0F);
+            Const w = Lq_current_frequency_ * (math::Pi * 2.0F);
 
             const auto output = voltage_modulator_wrapper_.access().onNextPWMPeriod(phase_currents_ab,
                                                                                     inverter_voltage,
@@ -368,7 +368,7 @@ public:
             state_variables_[2] = output.reference_Udq[1];
             state_variables_[3] = output.estimated_Idq[1];
 
-            if ((getTimeSinceStateSwitch() > LsMeasurementDuration) && !Udq_was_constrained)
+            if ((getTimeSinceStateSwitch() > LqMeasurementDuration) && !Udq_was_constrained)
             {
                 // We're crunching very large numbers here, so we use double to avoid degradation of precision
                 static const auto square_double = [](double x) { return double(x) * double(x); };
@@ -378,12 +378,12 @@ public:
 
                 Const LsHF = Scalar(std::sqrt(Ud_square / (Iq_square * double(w) * double(w))));
 
-                result_.l_ab = LsHF * 2.0F;
+                result_.lq = LsHF;
 
-                IRQDebugOutputBuffer::setVariableFromIRQ<0>(result_.l_ab);
+                IRQDebugOutputBuffer::setVariableFromIRQ<0>(result_.lq);
 
                 if ((mode_ == MotorIdentificationMode::Static) ||
-                    !MotorParameters::getLabLimits().contains(result_.l_ab))
+                    !MotorParameters::getLqLimits().contains(result_.lq))
                 {
                     switchState(State::Finalization);
                 }
@@ -401,7 +401,7 @@ public:
             if (Udq_was_constrained)
             {
                 // Udq was constrained, therefore the measurements cannot be trusted
-                result_.l_ab = 0;
+                result_.lq = 0;
                 switchState(State::Finalization);
             }
             break;
@@ -417,7 +417,7 @@ public:
             constexpr int IdxI       = 3;
 
             // This is the maximum voltage we start from.
-            Const initial_voltage = estimation_current_ * (result_.r_ab / 2.0F);
+            Const initial_voltage = estimation_current_ * (result_.rs / 2.0F);
 
             // Continuously maintaining the smoothed out current estimates throughout the whole process.
             const auto Idq = performParkTransform(performClarkeTransform(phase_currents_ab),
@@ -455,7 +455,7 @@ public:
                 Const Uq = state_variables_[IdxVoltage] * dead_time_compensation_mult;
                 Const I  = state_variables_[IdxI];
                 Const w  = state_variables_[IdxAngVel];
-                Const Rs = result_.r_ab / 2.0F;
+                Const Rs = result_.rs / 2.0F;
 
                 Const new_phi = (Uq - I * Rs) / w;
 
@@ -560,7 +560,7 @@ public:
             out[4] = currents_filter_.getValue().sum();
         }
 
-        if (state_ == State::LsMeasurement)
+        if (state_ == State::LqMeasurement)
         {
             out[4] = Scalar(voltage_modulator_wrapper_.access().getUdqNormalizationCounter().get());
         }

@@ -53,8 +53,8 @@ Real g_max_current        ("m.max_ampere",        0.0F,       0.0F,  200.0F);
 Real g_spinup_current     ("m.spinup_ampere",     0.0F,       0.0F,   50.0F);
 Real g_current_ramp       ("m.ampere_per_sec",   30.0F,       0.1F, 1000.0F);
 Real g_field_flux         ("m.phi_milliweber",    0.0F,       0.0F, foc::MotorParameters::getPhiLimits().max * 1e3F);
-Real g_resistance_ab      ("m.rab_ohm",           0.0F,       0.0F, foc::MotorParameters::getRabLimits().max);
-Real g_inductance_ab      ("m.lab_microhenry",    0.0F,       0.0F, foc::MotorParameters::getLabLimits().max * 1e6F);
+Real g_phase_resistance   ("m.rs_ohm",            0.0F,       0.0F, foc::MotorParameters::getRsLimits().max);
+Real g_inductance_quadr   ("m.lq_microhenry",     0.0F,       0.0F, foc::MotorParameters::getLqLimits().max * 1e6F);
 Natural g_num_poles       ("m.num_poles",            0,          0,     200);
 Natural g_num_attempts    ("m.num_attempts",        10,          1, 1000000);
 
@@ -113,8 +113,8 @@ foc::MotorParameters readMotorParameters()
     out.spinup_current          = g_spinup_current.get();
     out.current_ramp_amp_per_s  = g_current_ramp.get();
     out.phi                     = g_field_flux.get() * 1e-3F;
-    out.r_ab                    = g_resistance_ab.get();
-    out.l_ab                    = g_inductance_ab.get() * 1e-6F;
+    out.rs                      = g_phase_resistance.get();
+    out.lq                      = g_inductance_quadr.get() * 1e-6F;
     out.num_poles               = g_num_poles.get();
     out.num_stalls_to_latch     = g_num_attempts.get();
 
@@ -137,8 +137,8 @@ void writeMotorParameters(const foc::MotorParameters& obj)
     assign(g_spinup_current,     obj.spinup_current);
     assign(g_current_ramp,       obj.current_ramp_amp_per_s);
     assign(g_field_flux,         obj.phi * 1e3F);
-    assign(g_resistance_ab,      obj.r_ab);
-    assign(g_inductance_ab,      obj.l_ab * 1e6F);
+    assign(g_phase_resistance,   obj.rs);
+    assign(g_inductance_quadr,   obj.lq * 1e6F);
     assign(g_num_poles,          obj.num_poles);
     assign(g_num_attempts,       obj.num_stalls_to_latch);
 }

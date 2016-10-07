@@ -48,8 +48,8 @@ struct MotorParameters
     Scalar current_ramp_amp_per_s = 0;  ///< Current setpoint slope, Ampere/second.
 
     Scalar phi = 0;                     ///< Magnetic field flux linkage, Weber
-    Scalar r_ab = 0;                    ///< Phase-to-phase resistance, Ohm
-    Scalar l_ab = 0;                    ///< Phase-to-phase inductance, Henry
+    Scalar rs = 0;                      ///< Phase resistance (half of phase-to-phase resistance), Ohm
+    Scalar lq = 0;                      ///< Quadrature phase inductance, Henry
 
     std::uint_fast8_t num_poles = 0;    ///< Number of magnetic poles (not pairs!); must be a positive even number
 
@@ -62,15 +62,15 @@ struct MotorParameters
                  100.00e-3F };
     }
 
-    static math::Range<> getRabLimits()
+    static math::Range<> getRsLimits()
     {
         return { 0.01F,
-                 2.00F };
+                 1.00F };
     }
 
-    static math::Range<> getLabLimits()
+    static math::Range<> getLqLimits()
     {
-        return {    5e-6F,
+        return {    3e-6F,
                  1000e-6F };
     }
 
@@ -95,8 +95,8 @@ struct MotorParameters
                is_positive(spinup_current)              &&
                is_positive(current_ramp_amp_per_s)      &&
                getPhiLimits().contains(phi)             &&
-               getRabLimits().contains(r_ab)            &&
-               getLabLimits().contains(l_ab)            &&
+               getRsLimits().contains(rs)               &&
+               getLqLimits().contains(lq)               &&
                (num_poles >= 2)                         &&
                (num_poles % 2 == 0)                     &&
                (num_stalls_to_latch >= 1)               &&
@@ -130,8 +130,8 @@ struct MotorParameters
             "Ispup: %-7.1f A\n"
             "Iramp: %-7.1f A/s\n"
             "Phi  : %-7.3f mWb\n"
-            "Rab  : %-7.3f Ohm\n"
-            "Lab  : %-7.3f uH\n"
+            "Rs   : %-7.3f Ohm\n"
+            "Lq   : %-7.3f uH\n"
             "Npols: %u, %.1f MRPM/V\n"
             "Nstlt: %u\n"
             "Valid: %s").format(
@@ -143,8 +143,8 @@ struct MotorParameters
             double(spinup_current),
             double(current_ramp_amp_per_s),
             double(phi) * 1e3,
-            double(r_ab),
-            double(l_ab) * 1e6,
+            double(rs),
+            double(lq) * 1e6,
             unsigned(num_poles),
             double(kv),
             unsigned(num_stalls_to_latch),

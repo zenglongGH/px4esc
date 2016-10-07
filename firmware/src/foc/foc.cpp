@@ -154,8 +154,8 @@ struct Context
 
     Context(const ObserverParameters& observer_params,
             Const field_flux,
-            Const stator_phase_inductance,
-            Const stator_phase_resistance,
+            Const Lq,
+            Const Rs,
             Const max_current,
             Const min_current,
             Const current_ramp,
@@ -163,11 +163,11 @@ struct Context
             Const pwm_dead_time) :
         observer(observer_params,
                  field_flux,
-                 stator_phase_inductance,
-                 stator_phase_inductance,
-                 stator_phase_resistance),
-        modulator(stator_phase_inductance,
-                  stator_phase_resistance,
+                 Lq,            // ASSUMPTION: Ld ~= Lq
+                 Lq,
+                 Rs),
+        modulator(Lq,
+                  Rs,
                   max_current,
                   pwm_period,
                   pwm_dead_time,
@@ -183,16 +183,13 @@ Context* g_context = nullptr;
 
 void initializeContext()
 {
-    Const Ls = g_motor_params.l_ab / 2.0F;
-    Const Rs = g_motor_params.r_ab / 2.0F;
-
     alignas(16) static std::uint8_t context_storage[sizeof(Context)];
     std::fill(std::begin(context_storage), std::end(context_storage), 0);       // Paranoia time
 
     g_context = new (context_storage) Context(g_observer_params,
                                               g_motor_params.phi,
-                                              Ls,
-                                              Rs,
+                                              g_motor_params.lq,
+                                              g_motor_params.rs,
                                               g_motor_params.max_current,
                                               g_motor_params.min_current,
                                               g_motor_params.current_ramp_amp_per_s,
