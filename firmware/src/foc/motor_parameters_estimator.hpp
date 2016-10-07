@@ -457,9 +457,8 @@ public:
                 Const Uq = state_variables_[IdxVoltage] * dead_time_compensation_mult;
                 Const I  = state_variables_[IdxI];
                 Const w  = state_variables_[IdxAngVel];
-                Const Rs = result_.rs / 2.0F;
 
-                Const new_phi = (Uq - I * Rs) / w;
+                Const new_phi = (Uq - I * result_.rs) / w;
 
                 result_.phi = std::max(result_.phi, new_phi);
 
