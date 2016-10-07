@@ -286,6 +286,8 @@ public:
         {
             static constexpr Scalar ValidCurrentThreshold = 1e-3F;
 
+            currents_filter_.update(phase_currents_ab); // This is needed only for debugging
+
             /*
              * Precise resistance measurement.
              * We're using the rough measurement in order to maintain the requested current, more or less.
