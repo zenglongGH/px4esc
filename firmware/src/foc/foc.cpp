@@ -477,11 +477,11 @@ void printStatusInfo()
         }
     }
 
-    std::printf("State        : %d\n"
+    std::printf("State        : %s [%d]\n"
                 "Control Mode : %d\n"
                 "Setpoint     : %.3f\n"
                 "Succ. Stalls : %u\n",
-                int(state),
+                stateToString(state), int(state),
                 int(control_mode),
                 double(setpoint),
                 unsigned(num_successive_rotor_stalls));
