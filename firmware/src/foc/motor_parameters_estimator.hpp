@@ -154,7 +154,7 @@ class MotorParametersEstimator
     Scalar state_switched_at_ = 0;
 
     std::array<Averager, 1> averagers_;
-    std::array<Scalar, 4> state_variables_{};
+    std::array<Scalar, 5> state_variables_{};
 
     math::SimpleMovingAverageFilter<500, Vector<2>> currents_filter_;
 
@@ -417,6 +417,7 @@ public:
             constexpr int IdxAngVel  = 1;
             constexpr int IdxAngPos  = 2;
             constexpr int IdxI       = 3;
+            constexpr int IdxMinI    = 4;
 
             // This is the maximum voltage we start from.
             Const initial_voltage = estimation_current_ * result_.rs;
@@ -458,9 +459,12 @@ public:
                 Const I  = state_variables_[IdxI];
                 Const w  = state_variables_[IdxAngVel];
 
-                Const new_phi = (Uq - I * result_.rs) / w;
-
-                result_.phi = std::max(result_.phi, new_phi);
+                if ((I < state_variables_[IdxMinI]) ||
+                    (state_variables_[IdxMinI] <= 0))
+                {
+                    state_variables_[IdxMinI] = I;
+                    result_.phi = (Uq - I * result_.rs) / w;
+                }
 
                 Const dIdt = (state_variables_[IdxI] - prev_I) / pwm_period_;
 
@@ -547,30 +551,27 @@ public:
      */
     auto getDebugValues() const
     {
-        std::array<Scalar, 7> out
-        {
-            state_variables_[0],
-            state_variables_[1],
-            state_variables_[2],
-            state_variables_[3]
-        };
+        std::array<Scalar, 7> out{};
+        std::copy(state_variables_.begin(), state_variables_.end(), out.begin());
+
+        const unsigned FirstFreeIndex = state_variables_.size();
 
         if (state_ == State::PreRsMeasurement ||
             state_ == State::RsMeasurement)
         {
-            out[4] = currents_filter_.getValue().sum();
+            out.at(FirstFreeIndex) = currents_filter_.getValue().sum();
         }
 
         if (state_ == State::LqMeasurement)
         {
-            out[4] = Scalar(voltage_modulator_wrapper_.access().getUdqNormalizationCounter().get());
+            out.at(FirstFreeIndex) = Scalar(voltage_modulator_wrapper_.access().getUdqNormalizationCounter().get());
         }
 
         if (state_ == State::PhiMeasurementInitialization ||
             state_ == State::PhiMeasurementAcceleration ||
             state_ == State::PhiMeasurement)
         {
-            out[4] = result_.phi * 1e3F;
+            out.at(FirstFreeIndex) = result_.phi * 1e3F;
         }
 
         return out;
