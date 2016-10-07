@@ -64,7 +64,8 @@ enum class MotorIdentificationMode
  */
 class MotorParametersEstimator
 {
-    static constexpr Scalar RsMeasurementDuration       = 15.0F;
+    static constexpr Scalar RotorStabilizationDuration  =  1.0F;
+    static constexpr Scalar RsPhaseMeasurementDuration  = 10.0F;
     static constexpr Scalar LqMeasurementDuration       = 15.0F;
 
     // Voltage reduction during the measurement phase shold be very slow in order to
@@ -139,8 +140,11 @@ class MotorParametersEstimator
     enum class State
     {
         Initialization,
-        PreRsMeasurement,
-        RsMeasurement,
+        CoarseRsMeasurement,
+        RsMeasurementA,
+        RsMeasurementB,
+        RsMeasurementC,
+        RsMeasurementFinalization,
         PreLqMeasurement,
         LqMeasurement,
         PhiMeasurementInitialization,
@@ -234,7 +238,7 @@ public:
 
             if (estimation_current_ > 0.1F)
             {
-                switchState(State::PreRsMeasurement);
+                switchState(State::CoarseRsMeasurement);
             }
             else
             {
@@ -243,11 +247,12 @@ public:
             break;
         }
 
-        case State::PreRsMeasurement:
+        case State::CoarseRsMeasurement:
         {
             currents_filter_.update(phase_currents_ab);
 
             // Slowly increasing the voltage until we've reached the required current.
+            // We're supplying phase C in order to be able to use both current sensors with maximum resolution.
             if ((-currents_filter_.getValue().sum()) < estimation_current_)
             {
                 constexpr Scalar OhmPerSec = 0.1F;
@@ -258,7 +263,7 @@ public:
             else
             {
                 IRQDebugOutputBuffer::setVariableFromIRQ<3>(result_.rs);
-                switchState(State::RsMeasurement);
+                switchState(State::RsMeasurementA);
             }
 
             Const voltage = computeLineVoltageForResistanceMeasurement(estimation_current_, result_.rs);
@@ -282,50 +287,100 @@ public:
             break;
         }
 
-        case State::RsMeasurement:
+        case State::RsMeasurementA:
+        case State::RsMeasurementB:
+        case State::RsMeasurementC:
         {
-            static constexpr Scalar ValidCurrentThreshold = 1e-3F;
-
-            currents_filter_.update(phase_currents_ab); // This is needed only for debugging
-
             /*
              * Precise resistance measurement.
              * We're using the rough measurement in order to maintain the requested current, more or less.
+             * We also need to measure all three phase pairs INDEPENDENTLY, because many motors have
+             * very different phase resistances. It is not possible to find the statistically optimal
+             * resistance without individual measurements per phase pair.
              */
+            static constexpr Scalar ValidCurrentThreshold = 1e-3F;
+
             Const voltage = computeLineVoltageForResistanceMeasurement(estimation_current_, result_.rs);
-            pwm_vector = {
-                0,
-                0,
-                computeRelativePhaseVoltage(voltage, inverter_voltage)
+            Const pwm_channel_setpoint = computeRelativePhaseVoltage(voltage, inverter_voltage);
+
+            pwm_vector = Vector<3>::Zero();
+
+            currents_filter_.update(phase_currents_ab); // This is needed only for debugging
+
+            static const auto process_once = [](Const current, Const voltage, Averager& averager, Const state_duration)
+            {
+                if ((state_duration > RotorStabilizationDuration) &&
+                    (current > ValidCurrentThreshold))
+                {
+                    averager.addSample(voltage * (2.0F / 3.0F) / current);
+                }
+                return state_duration > (RsPhaseMeasurementDuration + RotorStabilizationDuration);
             };
 
-            if (phase_currents_ab.maxCoeff() < -ValidCurrentThreshold)
+            if (state_ == State::RsMeasurementA)
             {
-                averagers_[0].addSample(
-                    ((voltage / 3.0F) * ((1.0F / -phase_currents_ab[0]) + (1.0F / -phase_currents_ab[1]))) / 2.0F);
+                pwm_vector[0] = pwm_channel_setpoint;
+                Const current = phase_currents_ab[0];
+                if (process_once(current, voltage, averagers_[0], getTimeSinceStateSwitch()))
+                {
+                    switchState(State::RsMeasurementB, true);
+                }
+            }
+            else if (state_ == State::RsMeasurementB)
+            {
+                pwm_vector[1] = pwm_channel_setpoint;
+                Const current = phase_currents_ab[1];
+                if (process_once(current, voltage, averagers_[1], getTimeSinceStateSwitch()))
+                {
+                    switchState(State::RsMeasurementC, true);
+                }
+            }
+            else if (state_ == State::RsMeasurementC)
+            {
+                pwm_vector[2] = pwm_channel_setpoint;
+                Const current = -phase_currents_ab.sum();
+                if (process_once(current, voltage, averagers_[2], getTimeSinceStateSwitch()))
+                {
+                    switchState(State::RsMeasurementFinalization, true);
+                }
+            }
+            else
+            {
+                assert(false);
+                switchState(State::Finalization);
+                break;
+            }
+            break;
+        }
+
+        case State::RsMeasurementFinalization:
+        {
+            constexpr unsigned MinSamples = 100;
+
+            Scalar r_samples[3]{};
+            std::transform(averagers_.begin(), averagers_.end(), std::begin(r_samples), [](Averager& a)
+            {
+                return (a.getNumSamples() > MinSamples) ? Scalar(a.getAverage()) : Scalar(0);
+            });
+            std::sort(std::begin(r_samples), std::end(r_samples));
+
+            for (unsigned i = 0; i < 3; i++)
+            {
+                IRQDebugOutputBuffer::setVariableFromIRQ(i, r_samples[i]);
             }
 
-            if (getTimeSinceStateSwitch() > RsMeasurementDuration)
+            result_.rs = r_samples[1];  // Taking the median
+
+            // If at least one sample is invalid, throw out all measurements!
+            if (std::all_of(std::begin(r_samples), std::end(r_samples),
+                            [](Const x) { return MotorParameters::getRsLimits().contains(x); }) &&
+                MotorParameters::getRsLimits().contains(result_.rs))    // Megaparanoia!
             {
-                if (averagers_[0].getNumSamples() > 100)
-                {
-                    result_.rs = Scalar(averagers_[0].getAverage());
-                }
-                else
-                {
-                    result_.rs = 0;        // Failed
-                }
-
-                IRQDebugOutputBuffer::setVariableFromIRQ<0>(result_.rs);
-
-                if (MotorParameters::getRsLimits().contains(result_.rs))
-                {
-                    switchState(State::PreLqMeasurement);
-                }
-                else
-                {
-                    switchState(State::Finalization);
-                }
+                switchState(State::PreLqMeasurement);
+            }
+            else
+            {
+                switchState(State::Finalization);
             }
             break;
         }
@@ -555,10 +610,15 @@ public:
 
         const unsigned FirstFreeIndex = state_variables_.size();
 
-        if (state_ == State::PreRsMeasurement ||
-            state_ == State::RsMeasurement)
+        if (state_ == State::CoarseRsMeasurement ||
+            state_ == State::RsMeasurementA ||
+            state_ == State::RsMeasurementB ||
+            state_ == State::RsMeasurementC ||
+            state_ == State::RsMeasurementFinalization)
         {
-            out.at(FirstFreeIndex) = currents_filter_.getValue().sum();
+            const auto val = currents_filter_.getValue();
+            out.at(FirstFreeIndex - 1) = val[0];
+            out.at(FirstFreeIndex - 0) = val[1];
         }
 
         if (state_ == State::LqMeasurement)

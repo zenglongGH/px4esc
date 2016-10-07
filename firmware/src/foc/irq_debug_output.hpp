@@ -64,6 +64,17 @@ public:
     }
 
     /**
+     * Alias without compile-time bounds check.
+     */
+    template <typename Value>
+    static void setVariableFromIRQ(const unsigned index, const Value value)
+    {
+        auto& self = getInstance();
+        self.vars_.at(index) = Scalar(value);
+        self.update_flags_.at(index) = true;
+    }
+
+    /**
      * This function can be called only from a regular thread context.
      * Note that the method uses no locking, this is intentional.
      * There are corner cases where it may skip a value due to race condition, but this is acceptable.
