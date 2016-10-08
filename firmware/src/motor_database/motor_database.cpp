@@ -40,7 +40,7 @@ static const Entry g_entries[] =
     Entry("T-Motor MT2216-12", []()
     {
         MotorParameters p;
-        p.nominal_spinup_duration = 0.5F;
+        p.nominal_spinup_duration = 1.0F;
         p.min_electrical_ang_vel  = 100.0F;
         p.min_current             = 0.3F;
         p.max_current             = 18.0F;
@@ -57,7 +57,7 @@ static const Entry g_entries[] =
     Entry("T-Motor U8-16", []()
     {
         MotorParameters p;
-        p.nominal_spinup_duration = 0.5F;
+        p.nominal_spinup_duration = 1.0F;
         p.min_electrical_ang_vel  = 100.0F;
         p.min_current             = 0.5F;
         p.max_current             = 24.0F;
@@ -74,7 +74,7 @@ static const Entry g_entries[] =
     Entry("Maxon 339285", []()
     {
         MotorParameters p;
-        p.nominal_spinup_duration = 0.5F;
+        p.nominal_spinup_duration = 1.0F;
         p.min_electrical_ang_vel  = 100.0F;
         p.min_current             = 0.2F;
         p.max_current             = 3.5F;
