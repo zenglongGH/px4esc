@@ -123,9 +123,6 @@ foc::MotorParameters readMotorParameters()
     out.num_poles               = g_num_poles.get();
     out.num_stalls_to_latch     = g_num_attempts.get();
 
-    // Paranoid check - if params are mismatched, we'll see anomalies
-    writeMotorParameters(out);
-
     out.deduceMissingParameters();
 
     return out;
@@ -173,9 +170,6 @@ foc::ObserverParameters readObserverParameters()
                                       g_P0_44.get());
 
     out.cross_coupling_compensation = g_cross_coupling_comp.get();
-
-    // Paranoid check - if params are mismatched, we'll see anomalies
-    writeObserverParameters(out);
 
     return out;
 }
