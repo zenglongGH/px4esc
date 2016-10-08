@@ -27,6 +27,7 @@
 #include <foc/foc.hpp>
 #include <zubax_chibios/util/heapless.hpp>
 #include <utility>
+#include <functional>
 
 
 namespace motor_database
@@ -49,6 +50,11 @@ struct Entry
           const foc::MotorParameters& arg_parameters) :
         name(arg_name),
         parameters(arg_parameters)
+    { }
+
+    Entry(const Name& arg_name,
+          const std::function<foc::MotorParameters()> factory) :
+        Entry(arg_name, factory())
     { }
 
     bool isEmpty() const { return name.empty(); }
