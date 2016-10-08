@@ -103,11 +103,12 @@ void cbTimer(const uavcan::TimerEvent& event)
         uavcan::equipment::esc::Status status;
         const auto hw_status = board::motor::getStatus();
 
-        status.esc_index = g_self_index;
+        status.esc_index   = g_self_index;
+        status.error_count = foc::getErrorCount();
         status.voltage     = hw_status.inverter_voltage;
         status.temperature = hw_status.inverter_temperature;
-        status.current = foc::getInstantCurrent();
-        status.rpm = static_cast<std::int32_t>(std::round(foc::getInstantMechanicalRPM()));
+        status.current     = foc::getInstantCurrent();
+        status.rpm         = static_cast<std::int32_t>(std::round(foc::getInstantMechanicalRPM()));
         status.power_rating_pct = std::uint8_t(foc::getInstantDemandFactor() * 100.0F + 0.5F);
 
         (void) g_pub_status->broadcast(status);

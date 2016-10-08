@@ -187,6 +187,12 @@ Scalar getInstantDemandFactor();
 Scalar getInstantMechanicalRPM();
 
 /**
+ * Returns the number of all outstanding errors at the moment.
+ * The exact semantics is yet to be defined; refer to the code to learn more.
+ */
+std::uint32_t getErrorCount();
+
+/**
  * Generate sound using the motor windings.
  * The request MAY be ignored if the controller is in not in the Idle state.
  * Units are SI (Hertz, seconds).

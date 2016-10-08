@@ -417,6 +417,11 @@ Scalar getInstantMechanicalRPM()
     return 0;
 }
 
+std::uint32_t getErrorCount()
+{
+    return g_num_successive_rotor_stalls;
+}
+
 
 void beep(Const frequency,
           Const duration)
