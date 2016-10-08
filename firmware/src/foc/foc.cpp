@@ -688,7 +688,9 @@ void handleMainIRQ(Const period)
         g_context->inverter_power = (Udq.transpose() * Idq)[0] * 1.5F;
 
         g_debug_tracer.set<5>(g_context->observer.getAngularVelocity());
-        g_debug_tracer.set<6>(g_context->inverter_power / board::motor::getInverterVoltage());
+        g_debug_tracer.set<6>((g_state == State::Spinup) ?
+                              g_context->angular_velocity :
+                              g_context->inverter_power / board::motor::getInverterVoltage());
 
         /*
          * Updating setpoint and handling termination condition.
