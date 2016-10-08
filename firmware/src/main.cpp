@@ -38,6 +38,7 @@
 #include "foc/foc.hpp"
 #include "motor_database/motor_database.hpp"
 #include "params.hpp"
+#include "aux_cmd_iface.hpp"
 
 #if __GNUC__ < 5
 # error "GCC version 5.x or newer is required"
@@ -269,13 +270,10 @@ os::watchdog::Timer init()
     board::motor::printStatus();
 
     /*
-     * CLI initialization
+     * Interfaces
      */
     cli::init(&onRebootRequested);
 
-    /*
-     * UAVCAN node initialization
-     */
     uavcan_node::init(app_shared_available ? app_shared.can_bus_speed : 0,
                       app_shared_available ? app_shared.uavcan_node_id : 0,
                       {fw_version.major, fw_version.minor},
@@ -283,6 +281,8 @@ os::watchdog::Timer init()
                       fw_version.vcs_commit,
                       &onFirmwareUpdateRequestedFromUAVCAN,
                       &onRebootRequested);
+
+    aux_cmd_iface::init();
 
     return watchdog;
 }
