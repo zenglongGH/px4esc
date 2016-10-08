@@ -213,9 +213,7 @@ public:
         pwm_dead_time_(pwm_dead_time),
         result_(initial_parameters),
         currents_filter_(Vector<2>::Zero())
-    {
-        assert(estimation_current_ > 0);
-    }
+    { }
 
     /**
      * Must be invoked on every PWM period with appropriate measurements.
