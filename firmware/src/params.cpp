@@ -86,6 +86,9 @@ Real g_cross_coupling_comp("foc.obs.cc_comp", Default().cross_coupling_compensat
 } // namespace observer
 
 
+chibios_rt::Mutex g_mutex;
+
+
 template <typename T, typename Src>
 void assign(os::config::Param<T>& destination, const Src source)
 {
@@ -102,6 +105,8 @@ void assign(os::config::Param<T>& destination, const Src source)
 
 foc::MotorParameters readMotorParameters()
 {
+    os::MutexLocker locker(g_mutex);
+
     foc::MotorParameters out;
 
     using namespace motor;
@@ -128,6 +133,8 @@ foc::MotorParameters readMotorParameters()
 
 void writeMotorParameters(const foc::MotorParameters& obj)
 {
+    os::MutexLocker locker(g_mutex);
+
     using namespace motor;
 
     assign(g_spinup_duration,    obj.nominal_spinup_duration);
@@ -146,6 +153,8 @@ void writeMotorParameters(const foc::MotorParameters& obj)
 
 foc::ObserverParameters readObserverParameters()
 {
+    os::MutexLocker locker(g_mutex);
+
     foc::ObserverParameters out;
 
     using namespace observer;
@@ -173,6 +182,8 @@ foc::ObserverParameters readObserverParameters()
 
 void writeObserverParameters(const foc::ObserverParameters& obj)
 {
+    os::MutexLocker locker(g_mutex);
+
     using namespace observer;
 
     static const auto unpacker = [](const auto matrix, std::initializer_list<Real*> param_array)
