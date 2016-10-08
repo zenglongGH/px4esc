@@ -236,6 +236,11 @@ public:
             result_.rs = 0;
             result_.lq = 0;
 
+            if (mode_ == MotorIdentificationMode::RotationWithoutMechanicalLoad)
+            {
+                result_.phi = 0;
+            }
+
             if (estimation_current_ > 0.1F)
             {
                 switchState(State::CoarseRsMeasurement);
