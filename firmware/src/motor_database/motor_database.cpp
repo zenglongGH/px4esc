@@ -36,10 +36,10 @@ static const Entry g_entries[] =
 {
     //               nominal_spinup_duration min_current spinup_current     phi                  num_spinup_attempts
     //                    min_electrical_ang_vel | max_current | current_ramp_amp_per_s rs     lq num_poles
-    Entry("T-Motor MT2216-12",  {0.5F, 100.0F, 0.3F, 18.0F,  0.0F, 30.0F, 1.125e-3F, 0.110F,  23e-6F, 14, 10}),
-    Entry("T-Motor U8-16",      {0.5F, 100.0F, 0.5F, 24.0F,  0.0F, 30.0F, 3.938e-3F, 0.100F,  67e-6F, 28, 10}),
-    Entry("Maxon 339285",       {0.5F, 100.0F, 0.1F,  3.5F,  0.0F, 30.0F, 1.814e-3F, 0.232F, 161e-6F, 16, 10}),
-    Entry("XAircraft 650",      {0.5F, 100.0F, 0.3F, 18.0F,  0.0F, 30.0F, 1.826e-3F, 0.070F,  25e-6F, 14, 5})
+    Entry("T-Motor MT2216-12",  {0.5F, 100.0F, 0.3F, 18.0F,  0.0F, 300.0F, 1.125e-3F, 0.110F,  23e-6F, 14, 10}),
+    Entry("T-Motor U8-16",      {0.5F, 100.0F, 0.5F, 24.0F,  0.0F, 300.0F, 3.938e-3F, 0.100F,  67e-6F, 28, 10}),
+    Entry("Maxon 339285",       {0.5F, 100.0F, 0.1F,  3.5F,  0.0F, 300.0F, 1.814e-3F, 0.232F, 161e-6F, 16, 10}),
+    Entry("XAircraft 650",      {0.5F, 100.0F, 0.3F, 18.0F,  0.0F, 300.0F, 1.826e-3F, 0.070F,  25e-6F, 14, 5})
 };
 
 

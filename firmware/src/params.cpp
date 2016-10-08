@@ -51,7 +51,7 @@ Real g_min_electr_ang_vel ("m.min_eradsec",     100.0F,      10.0F, 1000.0F);
 Real g_min_current        ("m.min_ampere",        0.0F,       0.0F,   50.0F);
 Real g_max_current        ("m.max_ampere",        0.0F,       0.0F,  200.0F);
 Real g_spinup_current     ("m.spinup_ampere",     0.0F,       0.0F,   50.0F);
-Real g_current_ramp       ("m.ampere_per_sec",   30.0F,       0.1F, 1000.0F);
+Real g_current_ramp       ("m.ampere_per_sec",  300.0F,       0.1F, 1000.0F);
 Real g_field_flux         ("m.phi_milliweber",    0.0F,       0.0F, foc::MotorParameters::getPhiLimits().max * 1e3F);
 Real g_phase_resistance   ("m.rs_ohm",            0.0F,       0.0F, foc::MotorParameters::getRsLimits().max);
 Real g_inductance_quadr   ("m.lq_microhenry",     0.0F,       0.0F, foc::MotorParameters::getLqLimits().max * 1e6F);
