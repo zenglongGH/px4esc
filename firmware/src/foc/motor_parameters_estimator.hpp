@@ -262,7 +262,7 @@ public:
             }
             else
             {
-                IRQDebugOutputBuffer::setVariableFromIRQ<3>(result_.rs);
+                IRQDebugOutputBuffer::setVariableFromIRQ<0>(result_.rs);
                 switchState(State::RsMeasurementA);
             }
 
@@ -294,9 +294,9 @@ public:
             /*
              * Precise resistance measurement.
              * We're using the rough measurement in order to maintain the requested current, more or less.
-             * We also need to measure all three phase pairs INDEPENDENTLY, because many motors have
+             * We also need to measure all three phases INDEPENDENTLY, because many motors have
              * very different phase resistances. It is not possible to find the statistically optimal
-             * resistance without individual measurements per phase pair.
+             * resistance without individual measurements per phase.
              */
             static constexpr Scalar ValidCurrentThreshold = 1e-3F;
 
@@ -426,7 +426,6 @@ public:
                                                                                     w,
                                                                                     state_variables_[0],
                                                                                     estimation_current_);
-
             const bool Udq_was_constrained =
                 voltage_modulator_wrapper_.access().getUdqNormalizationCounter().get() > 0;
 
@@ -436,7 +435,7 @@ public:
             Const dead_time_compensation_mult = 1.0F - pwm_dead_time_ / pwm_period_;
 
             averagers_[0].addSample(output.reference_Udq[0] * dead_time_compensation_mult);
-            averagers_[1].addSample(output.estimated_Idq[0]);
+            averagers_[1].addSample(output.reference_Udq[1] * dead_time_compensation_mult);
             averagers_[2].addSample(output.estimated_Idq[1]);
 
             // Saving internal states into the state variables to make them observable from outside, for debugging.
@@ -448,25 +447,44 @@ public:
             if ((getTimeSinceStateSwitch() > LqMeasurementDuration) && !Udq_was_constrained)
             {
                 Const Ud = Scalar(averagers_[0].getAverage());
-                Const Id = Scalar(averagers_[1].getAverage());
+                Const Uq = Scalar(averagers_[1].getAverage());
                 Const Iq = Scalar(averagers_[2].getAverage());
 
-                result_.lq = std::abs(Ud - result_.rs * Id) / (w * Iq);
+                Const LqHF = std::abs(Ud / (w * Iq));           // Normally we'd need to use only this formula
 
-                IRQDebugOutputBuffer::setVariableFromIRQ<0>(result_.lq);
+                Const RoverL = std::abs((w * Uq) / Ud);         // This is a backup solution
+                Const LqRoverL = result_.rs / RoverL;
 
-                if ((mode_ == MotorIdentificationMode::Static) ||
-                    !MotorParameters::getLqLimits().contains(result_.lq))
+                IRQDebugOutputBuffer::setVariableFromIRQ<0>(LqHF);
+                IRQDebugOutputBuffer::setVariableFromIRQ<1>(LqRoverL);
+                IRQDebugOutputBuffer::setVariableFromIRQ<2>(RoverL);
+
+                if (MotorParameters::getLqLimits().contains(LqHF) &&
+                    MotorParameters::getLqLimits().contains(LqRoverL))
                 {
-                    switchState(State::Finalization);
-                }
-                else if (mode_ == MotorIdentificationMode::RotationWithoutMechanicalLoad)
-                {
-                    switchState(State::PhiMeasurementInitialization);
+                    // Measured values are valid
+                    // The measured value is typically lower than the true inductance, so we pick whichever is greater
+                    result_.lq = std::max(LqHF, LqRoverL);
+
+                    // Switching to the next state
+                    if (mode_ == MotorIdentificationMode::Static)
+                    {
+                        switchState(State::Finalization);
+                    }
+                    else if (mode_ == MotorIdentificationMode::RotationWithoutMechanicalLoad)
+                    {
+                        switchState(State::PhiMeasurementInitialization);
+                    }
+                    else
+                    {
+                        assert(false);
+                        switchState(State::Finalization);
+                    }
                 }
                 else
                 {
-                    assert(false);
+                    // Measured values are invalid
+                    result_.lq = 0;
                     switchState(State::Finalization);
                 }
             }
