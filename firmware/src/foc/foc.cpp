@@ -152,6 +152,8 @@ struct Context
 
     Scalar inverter_power = 0;                                 ///< Watt, updated from the main IRQ
 
+    Scalar remaining_time_before_stall_detection_enabled = 0;
+
     Context(const ObserverParameters& observer_params,
             Const field_flux,
             Const Lq,
@@ -244,9 +246,6 @@ void setMotorParameters(const MotorParameters& params)
 {
     AbsoluteCriticalSectionLocker locker;
     g_motor_params = params;
-    // Making sure the motor restarts if already running
-    g_setpoint = 0;
-    g_setpoint_remaining_ttl = 0;
 }
 
 MotorParameters getMotorParameters()
@@ -314,10 +313,16 @@ void setSetpoint(ControlMode control_mode,
 
     g_control_mode = control_mode;
 
-    // When setting zero setpoint, reset the rotor stall counter
-    if (std::abs(value) < 1e-3F)
     {
-        g_num_successive_rotor_stalls = 0;
+        const bool zero_setpoint = os::float_eq::closeToZero(value);
+
+        const bool sign_flip = ((g_setpoint > 0) && (value < 0)) ||
+                               ((g_setpoint < 0) && (value > 0));
+
+        if (zero_setpoint || sign_flip)
+        {
+            g_num_successive_rotor_stalls = 0;
+        }
     }
 
     switch (g_state)
@@ -599,11 +604,19 @@ void handleMainIRQ(Const period)
                                                          g_context->reference_Iq,
                                                          g_context->angular_velocity);
 
-                // Stopping if the angular velocity is too low
-                if (std::abs(g_context->angular_velocity) < (g_motor_params.min_electrical_ang_vel * 0.25F))
+                if (g_context->remaining_time_before_stall_detection_enabled > 0)
                 {
-                    g_num_successive_rotor_stalls++;
-                    g_state = State::Spinup;    // Dropping into the spinup mode to change direction if necessary
+                    // We've just entered the running mode, stall detection is temporarily suppressed
+                    g_context->remaining_time_before_stall_detection_enabled -= period;
+                }
+                else
+                {
+                    // Stopping if the angular velocity is too low
+                    if (std::abs(g_context->angular_velocity) < g_motor_params.min_electrical_ang_vel)
+                    {
+                        g_state = State::Idle;      // We'll possibly switch back to spinup from idle later
+                        g_num_successive_rotor_stalls++;
+                    }
                 }
             }
             else
@@ -614,39 +627,36 @@ void handleMainIRQ(Const period)
                 if (((g_setpoint > 0) != (g_context->reference_Iq > 0)) ||
                     os::float_eq::closeToZero(g_context->reference_Iq))
                 {
-                    g_context->reference_Iq = g_motor_params.spinup_current;
-                    if (g_setpoint < 0)
-                    {
-                        g_context->reference_Iq = -g_context->reference_Iq;
-                    }
+                    g_context->reference_Iq = std::copysign(g_motor_params.spinup_current, g_setpoint);
+                    g_context->angular_velocity = 0;
                 }
 
-                // Open loop acceleration (shall we get rid of the hard-coded multiplier?)
-                if (std::abs(g_context->angular_velocity) <= (g_motor_params.min_electrical_ang_vel * 3.0F))
-                {
-                    Const increase = g_motor_params.min_electrical_ang_vel * variable_delta;
-
-                    g_context->angular_velocity += (g_setpoint > 0) ? increase : -increase;
-                }
+                // Steady acceleration
+                g_context->angular_velocity += std::copysign(g_motor_params.min_electrical_ang_vel * variable_delta,
+                                                             g_setpoint);
 
                 // Observer synchronization
-                if (std::abs(g_context->angular_velocity) >= g_motor_params.min_electrical_ang_vel)
+                if (std::abs(g_context->angular_velocity) > g_motor_params.min_electrical_ang_vel)
                 {
+                    // Current adjustment
                     {
-                        // The current is steadily decreasing until observer synchronization is established.
-                        // This also limits the maximum time alloted for spinup - when the current drops
-                        // below the minimum, spinup will be aborted.
-                        // Note that the current starts decreasing not synchronously with acceleration,
-                        // but this behavior is intended - they don't need to be synchronized.
-                        Const decrease = g_motor_params.spinup_current * variable_delta;
-                        if (g_context->reference_Iq > 0)
+                        Scalar dI = g_motor_params.max_current * variable_delta;
+
+                        if (std::abs(g_context->observer.getAngularVelocity()) > std::abs(g_context->angular_velocity))
                         {
-                            g_context->reference_Iq -= decrease;
+                            // Decrease current if the observer reports higher speed, increase otherwise
+                            dI = -dI;
                         }
-                        else
+
+                        if (g_setpoint < 0)
                         {
-                            g_context->reference_Iq += decrease;
+                            // We're spinning in the opposite direction, all signs flipped
+                            dI = -dI;
                         }
+
+                        g_context->reference_Iq =
+                            math::Range<>(-g_motor_params.max_current, g_motor_params.max_current).
+                            constrain(g_context->reference_Iq + dI);
                     }
 
                     // Evaluating the observer synchronization precision
@@ -659,15 +669,24 @@ void handleMainIRQ(Const period)
                     // Decision to hand-off control to the normal mode.
                     // Not sure if the hardcoded thresholds are okay.
                     const bool ang_pos_ok = std::abs(ang_pos_error) < math::convertDegreesToRadian(20.0F);
-                    const bool ang_vel_ok = ang_vel_rel_error < 0.2F;
+                    const bool ang_vel_ok = ang_vel_rel_error < 0.1F;
                     if (ang_vel_ok && ang_pos_ok)
                     {
                         g_state = State::Running;
+                        g_context->remaining_time_before_stall_detection_enabled =
+                            g_motor_params.nominal_spinup_duration;
                     }
                 }
 
                 // Fault detection
-                if (std::abs(g_context->reference_Iq) < g_motor_params.min_current)
+                const math::Range<> abs_current_range(g_motor_params.min_current, g_motor_params.max_current);
+
+                Const max_angular_velocity = g_motor_params.min_electrical_ang_vel * 3.0F; // FIXME hardcoded constant
+
+                const bool failed = !abs_current_range.contains(std::abs(g_context->reference_Iq)) ||
+                                    std::abs(g_context->angular_velocity) > max_angular_velocity;
+
+                if (failed)
                 {
                     g_num_successive_rotor_stalls++;
                     g_setpoint = 0;     // Stopping
