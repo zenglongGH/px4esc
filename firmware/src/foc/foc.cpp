@@ -314,6 +314,12 @@ void setSetpoint(ControlMode control_mode,
 
     g_control_mode = control_mode;
 
+    // When setting zero setpoint, reset the rotor stall counter
+    if (std::abs(value) < 1e-3F)
+    {
+        g_num_successive_rotor_stalls = 0;
+    }
+
     switch (g_state)
     {
     case State::Idle:
@@ -328,18 +334,9 @@ void setSetpoint(ControlMode control_mode,
 
     case State::MotorIdentification:
     case State::HardwareTesting:
-    {
-        break;          // Ignoring
-    }
-
     case State::Fault:
     {
-        // When setting zero setpoint at the fault state, reset the rotor stall counter
-        if (std::abs(value) < 1e-3F)
-        {
-            g_num_successive_rotor_stalls = 0;
-        }
-        break;
+        break;          // Ignoring
     }
     }
 }
@@ -355,11 +352,7 @@ void stop()
 
     g_setpoint = 0;
     g_setpoint_remaining_ttl = 0;
-
-    if (g_state == State::Fault)
-    {
-        g_state = State::Idle;
-    }
+    g_num_successive_rotor_stalls = 0;
 }
 
 
