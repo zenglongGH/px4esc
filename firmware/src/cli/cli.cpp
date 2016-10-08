@@ -738,6 +738,7 @@ class MotorDatabaseCommand : public os::shell::ICommandHandler
                     print(ios, entry);
                     if (command == "use")
                     {
+                        params::writeMotorParameters(entry.parameters);
                         foc::setMotorParameters(entry.parameters);
                         ios.puts("Motor parameters updated.");
                     }

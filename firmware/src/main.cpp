@@ -60,32 +60,25 @@ os::config::Param<int> g_param_motor_db_entry("motor_db.entry",    -1,     -1, m
  */
 class CustomConfigStorageBackend : public os::stm32::ConfigStorageBackend
 {
-    static bool codeExecutionCanBeInterruptedNow()
-    {
-        const auto state = foc::getState();
-
-        return (state == foc::State::Idle ||
-                state == foc::State::Fault) &&
-               (board::motor::PWMHandle::getTotalNumberOfActiveHandles() == 0) &&
-               !board::motor::isCalibrationInProgress();
-    }
-
     int write(std::size_t offset, const void* data, std::size_t len) override
     {
         // Raising priority allows to prevent race condition when accessing the inverter driver
         os::TemporaryPriorityChanger priority_adjustment_expert(HIGHPRIO);
 
-        if (codeExecutionCanBeInterruptedNow() &&
+        if (canModifyStorageNow() &&
             board::motor::suspend())
         {
             const int res = os::stm32::ConfigStorageBackend::write(offset, data, len);
             board::motor::unsuspend();
-            DEBUG_LOG("Main: Flash write result: %d\n", res);
+            if (res < 0)
+            {
+                os::lowsyslog("CustomConfigStorageBackend: Write error %d\n", res);
+            }
             return res;
         }
         else
         {
-            os::lowsyslog("Main: FLASH WRITE DENIED\n");
+            os::lowsyslog("CustomConfigStorageBackend: WRITE DENIED\n");
             return -EACCES;
         }
     }
@@ -94,17 +87,20 @@ class CustomConfigStorageBackend : public os::stm32::ConfigStorageBackend
     {
         os::TemporaryPriorityChanger priority_adjustment_expert(HIGHPRIO);
 
-        if (codeExecutionCanBeInterruptedNow() &&
+        if (canModifyStorageNow() &&
             board::motor::suspend())
         {
             const int res = os::stm32::ConfigStorageBackend::erase();
             board::motor::unsuspend();
-            DEBUG_LOG("Main: Flash erase result: %d\n", res);
+            if (res < 0)
+            {
+                os::lowsyslog("CustomConfigStorageBackend: Erase error %d\n", res);
+            }
             return res;
         }
         else
         {
-            os::lowsyslog("Main: FLASH ERASE DENIED\n");
+            os::lowsyslog("CustomConfigStorageBackend: ERASE DENIED\n");
             return -EACCES;
         }
     }
@@ -114,6 +110,16 @@ public:
         os::stm32::ConfigStorageBackend(reinterpret_cast<void*>(0x08008000),
                                         0x4000)
     { }
+
+    static bool canModifyStorageNow()
+    {
+        const auto state = foc::getState();
+
+        return (state == foc::State::Idle ||
+                state == foc::State::Fault) &&
+               (board::motor::PWMHandle::getTotalNumberOfActiveHandles() == 0) &&
+               !board::motor::isCalibrationInProgress();
+    }
 } g_config_storage_backend;
 
 
@@ -183,6 +189,35 @@ auto onFirmwareUpdateRequestedFromUAVCAN(
 }
 
 /**
+ * Some of configuration parameters can be loaded and applied without reboot.
+ * This is done here.
+ */
+void reloadConfigurationParameters()
+{
+    // Motor
+    if (g_param_motor_db_entry.get() >= 0)      // Rewriting motor parameters from the database if requested
+    {
+        unsigned index = unsigned(g_param_motor_db_entry.get());
+        const auto entry = motor_database::getByIndex(index);
+
+        os::lowsyslog("Main: Overwriting motor params from the selected Motor DB entry %u '%s'...\n",
+                      index, entry.name.c_str());
+
+        params::writeMotorParameters(entry.parameters);
+
+        // Resetting the DB entry index - parameters are now stored in the custom configuration
+        g_param_motor_db_entry.set(int(g_param_motor_db_entry.default_));
+        os::lowsyslog("Main: Parameter '%s' has been reset back to %d\n",
+                      g_param_motor_db_entry.name, int(g_param_motor_db_entry.default_));
+    }
+
+    foc::setMotorParameters(params::readMotorParameters());
+
+    // Observer
+    foc::setObserverParameters(params::readObserverParameters());
+}
+
+/**
  * This is invoked once immediately after boot.
  */
 os::watchdog::Timer init()
@@ -226,39 +261,7 @@ os::watchdog::Timer init()
 
     os::lowsyslog("Hardware test result:\n%s\n\n", foc::getLastHardwareTestReport().toString().c_str());
 
-    // Motor parameters initialization
-    {
-        if (g_param_motor_db_entry.get() >= 0)
-        {
-            unsigned index = unsigned(g_param_motor_db_entry.get());
-            const auto entry = motor_database::getByIndex(index);
-
-            os::lowsyslog("Main: Overwriting motor params from the selected Motor DB entry %u '%s'...\n",
-                          index, entry.name.c_str());
-
-            params::writeMotorParameters(entry.parameters);
-
-            // Resetting the DB entry index - parameters are now stored in the custom configuration
-            g_param_motor_db_entry.set(int(g_param_motor_db_entry.default_));
-            os::lowsyslog("Main: Parameter '%s' has been reset back to %d\n",
-                          g_param_motor_db_entry.name, int(g_param_motor_db_entry.default_));
-        }
-
-        os::lowsyslog("Main: Restoring motor params...\n");
-        const auto motor_params = params::readMotorParameters();
-        os::lowsyslog("%s\n\n", motor_params.toString().c_str());
-
-        foc::setMotorParameters(motor_params);
-    }
-
-    // Observer parameters initialization
-    {
-        os::lowsyslog("Main: Restoring observer params...\n");
-        const auto observer_params = params::readObserverParameters();
-        os::lowsyslog("%s\n\n", observer_params.toString().c_str());
-
-        foc::setObserverParameters(observer_params);
-    }
+    reloadConfigurationParameters();
 
     // Initializing to Idle
     foc::stop();
@@ -283,6 +286,72 @@ os::watchdog::Timer init()
 
     return watchdog;
 }
+
+/**
+ * Managing configuration parameters in the background from the main thread.
+ */
+class BackgroundConfigManager
+{
+    static constexpr float ReloadDelay          = 0.5F;
+    static constexpr float SaveDelay            = 1.0F;
+    static constexpr float SaveDelayAfterError  = 10.0F;
+
+    unsigned modification_counter_ = os::config::getModificationCounter();
+    ::systime_t last_modification_ts_ = chVTGetSystemTimeX();
+    bool pending_reload_ = false;
+    bool pending_save_ = false;
+    bool last_save_failed_ = false;
+
+    float getTimeSinceModification() const
+    {
+        return float(ST2MS(chVTTimeElapsedSinceX(last_modification_ts_))) / 1e3F;
+    }
+
+public:
+    void poll()
+    {
+        const auto new_mod_cnt = os::config::getModificationCounter();
+
+        if (new_mod_cnt != modification_counter_)
+        {
+            modification_counter_ = new_mod_cnt;
+            last_modification_ts_ = chVTGetSystemTimeX();
+            pending_reload_ = true;
+            pending_save_ = true;
+        }
+
+        if (pending_reload_)
+        {
+            if (getTimeSinceModification() > ReloadDelay)
+            {
+                pending_reload_ = false;
+                os::lowsyslog("BackgroundConfigManager: Reloading [modcnt=%u]\n", modification_counter_);
+                reloadConfigurationParameters();
+            }
+        }
+
+        if (pending_save_)
+        {
+            if (getTimeSinceModification() > (last_save_failed_ ? SaveDelayAfterError : SaveDelay) &&
+                g_config_storage_backend.canModifyStorageNow())
+            {
+                os::lowsyslog("BackgroundConfigManager: Saving [modcnt=%u]\n", modification_counter_);
+                const int res = os::config::save();
+                if (res >= 0)
+                {
+                    pending_save_ = false;
+                    last_save_failed_ = false;
+                }
+                else
+                {
+                    last_save_failed_ = true;
+                    os::lowsyslog("BackgroundConfigManager: SAVE ERROR %d '%s'\n",
+                                  res, std::strerror(std::abs(res)));
+                }
+            }
+        }
+    }
+};
 
 }
 }
@@ -319,11 +388,15 @@ int main()
      */
     constexpr unsigned LoopPeriodMSec = 100;
 
+    app::BackgroundConfigManager config_manager;
+
     auto next_step_at = chVTGetSystemTime();
 
     while (!os::isRebootRequested())
     {
         watchdog.reset();
+
+        config_manager.poll();
 
         next_step_at += MS2ST(LoopPeriodMSec);
         os::sleepUntilChTime(next_step_at);
