@@ -432,7 +432,9 @@ public:
             state_variables_[0] = output.extrapolated_angular_position;
             pwm_vector = output.pwm_setpoint;
 
-            Const dead_time_compensation_mult = 1.0F - pwm_dead_time_ / pwm_period_;
+            // TODO: Compensation disabled, since it yields lower values than expected
+            Const dead_time_compensation_mult = 1.0F;
+            //Const dead_time_compensation_mult = 1.0F - pwm_dead_time_ / pwm_period_;
 
             averagers_[0].addSample(output.reference_Udq[0] * dead_time_compensation_mult);
             averagers_[1].addSample(output.reference_Udq[1] * dead_time_compensation_mult);
@@ -542,7 +544,9 @@ public:
             }
             else if (state_ == State::PhiMeasurement)
             {
-                Const dead_time_compensation_mult = 1.0F - pwm_dead_time_ / pwm_period_;
+                // TODO: Compensation disabled, since it yields lower values than expected
+                Const dead_time_compensation_mult = 1.0F;
+                //Const dead_time_compensation_mult = 1.0F - pwm_dead_time_ / pwm_period_;
 
                 Const Uq = state_variables_[IdxVoltage] * dead_time_compensation_mult;
                 Const I  = state_variables_[IdxI];
