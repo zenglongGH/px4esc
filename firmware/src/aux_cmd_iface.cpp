@@ -184,6 +184,9 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
 
         setName("aux_cmd_iface");
 
+        // First things first
+        g_param_cmd.set(unsigned(Command::None));
+
         while (!os::isRebootRequested())
         {
             waitFor(0.1F);
