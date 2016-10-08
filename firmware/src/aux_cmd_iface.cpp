@@ -25,6 +25,7 @@
 #include "aux_cmd_iface.hpp"
 #include <zubax_chibios/os.hpp>
 #include <params.hpp>
+#include <motor_database/motor_database.hpp>
 #include <unistd.h>
 #include <foc/foc.hpp>
 
@@ -34,31 +35,28 @@ namespace aux_cmd_iface
 namespace
 {
 
-enum class Command
-{
-    None,
+constexpr int CmdNone                   = -1;
 
-    HardwareTest,
-    MotorIDStatic,
-    MotorIDRotating,
+constexpr int CmdLoadMotorParamsFromDB  = 0;
 
-    ComeOnHowComeNewCppStandardsDontSupportEnumSizeTraits
-};
+constexpr int CmdHardwareTest           = 1000;
+constexpr int CmdMotorIDStatic          = 1001;
+constexpr int CmdMotorIDRotating        = 1002;
 
-os::config::Param<unsigned> g_param_cmd("exec_aux_command", 0, 0,
-                                        unsigned(Command::ComeOnHowComeNewCppStandardsDontSupportEnumSizeTraits) - 1);
 
-os::Logger g_logger("Aux Cmd Iface");
+os::config::Param<int> g_param_cmd("exec_aux_command", -1, -1, 9999);
+
+os::Logger g_logger("AuxCmdIface");
 
 
 class Thread : public chibios_rt::BaseStaticThread<2048>
 {
     static constexpr float WatchdogTimeout = 1.0F;
 
-    os::watchdog::Timer watchdog_;
+    mutable os::watchdog::Timer watchdog_;
 
 
-    void waitFor(float duration)
+    void waitFor(float duration) const
     {
         assert(duration < WatchdogTimeout);
         watchdog_.reset();
@@ -66,115 +64,107 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
         watchdog_.reset();
     }
 
-    void execute(const Command cmd)
+    void doLoadMotorParams(unsigned db_index) const
+    {
+        const auto entry = motor_database::getByIndex(db_index);
+        g_logger.println("Overwriting motor params from the selected Motor DB entry %u '%s'...",
+                         db_index, entry.name.c_str());
+
+        params::writeMotorParameters(entry.parameters);
+    }
+
+    void doHardwareTest() const
+    {
+        foc::beginHardwareTest();
+        while (foc::getState() == foc::State::HardwareTesting)
+        {
+            waitFor(0.01F);
+        }
+        g_logger.println("HW test result: %s", foc::getLastHardwareTestReport().toString().c_str());
+    }
+
+    void doMotorID(foc::MotorIdentificationMode mode) const
+    {
+        static const auto is_inactive = []()
+        {
+            const auto state = foc::getState();
+            return state == foc::State::Idle ||
+                   state == foc::State::Fault;
+        };
+
+        // Aborting immediately if busy
+        if (!is_inactive())
+        {
+            g_logger.puts("Bad state");
+            return;
+        }
+
+        // Hardware testing
+        doHardwareTest();
+
+        if (!foc::getLastHardwareTestReport().isSuccessful() ||
+            !is_inactive())
+        {
+            g_logger.puts("Bad state or HW test failure");
+            return;
+        }
+
+        // Identification
+        foc::beginMotorIdentification(mode);
+
+        while (foc::getState() == foc::State::MotorIdentification)
+        {
+            waitFor(0.01F);
+        }
+
+        // Saving the results
+        const auto result = foc::getMotorParameters();
+        g_logger.println("Motor params:\n%s", result.toString().c_str());
+        params::writeMotorParameters(result);
+    }
+
+    void execute(const int cmd)
     {
         class LoggingHelper
         {
             const ::systime_t started_at_ = chVTGetSystemTimeX();
-            const Command command_;
+            const int command_;
 
         public:
-            LoggingHelper(const Command cmd) :
+            LoggingHelper(const int cmd) :
                 command_(cmd)
             {
-                g_logger.println("Beginning execution of command %u...\n", unsigned(command_));
+                g_logger.println("Beginning execution of command %d...", command_);
             }
 
             ~LoggingHelper()
             {
                 const auto elapsed = float(ST2US(chVTTimeElapsedSinceX(started_at_))) / 1e6F;
-                g_logger.println("Execution of command %u finished in %.1f seconds\n",
-                              unsigned(command_), double(elapsed));
+                g_logger.println("Execution of command %d finished in %.1f seconds",
+                                 command_, double(elapsed));
             }
         } logging_helper(cmd);
 
-        switch (cmd)
+        if (cmd >= CmdLoadMotorParamsFromDB &&
+            cmd <= (CmdLoadMotorParamsFromDB + int(motor_database::getMaxIndex())))
         {
-        case Command::HardwareTest:
-        {
-            foc::beginHardwareTest();
-            while (foc::getState() == foc::State::HardwareTesting)
-            {
-                waitFor(0.01F);
-            }
-            g_logger.println("HW test result: %s", foc::getLastHardwareTestReport().toString().c_str());
-            break;
+            doLoadMotorParams(unsigned(cmd - CmdLoadMotorParamsFromDB));
         }
-
-        case Command::MotorIDStatic:
-        case Command::MotorIDRotating:
+        else if (cmd == CmdHardwareTest)
         {
-            static const auto is_inactive = []()
-            {
-                const auto state = foc::getState();
-                return state == foc::State::Idle ||
-                       state == foc::State::Fault;
-            };
-
-            /*
-             * Aborting immediately if busy
-             */
-            if (!is_inactive())
-            {
-                g_logger.puts("Bad state");
-                break;
-            }
-
-            /*
-             * Hardware testing
-             */
-            foc::beginHardwareTest();
-            while (foc::getState() == foc::State::HardwareTesting)
-            {
-                waitFor(0.01F);
-            }
-
-            if (!foc::getLastHardwareTestReport().isSuccessful() ||
-                !is_inactive())
-            {
-                g_logger.println("Bad state or HW test failure [%s]",
-                                 foc::getLastHardwareTestReport().toString().c_str());
-                break;
-            }
-
-            /*
-             * Identification
-             */
-            if (cmd == Command::MotorIDStatic)
-            {
-                foc::beginMotorIdentification(foc::MotorIdentificationMode::Static);
-            }
-            else if (cmd == Command::MotorIDRotating)
-            {
-                foc::beginMotorIdentification(foc::MotorIdentificationMode::RotationWithoutMechanicalLoad);
-            }
-            else
-            {
-                assert(false);
-                break;
-            }
-
-            while (foc::getState() == foc::State::MotorIdentification)
-            {
-                waitFor(0.01F);
-            }
-
-            /*
-             * Saving the results
-             */
-            const auto result = foc::getMotorParameters();
-            g_logger.println("Motor params:\n%s", result.toString().c_str());
-            params::writeMotorParameters(result);
-
-            break;
+            doHardwareTest();
         }
-
-        case Command::None:
-        case Command::ComeOnHowComeNewCppStandardsDontSupportEnumSizeTraits:
+        else if (cmd == CmdMotorIDStatic)
         {
-            g_logger.println("INVALID COMMAND %u\n", unsigned(cmd));
-            break;
+            doMotorID(foc::MotorIdentificationMode::Static);
         }
+        else if (cmd == CmdMotorIDRotating)
+        {
+            doMotorID(foc::MotorIdentificationMode::RotationWithoutMechanicalLoad);
+        }
+        else
+        {
+            g_logger.println("INVALID COMMAND %d", cmd);
         }
     }
 
@@ -185,21 +175,21 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
         setName("aux_cmd_iface");
 
         // First things first
-        g_param_cmd.set(unsigned(Command::None));
+        g_param_cmd.set(CmdNone);
 
         while (!os::isRebootRequested())
         {
             waitFor(0.1F);
 
-            const auto cmd = Command(g_param_cmd.get());
-            if (cmd != Command::None)
+            const auto cmd = g_param_cmd.get();
+            if (cmd >= 0)
             {
-                g_param_cmd.set(unsigned(Command::None));
+                g_param_cmd.set(CmdNone);
                 execute(cmd);
             }
         }
 
-        g_logger.puts("Stopped\n");
+        g_logger.puts("Stopped");
     }
 
 public:

@@ -52,10 +52,6 @@ namespace
 
 constexpr unsigned WatchdogTimeoutMSec = 1500;
 
-
-os::config::Param<int> g_param_motor_db_entry("motor_db.entry",    -1,     -1, motor_database::getMaxIndex());
-
-
 /**
  * This wrapper prohibits flash access when normal operation cannot be interrupted.
  */
@@ -195,26 +191,7 @@ auto onFirmwareUpdateRequestedFromUAVCAN(
  */
 void reloadConfigurationParameters()
 {
-    // Motor
-    if (g_param_motor_db_entry.get() >= 0)      // Rewriting motor parameters from the database if requested
-    {
-        unsigned index = unsigned(g_param_motor_db_entry.get());
-        const auto entry = motor_database::getByIndex(index);
-
-        os::lowsyslog("Main: Overwriting motor params from the selected Motor DB entry %u '%s'...\n",
-                      index, entry.name.c_str());
-
-        params::writeMotorParameters(entry.parameters);
-
-        // Resetting the DB entry index - parameters are now stored in the custom configuration
-        g_param_motor_db_entry.set(int(g_param_motor_db_entry.default_));
-        os::lowsyslog("Main: Parameter '%s' has been reset back to %d\n",
-                      g_param_motor_db_entry.name, int(g_param_motor_db_entry.default_));
-    }
-
     foc::setMotorParameters(params::readMotorParameters());
-
-    // Observer
     foc::setObserverParameters(params::readObserverParameters());
 }
 
