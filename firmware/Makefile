@@ -27,8 +27,10 @@ FW_VERSION_MINOR = 0
 # Application
 #
 
-CPPSRC = $(shell find src -name '*.cpp')
-CSRC = $(shell find src -name '*.c')
+# Files must be sorted in order to maintain persistent order of configuration parameters. Read the code for more info.
+# Doesn't work on Windoze? Well that's too bad!
+CPPSRC = $(shell find src -name '*.cpp' | sort)
+CSRC = $(shell find src -name '*.c' | sort)
 
 UINCDIR = src                \
           src/os_config
