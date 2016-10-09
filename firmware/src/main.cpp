@@ -336,7 +336,7 @@ public:
 };
 
 
-void updateUAVCANNodeStatus()
+void updateUAVCANNodeStatus(const bool board_ok)
 {
     using foc::State;
     using uavcan_node::NodeHealth;
@@ -351,14 +351,14 @@ void updateUAVCANNodeStatus()
     case State::Running:
     {
         setNodeMode(NodeMode::Operational);
-        setNodeHealth(NodeHealth::OK);
+        setNodeHealth(board_ok ? NodeHealth::OK : NodeHealth::Warning);
         break;
     }
     case State::MotorIdentification:
     case State::HardwareTesting:
     {
         setNodeMode(NodeMode::Maintenance);
-        setNodeHealth(NodeHealth::OK);
+        setNodeHealth(board_ok ? NodeHealth::OK : NodeHealth::Warning);
         break;
     }
     case State::Fault:
@@ -370,29 +370,39 @@ void updateUAVCANNodeStatus()
     }
 }
 
-
-led_indicator::Pattern makeLEDPattern()
+led_indicator::Pattern makeLEDPattern(const bool board_ok)
 {
-    static const board::RGB Red  (1.0F, 0,    0);
-    static const board::RGB Green(0,    1.0F, 0);
-    static const board::RGB Blue (0,    0,    1.0F);
+    static const board::RGB Red         (1.0F, 0,    0);
+    static const board::RGB Yellow      (1.0F, 1.0F, 0);
+    static const board::RGB Green       (0,    1.0F, 0);
+    static const board::RGB Blue        (0,    0,    1.0F);
 
     using foc::State;
 
+    const auto base_color = board_ok ? Green : Yellow;
+
     switch (foc::getState())
     {
-    case State::Idle:                   return {Green};
-    case State::MotorIdentification:    return {Green, 2};
-    case State::HardwareTesting:        return {Green, 1};
+    case State::Idle:                   return {base_color * 0.1F};
+    case State::Spinup:                 return {base_color, 1};
+    case State::Running:                return {base_color};
 
-    case State::Spinup:                 return {Blue, 1};
-    case State::Running:                return {Blue};
+    case State::MotorIdentification:    return {Blue, 2};
+    case State::HardwareTesting:        return {Blue, 1};
 
     case State::Fault:                  return {Red, 1};
     }
 
     assert(false);
     return {Red, 100};
+}
+
+bool isBoardHealthOK()
+{
+    const auto s = board::motor::getStatus();
+    const auto lim = board::motor::getLimits().safe_operating_area;
+    return lim.inverter_temperature.contains(s.inverter_temperature) &&
+           lim.inverter_voltage.contains(s.inverter_voltage);
 }
 
 }
@@ -437,10 +447,12 @@ int main()
     {
         watchdog.reset();
 
-        led_indicator.onNextTimeFrame();
-        led_indicator.setPattern(app::makeLEDPattern());
+        const bool board_ok = app::isBoardHealthOK();
 
-        app::updateUAVCANNodeStatus();          // This will also switch the node away from the Initialization state
+        led_indicator.onNextTimeFrame();
+        led_indicator.setPattern(app::makeLEDPattern(board_ok));
+
+        app::updateUAVCANNodeStatus(board_ok);  // This will also switch the node away from the Initialization state
 
         config_manager.poll();
 
