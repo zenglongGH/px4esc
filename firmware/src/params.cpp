@@ -88,6 +88,8 @@ Real g_cross_coupling_comp("foc.obs.cc_comp", Default().cross_coupling_compensat
 
 chibios_rt::Mutex g_mutex;
 
+os::Logger g_logger("Params");
+
 
 template <typename T, typename Src>
 void assign(os::config::Param<T>& destination, const Src source)
@@ -96,8 +98,8 @@ void assign(os::config::Param<T>& destination, const Src source)
 
     if (res < 0)
     {
-        os::lowsyslog("Params: ERROR: COULD NOT SET PARAM '%s' TO '%s': ERROR %d\n",
-                      destination.name, os::heapless::concatenate(source).c_str(), res);
+        g_logger.println("ERROR: COULD NOT SET PARAM '%s' TO '%s': ERROR %d",
+                         destination.name, os::heapless::concatenate(source).c_str(), res);
     }
 }
 

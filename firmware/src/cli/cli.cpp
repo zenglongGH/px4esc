@@ -824,6 +824,7 @@ class ThreadsCommand : public os::shell::ICommandHandler
 class CLIThread : public chibios_rt::BaseStaticThread<2048>
 {
     os::shell::Shell<20> shell_;
+    os::Logger logger{"CLI"};
 
     void main() override
     {
@@ -844,7 +845,7 @@ class CLIThread : public chibios_rt::BaseStaticThread<2048>
             foc::IRQDebugOutputBuffer::printIfNeeded();
         }
 
-        os::lowsyslog("CLI: Stopped\n");
+        logger.puts("Stopped");
     }
 
     static auto renderPrompt()

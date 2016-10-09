@@ -58,6 +58,8 @@ constexpr unsigned WatchdogTimeoutMSec = 1500;
  */
 class CustomConfigStorageBackend : public os::stm32::ConfigStorageBackend
 {
+    os::Logger logger{"CustomConfigStorageBackend"};
+
     int write(std::size_t offset, const void* data, std::size_t len) override
     {
         // Raising priority allows to prevent race condition when accessing the inverter driver
@@ -70,13 +72,13 @@ class CustomConfigStorageBackend : public os::stm32::ConfigStorageBackend
             board::motor::unsuspend();
             if (res < 0)
             {
-                os::lowsyslog("CustomConfigStorageBackend: Write error %d\n", res);
+                logger.println("Write error %d", res);
             }
             return res;
         }
         else
         {
-            os::lowsyslog("CustomConfigStorageBackend: WRITE DENIED\n");
+            logger.println("WRITE DENIED");
             return -EACCES;
         }
     }
@@ -92,13 +94,13 @@ class CustomConfigStorageBackend : public os::stm32::ConfigStorageBackend
             board::motor::unsuspend();
             if (res < 0)
             {
-                os::lowsyslog("CustomConfigStorageBackend: Erase error %d\n", res);
+                logger.println("Erase error %d", res);
             }
             return res;
         }
         else
         {
-            os::lowsyslog("CustomConfigStorageBackend: ERASE DENIED\n");
+            logger.println("ERASE DENIED");
             return -EACCES;
         }
     }
@@ -120,13 +122,15 @@ public:
     }
 } g_config_storage_backend;
 
+os::Logger g_logger("Main");
+
 
 /**
  * This callback is invoked when any component wants the application to restart. This is thread safe.
  */
 bool onRebootRequested(const char* reason)
 {
-    os::lowsyslog("Main: Reboot requested; reason: %s\n", reason);
+    g_logger.println("Reboot requested; reason: %s", reason);
     os::requestReboot();
     return true;                // Should reject while the motor is running?
 }
@@ -145,12 +149,14 @@ auto onFirmwareUpdateRequestedFromUAVCAN(
      */
     static bool already_in_progress = false;
 
-    os::lowsyslog("Main: UAVCAN firmware update request from %d, source %d, path '%s'\n",
-                  request.getSrcNodeID().get(), request.source_node_id, request.image_file_remote_path.path.c_str());
+    g_logger.println("UAVCAN firmware update request from %d, source %d, path '%s'",
+                     request.getSrcNodeID().get(),
+                     request.source_node_id,
+                     request.image_file_remote_path.path.c_str());
 
     if (already_in_progress)
     {
-        os::lowsyslog("Main: UAVCAN firmware update is already in progress, rejecting\n");
+        g_logger.println("UAVCAN firmware update is already in progress, rejecting");
         return uavcan::protocol::file::BeginFirmwareUpdate::Response::ERROR_IN_PROGRESS;
     }
 
@@ -170,8 +176,8 @@ auto onFirmwareUpdateRequestedFromUAVCAN(
 
     static_assert(request.image_file_remote_path.path.MaxSize < shared.UAVCANFileNameMaxLength, "Err...");
 
-    os::lowsyslog("Main: Bootloader args: CAN bus bitrate: %u, local node ID: %d\n",
-                  unsigned(shared.can_bus_speed), shared.uavcan_node_id);
+    g_logger.println("Bootloader args: CAN bus bitrate: %u, local node ID: %d",
+                     unsigned(shared.can_bus_speed), shared.uavcan_node_id);
 
     /*
      * Commiting everything
@@ -182,7 +188,7 @@ auto onFirmwareUpdateRequestedFromUAVCAN(
 
     already_in_progress = true;
 
-    os::lowsyslog("Main: UAVCAN firmware update initiated\n");
+    g_logger.puts("UAVCAN firmware update initiated");
     return uavcan::protocol::file::BeginFirmwareUpdate::Response::ERROR_OK;
 }
 
@@ -216,12 +222,12 @@ os::watchdog::Timer init()
 
     if (app_shared_available)
     {
-        os::lowsyslog("Main: Bootloader struct values: CAN bitrate: %u, UAVCAN Node ID: %u\n",
-                      unsigned(app_shared.can_bus_speed), app_shared.uavcan_node_id);
+        g_logger.println("Bootloader struct values: CAN bitrate: %u, UAVCAN Node ID: %u",
+                         unsigned(app_shared.can_bus_speed), app_shared.uavcan_node_id);
     }
     else
     {
-        os::lowsyslog("Main: Bootloader struct is NOT present\n");
+        g_logger.puts("Bootloader struct is NOT present");
     }
 
     /*
@@ -230,10 +236,10 @@ os::watchdog::Timer init()
     board::motor::init();
     foc::init();
 
-    os::lowsyslog("Main: Board limits:\n%s\n", board::motor::getLimits().toString().c_str());
+    g_logger.println("Board limits:\n%s", board::motor::getLimits().toString().c_str());
 
     // Power on self test
-    os::lowsyslog("Main: Testing hardware...\n");
+    g_logger.puts("Testing hardware...");
 
     foc::beginHardwareTest();
 
@@ -242,7 +248,7 @@ os::watchdog::Timer init()
         ::sleep(1);
     }
 
-    os::lowsyslog("Hardware test result: %s\n", foc::getLastHardwareTestReport().toString().c_str());
+    g_logger.puts(foc::getLastHardwareTestReport().toString().c_str());
 
     reloadConfigurationParameters();
 
@@ -278,6 +284,8 @@ class BackgroundConfigManager
     static constexpr float SaveDelay            = 1.0F;
     static constexpr float SaveDelayAfterError  = 10.0F;
 
+    os::Logger logger{"BackgroundConfigManager"};
+
     unsigned modification_counter_ = os::config::getModificationCounter();
     ::systime_t last_modification_ts_ = chVTGetSystemTimeX();
     bool pending_reload_ = false;
@@ -307,7 +315,7 @@ public:
             if (getTimeSinceModification() > ReloadDelay)
             {
                 pending_reload_ = false;
-                os::lowsyslog("BackgroundConfigManager: Reloading [modcnt=%u]\n", modification_counter_);
+                logger.println("Reloading [modcnt=%u]", modification_counter_);
                 reloadConfigurationParameters();
             }
         }
@@ -317,7 +325,7 @@ public:
             if (getTimeSinceModification() > (last_save_failed_ ? SaveDelayAfterError : SaveDelay) &&
                 g_config_storage_backend.canModifyStorageNow())
             {
-                os::lowsyslog("BackgroundConfigManager: Saving [modcnt=%u]\n", modification_counter_);
+                logger.println("Saving [modcnt=%u]", modification_counter_);
                 const int res = os::config::save();
                 if (res >= 0)
                 {
@@ -327,8 +335,7 @@ public:
                 else
                 {
                     last_save_failed_ = true;
-                    os::lowsyslog("BackgroundConfigManager: SAVE ERROR %d '%s'\n",
-                                  res, std::strerror(std::abs(res)));
+                    logger.println("SAVE ERROR %d '%s'", res, std::strerror(std::abs(res)));
                 }
             }
         }
@@ -468,7 +475,7 @@ int main()
 
     board::motor::emergency();                  // Just to be on the safe side
 
-    os::lowsyslog("Main: GOING DOWN FOR REBOOT\n");
+    app::g_logger.println("GOING DOWN FOR REBOOT");
 
     watchdog.reset();
 

@@ -72,6 +72,8 @@ constexpr unsigned PhaseBCurrentChannelIndex    = 12;
 constexpr unsigned InverterVoltageChannelIndex  = 11;
 constexpr unsigned TemperatureChannelIndex      = 10;
 
+os::Logger g_logger("Motor HW Driver");
+
 /*
  * ADC DMA buffers. We're using the canaries to ensure that no data corruption is happening.
  */
@@ -159,7 +161,7 @@ void initPWM(const double pwm_frequency,
     TIM1->BDTR = TIM_BDTR_MOE | TIM_BDTR_BKP | TIM_BDTR_BKE | dead_time_ticks;
 
     // Launching the timer
-    os::lowsyslog("Motor HW Driver: PWM cycle %u ticks, dead time %u ticks\n", pwm_cycle_ticks, dead_time_ticks);
+    g_logger.println("PWM cycle %u ticks, dead time %u ticks", pwm_cycle_ticks, dead_time_ticks);
 
     TIM1->CR1 |= TIM_CR1_CEN;
     TIM1->EGR = TIM_EGR_COMG | TIM_EGR_UG;
@@ -484,7 +486,7 @@ void init()
     static BoardFeatures board_features;
     g_board_features = &board_features;
 
-    os::lowsyslog("Motor HW Driver: Detected board: %s\n", g_board_features->getBoardName());
+    g_logger.println("Detected board: %s", g_board_features->getBoardName());
 
     /*
      * Initializing the MCU peripherals.
@@ -510,10 +512,10 @@ void init()
         nvicEnableVector(TIM8_CC_IRQn, MainIRQPriority);        // Triggered by software
     }
 
-    os::lowsyslog("Motor HW Driver: Fast IRQ period: %g us, Main IRQ period: %g us, ratio %u\n",
-                  double(g_pwm_period) * 1e6,
-                  double(g_pwm_period) * double(g_fast_irq_to_main_irq_period_ratio) * 1e6,
-                  g_fast_irq_to_main_irq_period_ratio);
+    g_logger.println("Fast IRQ period: %g us, Main IRQ period: %g us, ratio %u",
+                     double(g_pwm_period) * 1e6,
+                     double(g_pwm_period) * double(g_fast_irq_to_main_irq_period_ratio) * 1e6,
+                     g_fast_irq_to_main_irq_period_ratio);
 }
 
 /*

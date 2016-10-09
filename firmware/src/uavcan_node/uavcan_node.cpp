@@ -79,6 +79,8 @@ os::config::Param<std::uint8_t> g_param_node_id("uavcan.node_id",       0,      
 FirmwareUpdateRequestCallback g_on_firmware_update_requested;
 RebootRequestCallback g_on_reboot_requested;
 
+os::Logger g_logger("UAVCAN");
+
 /**
  * Implementation details.
  * Functions that return references to statics are designed this way as means to implement late initialization.
@@ -220,7 +222,7 @@ class RestartRequestHandler : public uavcan::IRestartRequestHandler
         }
         else
         {
-            os::lowsyslog("UAVCAN: REBOOT REQUEST HANDLER NOT SET\n");
+            g_logger.puts("REBOOT REQUEST HANDLER NOT SET");
             return false;
         }
     }
@@ -250,7 +252,7 @@ void handleBeginFirmwareUpdateRequest(
     }
     else
     {
-        os::lowsyslog("UAVCAN: FIRMWARE UPDATE HANDLER NOT SET\n");
+        g_logger.puts("FIRMWARE UPDATE HANDLER NOT SET");
         response.error = response.ERROR_UNKNOWN;
         response.optional_error_message = "Not supported by application";
     }
@@ -332,8 +334,8 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
             }
             else
             {
-                os::lowsyslog("UAVCAN: Could not init CAN; status: %d, autodetect: %d, bitrate: %u\n",
-                              res, int(autodetect), unsigned(bitrate));
+                g_logger.println("Could not init CAN; status: %d, autodetect: %d, bitrate: %u",
+                                 res, int(autodetect), unsigned(bitrate));
 
                 if (!autodetect)
                 {
@@ -341,7 +343,7 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
 
                     if (fixed_failures_cnt >= FixedBitrateInitTimeoutSec)
                     {
-                        os::lowsyslog("UAVCAN: Too many CAN init errors, falling back to autodetect\n");
+                        g_logger.puts("Too many CAN init errors, falling back to autodetect");
                         g_can_bit_rate = 0;
                     }
                 }
@@ -350,7 +352,7 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
         while (res < 0);
 
         assert(g_can_bit_rate > 0);
-        os::lowsyslog("UAVCAN: CAN inited at %u bps\n", unsigned(g_can_bit_rate));
+        g_logger.println("CAN inited at %u bps", unsigned(g_can_bit_rate));
     }
 
     void initNode()
@@ -394,7 +396,7 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
             {
                 break;
             }
-            os::lowsyslog("UAVCAN: Node init failure: %i, will retry\n", uavcan_start_res);
+            g_logger.println("Node init failure: %i, will retry", uavcan_start_res);
             ::sleep(1);
         }
         assert(getNode().isStarted());
@@ -406,7 +408,7 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
         {
             // Config takes precedence over hint
             getNode().setNodeID((g_param_node_id.get() > 0) ? g_param_node_id.get() : g_node_id);
-            os::lowsyslog("UAVCAN: Using static node ID %d\n", int(getNode().getNodeID().get()));
+            g_logger.println("Using static node ID %d", int(getNode().getNodeID().get()));
         }
         else
         {
@@ -419,7 +421,7 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
                 board::die(start_res);  // Should never happen
             }
 
-            os::lowsyslog("UAVCAN: Waiting for dynamic node ID allocation...\n");
+            g_logger.puts("Waiting for dynamic node ID allocation...");
 
             while (!dnid_client.isAllocationComplete())
             {
@@ -428,9 +430,9 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
                 wdt_.reset();
             }
 
-            os::lowsyslog("UAVCAN: Dynamic node ID %d allocated by %d\n",
-                          int(dnid_client.getAllocatedNodeID().get()),
-                          int(dnid_client.getAllocatorNodeID().get()));
+            g_logger.println("Dynamic node ID %d allocated by %d",
+                             int(dnid_client.getAllocatedNodeID().get()),
+                             int(dnid_client.getAllocatorNodeID().get()));
 
             getNode().setNodeID(dnid_client.getAllocatedNodeID());
         }
@@ -463,7 +465,7 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
         // TODO: Indication API
         // TODO: Enumeration API
 
-        os::lowsyslog("UAVCAN: Node started, ID %i\n", int(getNode().getNodeID().get()));
+        g_logger.println("Node started, ID %i", int(getNode().getNodeID().get()));
     }
 
     void main() override
@@ -490,13 +492,13 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
             const int spin_res = getNode().spin(uavcan::MonotonicDuration::fromMSec(100));
             if (spin_res < 0)
             {
-                os::lowsyslog("UAVCAN: Spin: %d\n", spin_res);
+                g_logger.println("Spin: %d", spin_res);
             }
 
             pollCommandFlags();
         }
 
-        os::lowsyslog("UAVCAN: Goodbye\n");
+        g_logger.puts("Goodbye");
         (void) getNode().spin(uavcan::MonotonicDuration::fromMSec(10));
     }
 
