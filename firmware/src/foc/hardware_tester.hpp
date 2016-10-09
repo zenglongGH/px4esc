@@ -189,7 +189,7 @@ public:
     {
         time_ += pwm_period_;
 
-        Vector<3> pwm_vector = Vector<3>::Ones() * 0.5F;
+        Vector<3> pwm_vector = Vector<3>::Zero();
 
         currents_filter_.update(raw_phase_currents_ab);
         const auto currents = currents_filter_.getValue();
@@ -291,7 +291,6 @@ public:
 
         case State::Finished:
         {
-            pwm_vector.setZero();
             /*
              * Normally we should be checking this in all states, but there's something wrong with the hardware
              * which causes intermittent FAULT reports sometimes, so we moved the check here temporarily.
