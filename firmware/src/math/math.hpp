@@ -114,6 +114,11 @@ struct Range
     {
         return (value >= min) && (value <= max);
     }
+
+    auto toString() const
+    {
+        return os::heapless::concatenate("[", min, ", ", max, "]");
+    }
 };
 
 /**
