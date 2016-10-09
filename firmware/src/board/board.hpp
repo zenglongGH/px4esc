@@ -30,6 +30,7 @@
 #include <hal.h>
 #include <zubax_chibios/util/heapless.hpp>
 #include <zubax_chibios/config/config.hpp>
+#include <math/math.hpp>
 
 #include "motor.hpp"
 
@@ -92,9 +93,10 @@ struct HardwareVersion
 HardwareVersion detectHardwareVersion();
 
 /**
- * Sets the LED brightness and color. Brightness is specified per channel in the range [0, 255].
+ * Sets the LED brightness and color. Brightness is specified per channel in the range [0, 1].
  */
-void setLEDRGB(uint8_t red, uint8_t green, uint8_t blue);
+using RGB = math::Vector<3>;
+void setRGBLED(const RGB& rgb);
 
 /**
  * Testpoint control.

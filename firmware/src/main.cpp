@@ -39,6 +39,7 @@
 #include "motor_database/motor_database.hpp"
 #include "params.hpp"
 #include "aux_cmd_iface.hpp"
+#include "led_indicator.hpp"
 
 #if __GNUC__ < 5
 # error "GCC version 5.x or newer is required"
@@ -205,6 +206,8 @@ os::watchdog::Timer init()
      */
     auto watchdog = board::init(WatchdogTimeoutMSec, g_config_storage_backend);
 
+    board::setRGBLED(board::RGB::Ones());
+
     const auto fw_version = bootloader_interface::getFirmwareVersion();
 
     const auto app_shared_read_result = bootloader_interface::readAndInvalidateSharedStruct();
@@ -237,7 +240,7 @@ os::watchdog::Timer init()
         ::sleep(1);
     }
 
-    os::lowsyslog("Hardware test result:\n%s\n\n", foc::getLastHardwareTestReport().toString().c_str());
+    os::lowsyslog("Hardware test result: %s\n", foc::getLastHardwareTestReport().toString().c_str());
 
     reloadConfigurationParameters();
 
@@ -365,6 +368,31 @@ void updateUAVCANNodeStatus()
     }
 }
 
+
+led_indicator::Pattern makeLEDPattern()
+{
+    static const board::RGB Red  (1.0F, 0,    0);
+    static const board::RGB Green(0,    1.0F, 0);
+    static const board::RGB Blue (0,    0,    1.0F);
+
+    using foc::State;
+
+    switch (foc::getState())
+    {
+    case State::Idle:                   return {Green};
+    case State::MotorIdentification:    return {Green, 2};
+    case State::HardwareTesting:        return {Green, 1};
+
+    case State::Spinup:                 return {Blue, 1};
+    case State::Running:                return {Blue};
+
+    case State::Fault:                  return {Red, 1};
+    }
+
+    assert(false);
+    return {Red, 100};
+}
+
 }
 }
 
@@ -374,7 +402,7 @@ namespace os
 extern void applicationHaltHook()
 {
     board::motor::emergency();
-    board::setLEDRGB(255, 0, 0);
+    board::setRGBLED({1.0F, 0, 0});
 }
 
 }
@@ -392,11 +420,13 @@ int main()
     foc::beep(5000.0F, 0.1F);
     ::usleep(100000);
     foc::beep(6000.0F, 0.1F);
+
     /*
      * Main loop
      */
-    constexpr unsigned LoopPeriodMSec = 100;
+    constexpr unsigned LoopPeriodMSec = 150;
 
+    led_indicator::Indicator led_indicator;     // Dependent on the loop period
     app::BackgroundConfigManager config_manager;
 
     auto next_step_at = chVTGetSystemTime();
@@ -405,9 +435,12 @@ int main()
     {
         watchdog.reset();
 
-        config_manager.poll();
+        led_indicator.onNextTimeFrame();
+        led_indicator.setPattern(app::makeLEDPattern());
 
-        app::updateUAVCANNodeStatus();  // This will also switch the node away from the Initialization state
+        app::updateUAVCANNodeStatus();          // This will also switch the node away from the Initialization state
+
+        config_manager.poll();
 
         next_step_at += MS2ST(LoopPeriodMSec);
         os::sleepUntilChTime(next_step_at);
@@ -416,13 +449,15 @@ int main()
     /*
      * Rebooting
      */
-    board::motor::emergency();             // Just to be on the safe side
+    board::setRGBLED(board::RGB::Ones());
+
+    board::motor::emergency();                  // Just to be on the safe side
 
     os::lowsyslog("Main: GOING DOWN FOR REBOOT\n");
 
     watchdog.reset();
 
-    ::sleep(1);         // Let other threads terminate properly
+    ::sleep(1);                                 // Let other threads terminate properly
 
     board::restart();
 

@@ -200,13 +200,13 @@ HardwareVersion detectHardwareVersion()
     return v;
 }
 
-void setLEDRGB(uint8_t red, uint8_t green, uint8_t blue)
+void setRGBLED(const RGB& rgb)
 {
-    constexpr unsigned Multiplier = 257;
+    constexpr unsigned Multiplier = 0xFFFF;
 
-    TIM3->CCR2 = red   * Multiplier;
-    TIM3->CCR3 = green * Multiplier;
-    TIM3->CCR4 = blue  * Multiplier;
+    TIM3->CCR2 = unsigned(rgb[0] * Multiplier + 0.4F);
+    TIM3->CCR3 = unsigned(rgb[1] * Multiplier + 0.4F);
+    TIM3->CCR4 = unsigned(rgb[2] * Multiplier + 0.4F);
 }
 
 } // namespace board
