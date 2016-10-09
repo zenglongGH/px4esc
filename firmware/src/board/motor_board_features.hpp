@@ -128,10 +128,10 @@ class BoardFeatures final
             Limits lim;
             lim.measurement_range.inverter_temperature = { math::convertCelsiusToKelvin(-40.0F),
                                                            math::convertCelsiusToKelvin(125.0F)};
-            lim.measurement_range.inverter_voltage = { 8.0F, 54.3F };
+            lim.measurement_range.inverter_voltage = { 5.0F, 54.3F };
             lim.safe_operating_area = lim.measurement_range;
             lim.safe_operating_area.inverter_temperature.max = math::convertCelsiusToKelvin(85.0F);
-            lim.safe_operating_area.inverter_voltage.max = 51.0F;
+            lim.safe_operating_area.inverter_voltage = { 8.0F, 51.0F };
 
             return {
                 "Pixhawk ESC v1.6",
