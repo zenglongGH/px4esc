@@ -181,6 +181,45 @@ struct Status
 Status getStatus();
 
 /**
+ * Board-specific parameter limits.
+ */
+struct Limits
+{
+    using Range = math::Range<>;
+
+    struct Set
+    {
+        Range inverter_temperature;
+        Range inverter_voltage;
+
+        auto toString() const
+        {
+            return os::heapless::format("Inverter Temperature: [%.1f, %.1f]\n"
+                                        "Inverter Voltage    : %s",
+                                        double(math::convertKelvinToCelsius(inverter_temperature.min)),
+                                        double(math::convertKelvinToCelsius(inverter_temperature.max)),
+                                        inverter_voltage.toString().c_str());
+        }
+    };
+
+    Set measurement_range;
+    Set safe_operating_area;
+
+    auto toString() const
+    {
+        return os::heapless::format("Measurement Range:\n%s\n"
+                                    "Safe Operating Area:\n%s",
+                                    measurement_range.toString().c_str(),
+                                    safe_operating_area.toString().c_str());
+    }
+};
+
+/**
+ * @ref Limits
+ */
+const Limits& getLimits();
+
+/**
  * This external handler is invoked from the HIGHEST PRIORITY IRQ context shortly after the middle of every PWM
  * period, as soon as the corresponding ADC measurements are processed.
  * Steps were taken to minimize the measurement latency, so the application code can rely on that.

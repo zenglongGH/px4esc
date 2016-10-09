@@ -86,6 +86,7 @@ class BoardFeatures final
         float current_shunt_resistance = 0.0F;
         std::array<float, 2> current_amplifier_low_high_gains{};
         std::function<float (float)> temperature_transfer_function = [](float) { return 0; };
+        Limits limits;
     };
 
     // Board-dependent constants
@@ -124,12 +125,21 @@ class BoardFeatures final
         if (hwver.major == 1 &&
             hwver.minor == 0)
         {
+            Limits lim;
+            lim.measurement_range.inverter_temperature = { math::convertCelsiusToKelvin(-40.0F),
+                                                           math::convertCelsiusToKelvin(125.0F)};
+            lim.measurement_range.inverter_voltage = { 8.0F, 54.3F };
+            lim.safe_operating_area = lim.measurement_range;
+            lim.safe_operating_area.inverter_temperature.max = math::convertCelsiusToKelvin(85.0F);
+            lim.safe_operating_area.inverter_voltage.max = 51.0F;
+
             return {
                 "Pixhawk ESC v1.6",
                 compute_resistor_divider_gain(5100 * 2, 330 * 2),
                 1 * 1e-3F,
                 { 10.0F, 40.0F },
-                temp_tf_MCP9700
+                temp_tf_MCP9700,
+                lim
             };
         }
 
@@ -149,6 +159,8 @@ public:
     }
 
     const char* getBoardName() const { return board_config_.name; }
+
+    const Limits& getLimits() const { return board_config_.limits; }
 
     float convertADCVoltageToInverterVoltage(float voltage) const
     {

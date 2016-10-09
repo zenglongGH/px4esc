@@ -887,8 +887,11 @@ void handleFastIRQ(Const period,
             {
                 board::motor::beginCalibration();
 
-                // TODO: Pass valid parameter ranges from the board driver.
-                hardware_tester = new (hardware_tester_storage) HardwareTester(period);
+                const auto measurement_range = board::motor::getLimits().measurement_range;
+
+                hardware_tester = new (hardware_tester_storage) HardwareTester(period,
+                                                                               measurement_range.inverter_voltage,
+                                                                               measurement_range.inverter_temperature);
             }
 
             const auto hw_status = board::motor::getStatus();

@@ -166,9 +166,8 @@ private:
 
 public:
     HardwareTester(Const pwm_period,
-                   const Range inverter_voltage_range = Range(5.0F, 100.0F),
-                   const Range inverter_temperature_range = Range(math::convertCelsiusToKelvin(-55.0F),
-                                                                  math::convertCelsiusToKelvin(125.0F))) :
+                   const Range inverter_voltage_range,
+                   const Range inverter_temperature_range) :
         pwm_period_(pwm_period),
         inverter_voltage_range_(inverter_voltage_range),
         inverter_temperature_range_(inverter_temperature_range),

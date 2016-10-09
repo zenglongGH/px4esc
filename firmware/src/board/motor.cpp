@@ -672,6 +672,11 @@ Status getStatus()
     return s;
 }
 
+const Limits& getLimits()
+{
+    return g_board_features->getLimits();
+}
+
 }
 }
 

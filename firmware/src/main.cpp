@@ -230,6 +230,8 @@ os::watchdog::Timer init()
     board::motor::init();
     foc::init();
 
+    os::lowsyslog("Main: Board limits:\n%s\n", board::motor::getLimits().toString().c_str());
+
     // Power on self test
     os::lowsyslog("Main: Testing hardware...\n");
 
