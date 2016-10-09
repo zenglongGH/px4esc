@@ -252,9 +252,6 @@ os::watchdog::Timer init()
 
     reloadConfigurationParameters();
 
-    // Initializing to Idle
-    foc::stop();
-
     board::motor::printStatus();
 
     /*
