@@ -36,7 +36,12 @@ namespace led_indicator
 struct Pattern
 {
     board::RGB color_rgb = board::RGB::Zero();
-    std::uint8_t num_blinks = 0;
+
+    enum class Behavior
+    {
+        Solid,
+        Blinking
+    } behavior = Behavior::Solid;
 };
 
 /**
@@ -44,35 +49,32 @@ struct Pattern
  */
 class Indicator
 {
-    static constexpr int NumEmptySlotsBetweenPatterns = 3;
+    static constexpr unsigned LowHighFrequencyRatio = 4;
 
     Pattern pattern_;
-    int current_slot_ = 0;
+    bool led_on_ = false;
 
     void on()
     {
         board::setRGBLED(pattern_.color_rgb);
+        led_on_ = true;
     }
 
     void off()
     {
         board::setRGBLED(board::RGB::Zero());
+        led_on_ = false;
     }
 
-    void restartPattern()
+    void toggle()
     {
-        current_slot_ = pattern_.num_blinks * 2;
+        (this->*(led_on_ ? &Indicator::off : &Indicator::on))();
     }
 
 public:
     void setPattern(const Pattern& p)
     {
-        const bool needs_restart = p.num_blinks != pattern_.num_blinks;
         pattern_ = p;
-        if (needs_restart)
-        {
-            restartPattern();
-        }
     }
 
     /**
@@ -81,26 +83,18 @@ public:
      */
     void onNextTimeFrame()
     {
-        if (pattern_.num_blinks > 0)
+        if (pattern_.behavior == Pattern::Behavior::Solid)
         {
-            current_slot_--;
-            if (current_slot_ < 0)
-            {
-                off();
-                if (current_slot_ < -NumEmptySlotsBetweenPatterns)
-                {
-                    restartPattern();
-                }
-            }
-            else
-            {
-                (this->*((current_slot_ % 2 == 0) ? &Indicator::on : &Indicator::off))();
-            }
+            on();
+        }
+        else if (pattern_.behavior == Pattern::Behavior::Blinking)
+        {
+            toggle();
         }
         else
         {
-            current_slot_ = 0;
-            on();
+            assert(false);
+            off();
         }
     }
 };

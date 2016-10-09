@@ -378,23 +378,24 @@ led_indicator::Pattern makeLEDPattern(const bool board_ok)
     static const board::RGB Blue        (0,    0,    1.0F);
 
     using foc::State;
+    using Behavior = led_indicator::Pattern::Behavior;
 
     const auto base_color = board_ok ? Green : Yellow;
 
     switch (foc::getState())
     {
     case State::Idle:                   return {base_color * 0.1F};
-    case State::Spinup:                 return {base_color, 1};
+    case State::Spinup:                 return {base_color, Behavior::Blinking};
     case State::Running:                return {base_color};
 
-    case State::MotorIdentification:    return {Blue, 2};
-    case State::HardwareTesting:        return {Blue, 1};
+    case State::MotorIdentification:    return {Blue};
+    case State::HardwareTesting:        return {Blue, Behavior::Blinking};
 
-    case State::Fault:                  return {Red, 1};
+    case State::Fault:                  return {Red, Behavior::Blinking};
     }
 
     assert(false);
-    return {Red, 100};
+    return {};
 }
 
 bool isBoardHealthOK()
