@@ -330,6 +330,41 @@ public:
     }
 };
 
+
+void updateUAVCANNodeStatus()
+{
+    using foc::State;
+    using uavcan_node::NodeHealth;
+    using uavcan_node::NodeMode;
+    using uavcan_node::setNodeHealth;
+    using uavcan_node::setNodeMode;
+
+    switch (foc::getState())
+    {
+    case State::Idle:
+    case State::Spinup:
+    case State::Running:
+    {
+        setNodeMode(NodeMode::Operational);
+        setNodeHealth(NodeHealth::OK);
+        break;
+    }
+    case State::MotorIdentification:
+    case State::HardwareTesting:
+    {
+        setNodeMode(NodeMode::Maintenance);
+        setNodeHealth(NodeHealth::OK);
+        break;
+    }
+    case State::Fault:
+    {
+        // Keeping the mode unchanged for better diagnostics
+        setNodeHealth(NodeHealth::Critical);
+        break;
+    }
+    }
+}
+
 }
 }
 
@@ -357,9 +392,6 @@ int main()
     foc::beep(5000.0F, 0.1F);
     ::usleep(100000);
     foc::beep(6000.0F, 0.1F);
-
-    uavcan_node::notifyNodeInitializationComplete();
-
     /*
      * Main loop
      */
@@ -374,6 +406,8 @@ int main()
         watchdog.reset();
 
         config_manager.poll();
+
+        app::updateUAVCANNodeStatus();  // This will also switch the node away from the Initialization state
 
         next_step_at += MS2ST(LoopPeriodMSec);
         os::sleepUntilChTime(next_step_at);

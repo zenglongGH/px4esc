@@ -530,21 +530,21 @@ void init(std::uint32_t bit_rate_hint,
     (void) g_node_thread.start(NodeThreadPriority);
 }
 
-void setNodeStatus(NodeStatus ns)
+void setNodeHealth(NodeHealth ns)
 {
     switch (ns)
     {
-    case NodeStatus::OK:
+    case NodeHealth::OK:
     {
         g_node_status_health = uavcan::protocol::NodeStatus::HEALTH_OK;
         break;
     }
-    case NodeStatus::Warning:
+    case NodeHealth::Warning:
     {
         g_node_status_health = uavcan::protocol::NodeStatus::HEALTH_WARNING;
         break;
     }
-    case NodeStatus::Critical:
+    case NodeHealth::Critical:
     {
         g_node_status_health = uavcan::protocol::NodeStatus::HEALTH_CRITICAL;
         break;
@@ -552,10 +552,21 @@ void setNodeStatus(NodeStatus ns)
     }
 }
 
-void notifyNodeInitializationComplete()
+void setNodeMode(NodeMode mode)
 {
-    // Atomic write, no need for locking
-    g_node_status_mode = uavcan::protocol::NodeStatus::MODE_OPERATIONAL;
+    switch (mode)
+    {
+    case NodeMode::Operational:
+    {
+        g_node_status_mode = uavcan::protocol::NodeStatus::MODE_OPERATIONAL;
+        break;
+    }
+    case NodeMode::Maintenance:
+    {
+        g_node_status_mode = uavcan::protocol::NodeStatus::MODE_MAINTENANCE;
+        break;
+    }
+    }
 }
 
 uavcan::NodeID getNodeID()

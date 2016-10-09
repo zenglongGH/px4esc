@@ -34,13 +34,22 @@
 namespace uavcan_node
 {
 /**
- * Refer to setNodeStatus().
+ * Refer to @ref setNodeHealth().
  */
-enum class NodeStatus
+enum class NodeHealth
 {
     OK,
     Warning,
     Critical
+};
+
+/**
+ * Refer to @ref setNodeMode().
+ */
+enum class NodeMode
+{
+    Operational,
+    Maintenance
 };
 
 /**
@@ -86,14 +95,11 @@ void init(std::uint32_t bit_rate_hint,
           const RebootRequestCallback& on_reboot_requested);
 
 /**
- * Sets the status of the local node. The NodeStatus value is translated into the UAVCAN-defined node status code.
+ * Sets the status of the local node.
+ * The values are translated into the UAVCAN-defined node status code.
  */
-void setNodeStatus(NodeStatus ns);
-
-/**
- * Signal the local node that the application has completed initialization and is ready to perform its functions.
- */
-void notifyNodeInitializationComplete();
+void setNodeHealth(NodeHealth ns);
+void setNodeMode(NodeMode mode);
 
 /**
  * Returns current node ID (possibly invalid if it is not yet known).
