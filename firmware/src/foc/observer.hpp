@@ -38,13 +38,14 @@ namespace foc
  */
 struct ObserverParameters
 {
-    static constexpr Scalar Q_11_22     = 1.0F;
+    // Defaults
+    static constexpr Scalar Q_11_22     = 100.0F;
     static constexpr Scalar R_11_22     = 2.0F;
-    static constexpr Scalar P0_11_22    = 1000.0F;
+    static constexpr Scalar P0_11_22    = 0.001F;               // Initial currents assumed to be zero
 
     DiagonalMatrix<4> Q  = math::makeDiagonalMatrix(Q_11_22,
                                                     Q_11_22,
-                                                    100.0F,
+                                                    5000.0F,
                                                     1.0F);
 
     DiagonalMatrix<2> R  = math::makeDiagonalMatrix(R_11_22,
@@ -52,8 +53,8 @@ struct ObserverParameters
 
     DiagonalMatrix<4> P0 = math::makeDiagonalMatrix(P0_11_22,
                                                     P0_11_22,
-                                                    0.1F,      // We know that initial angular velocity is zero
-                                                    5000.0F);  // We don't know initial angular position
+                                                    0.001F,     // We know that initial angular velocity is zero
+                                                    5000.0F);   // We don't know initial angular position
 
     Scalar cross_coupling_compensation = 0.8F;
 
