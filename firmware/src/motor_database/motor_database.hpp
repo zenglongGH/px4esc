@@ -50,7 +50,9 @@ struct Entry
           const foc::MotorParameters& arg_parameters) :
         name(arg_name),
         parameters(arg_parameters)
-    { }
+    {
+        parameters.deduceMissingParameters();
+    }
 
     Entry(const Name& arg_name,
           const std::function<foc::MotorParameters()> factory) :
