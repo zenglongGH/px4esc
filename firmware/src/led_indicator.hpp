@@ -49,10 +49,11 @@ struct Pattern
  */
 class Indicator
 {
-    static constexpr unsigned LowHighFrequencyRatio = 4;
+    static constexpr unsigned TimeFramesPerFlash = 3;
 
     Pattern pattern_;
     bool led_on_ = false;
+    unsigned remaining_flash_time_frames_ = 0;
 
     void on()
     {
@@ -77,24 +78,37 @@ public:
         pattern_ = p;
     }
 
+    void flash()
+    {
+        remaining_flash_time_frames_ = TimeFramesPerFlash;
+    }
+
     /**
      * This function needs to be invoked at a constant rate.
      * The rate defines the base time frame, i.e. the pause between blinks.
      */
     void onNextTimeFrame()
     {
-        if (pattern_.behavior == Pattern::Behavior::Solid)
+        if (remaining_flash_time_frames_ > 0)
         {
-            on();
-        }
-        else if (pattern_.behavior == Pattern::Behavior::Blinking)
-        {
-            toggle();
+            remaining_flash_time_frames_--;
+            board::setRGBLED(board::RGB::Ones());
         }
         else
         {
-            assert(false);
-            off();
+            if (pattern_.behavior == Pattern::Behavior::Solid)
+            {
+                on();
+            }
+            else if (pattern_.behavior == Pattern::Behavior::Blinking)
+            {
+                toggle();
+            }
+            else
+            {
+                assert(false);
+                off();
+            }
         }
     }
 };

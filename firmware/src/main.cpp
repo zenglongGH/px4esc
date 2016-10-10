@@ -289,9 +289,22 @@ class BackgroundConfigManager
     bool pending_save_ = false;
     bool last_save_failed_ = false;
 
+    bool just_reloaded_ = false;
+    bool just_saved_ = false;
+
     float getTimeSinceModification() const
     {
         return float(ST2MS(chVTTimeElapsedSinceX(last_modification_ts_))) / 1e3F;
+    }
+
+    static bool doDestructiveTruthTest(bool& what)
+    {
+        if (what)
+        {
+            what = false;
+            return true;
+        }
+        return false;
     }
 
 public:
@@ -312,6 +325,7 @@ public:
             if (getTimeSinceModification() > ReloadDelay)
             {
                 pending_reload_ = false;
+                just_reloaded_ = true;
                 logger.println("Reloading [modcnt=%u]", modification_counter_);
                 reloadConfigurationParameters();
             }
@@ -328,6 +342,7 @@ public:
                 {
                     pending_save_ = false;
                     last_save_failed_ = false;
+                    just_saved_ = true;
                 }
                 else
                 {
@@ -337,6 +352,10 @@ public:
             }
         }
     }
+
+    bool hasBeenReloaded() { return doDestructiveTruthTest(just_reloaded_); }
+
+    bool hasBeenSaved() { return doDestructiveTruthTest(just_saved_); }
 };
 
 
@@ -452,14 +471,19 @@ int main()
     {
         watchdog.reset();
 
+        config_manager.poll();
+        if (config_manager.hasBeenReloaded() ||
+            config_manager.hasBeenSaved())
+        {
+            led_indicator.flash();
+        }
+
         const bool board_ok = app::isBoardHealthOK();
 
-        led_indicator.onNextTimeFrame();
         led_indicator.setPattern(app::makeLEDPattern(board_ok));
+        led_indicator.onNextTimeFrame();
 
         app::updateUAVCANNodeStatus(board_ok);  // This will also switch the node away from the Initialization state
-
-        config_manager.poll();
 
         next_step_at += MS2ST(LoopPeriodMSec);
         os::sleepUntilChTime(next_step_at);
