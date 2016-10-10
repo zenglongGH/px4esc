@@ -467,9 +467,12 @@ public:
                 if (MotorParameters::getLqLimits().contains(LqHF) &&
                     MotorParameters::getLqLimits().contains(LqRoverL))
                 {
-                    // Measured values are valid
-                    // The measured value is typically lower than the true inductance, so we pick whichever is greater
-                    result_.lq = std::max(LqHF, LqRoverL);
+                    /*
+                     * Measured values are valid.
+                     * The LqHF formula is robust and tends to provide reliable results,
+                     * whereas RoverL is highly dependent on frequency.
+                     */
+                    result_.lq = LqHF;
 
                     // Switching to the next state
                     if (mode_ == MotorIdentificationMode::Static)
