@@ -178,7 +178,7 @@ class PWMCommand : public os::shell::ICommandHandler
 
 class StatusCommand : public os::shell::ICommandHandler
 {
-    const char* getName() const override { return "s"; }
+    const char* getName() const override { return "status"; }
 
     void execute(os::shell::BaseChannelWrapper&, int, char**) override
     {
@@ -200,6 +200,17 @@ class StatusCommand : public os::shell::ICommandHandler
                     double(board::motor::getPWMDeadTime()) * 1e9);
     }
 } static cmd_status;
+
+
+class BriefStatusCommand : public os::shell::ICommandHandler
+{
+    const char* getName() const override { return "s"; }
+
+    void execute(os::shell::BaseChannelWrapper&, int, char**) override
+    {
+        foc::printStatusInfo();
+    }
+} static cmd_brief_status;
 
 
 class CalibrateCommand : public os::shell::ICommandHandler
@@ -864,6 +875,7 @@ public:
         (void) shell_.addCommandHandler(&cmd_uavcan);
         (void) shell_.addCommandHandler(&cmd_pwm);
         (void) shell_.addCommandHandler(&cmd_status);
+        (void) shell_.addCommandHandler(&cmd_brief_status);
         (void) shell_.addCommandHandler(&cmd_calibrate);
         (void) shell_.addCommandHandler(&cmd_spin);
         (void) shell_.addCommandHandler(&cmd_setpoint);
