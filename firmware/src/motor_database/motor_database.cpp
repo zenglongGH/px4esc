@@ -31,6 +31,16 @@ namespace
 {
 
 using foc::MotorParameters;
+using math::Scalar;
+
+namespace common
+{
+
+constexpr Scalar SpinupDuration         = 2.0F;
+constexpr Scalar MinElectricAngVel      = 250.0F;
+constexpr unsigned NumStallsToLatch     = 10;
+
+}
 
 /**
  * Motor database entries go here.
@@ -40,8 +50,8 @@ static const Entry g_entries[] =
     Entry("T-Motor MT2216-12", []()
     {
         MotorParameters p;
-        p.nominal_spinup_duration = 1.0F;
-        p.min_electrical_ang_vel  = 140.0F;
+        p.nominal_spinup_duration = common::SpinupDuration;
+        p.min_electrical_ang_vel  = common::MinElectricAngVel;
         p.min_current             = 0.3F;
         p.max_current             = 18.0F;
         p.spinup_current          = 0;
@@ -50,15 +60,15 @@ static const Entry g_entries[] =
         p.rs                      = 0.11F;
         p.lq                      = 23e-6F;
         p.num_poles               = 14;
-        p.num_stalls_to_latch     = 10;
+        p.num_stalls_to_latch     = common::NumStallsToLatch;
         return p;
     }),
 
     Entry("T-Motor U8-16", []()
     {
         MotorParameters p;
-        p.nominal_spinup_duration = 1.0F;
-        p.min_electrical_ang_vel  = 140.0F;
+        p.nominal_spinup_duration = common::SpinupDuration;
+        p.min_electrical_ang_vel  = common::MinElectricAngVel;
         p.min_current             = 0.5F;
         p.max_current             = 24.0F;
         p.spinup_current          = 0;
@@ -67,15 +77,15 @@ static const Entry g_entries[] =
         p.rs                      = 0.1F;
         p.lq                      = 67e-6F;
         p.num_poles               = 28;
-        p.num_stalls_to_latch     = 10;
+        p.num_stalls_to_latch     = common::NumStallsToLatch;
         return p;
     }),
 
     Entry("Maxon 339285", []()
     {
         MotorParameters p;
-        p.nominal_spinup_duration = 1.0F;
-        p.min_electrical_ang_vel  = 140.0F;
+        p.nominal_spinup_duration = common::SpinupDuration;
+        p.min_electrical_ang_vel  = common::MinElectricAngVel;
         p.min_current             = 0.2F;
         p.max_current             = 3.5F;
         p.spinup_current          = 0;
@@ -84,7 +94,7 @@ static const Entry g_entries[] =
         p.rs                      = 0.232F;
         p.lq                      = 161e-6F;
         p.num_poles               = 16;
-        p.num_stalls_to_latch     = 10;
+        p.num_stalls_to_latch     = common::NumStallsToLatch;
         return p;
     })
 };
