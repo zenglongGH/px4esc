@@ -46,8 +46,8 @@ using Natural = os::config::Param<unsigned>;
 namespace motor
 {
 
-Real g_spinup_duration    ("m.spinup_sec",        1.0F,       0.1F,    30.0F);
-Real g_min_electr_ang_vel ("m.min_eradsec",     140.0F,      10.0F,  1000.0F);
+Real g_spinup_duration    ("m.spinup_sec",        2.0F,       0.1F,    30.0F);
+Real g_min_electr_ang_vel ("m.min_eradsec",     250.0F,      10.0F,  1000.0F);
 Real g_min_current        ("m.min_ampere",        0.0F,       0.0F,    50.0F);
 Real g_max_current        ("m.max_ampere",        0.0F,       0.0F,   200.0F);
 Real g_spinup_current     ("m.spinup_ampere",     0.0F,       0.0F,    50.0F);
@@ -68,20 +68,17 @@ namespace observer
 
 using Default = foc::ObserverParameters;
 
-Real g_Q_11    ("foc.obs.q_11",    Default().Q.diagonal()[0],  1e-6F,  1e+6F);
-Real g_Q_22    ("foc.obs.q_22",    Default().Q.diagonal()[1],  1e-6F,  1e+6F);
-Real g_Q_33    ("foc.obs.q_33",    Default().Q.diagonal()[2],  1e-6F,  1e+6F);
-Real g_Q_44    ("foc.obs.q_44",    Default().Q.diagonal()[3],  1e-6F,  1e+6F);
+Real g_Q_11_22 ("obs.q_11_22",  Default().Q.diagonal()[0],  1e-6F,  1e+6F);
+Real g_Q_33    ("obs.q_33",     Default().Q.diagonal()[2],  1e-6F,  1e+6F);
+Real g_Q_44    ("obs.q_44",     Default().Q.diagonal()[3],  1e-6F,  1e+6F);
 
-Real g_R_11    ("foc.obs.r_11",    Default().R.diagonal()[0],  1e-6F,  1e+6F);
-Real g_R_22    ("foc.obs.r_22",    Default().R.diagonal()[1],  1e-6F,  1e+6F);
+Real g_R_11_22 ("obs.r_11_22",  Default().R.diagonal()[0],  1e-6F,  1e+6F);
 
-Real g_P0_11   ("foc.obs.p0_11",   Default().P0.diagonal()[0], 1e-6F,  1e+6F);
-Real g_P0_22   ("foc.obs.p0_22",   Default().P0.diagonal()[1], 1e-6F,  1e+6F);
-Real g_P0_33   ("foc.obs.p0_33",   Default().P0.diagonal()[2], 1e-6F,  1e+6F);
-Real g_P0_44   ("foc.obs.p0_44",   Default().P0.diagonal()[3], 1e-6F,  1e+6F);
+Real g_P0_11_22("obs.p0_11_22", Default().P0.diagonal()[0], 1e-6F,  1e+6F);
+Real g_P0_33   ("obs.p0_33",    Default().P0.diagonal()[2], 1e-6F,  1e+6F);
+Real g_P0_44   ("obs.p0_44",    Default().P0.diagonal()[3], 1e-6F,  1e+6F);
 
-Real g_cross_coupling_comp("foc.obs.cc_comp", Default().cross_coupling_compensation, 0.0F, 1.0F);
+Real g_cross_coupling_comp("obs.crosscp_comp", Default().cross_coupling_compensation, 0.0F, 1.0F);
 
 } // namespace observer
 
@@ -158,16 +155,16 @@ foc::ObserverParameters readObserverParameters()
 
     using namespace observer;
 
-    out.Q = math::makeDiagonalMatrix(g_Q_11.get(),
-                                     g_Q_22.get(),
+    out.Q = math::makeDiagonalMatrix(g_Q_11_22.get(),
+                                     g_Q_11_22.get(),
                                      g_Q_33.get(),
                                      g_Q_44.get());
 
-    out.R = math::makeDiagonalMatrix(g_R_11.get(),
-                                     g_R_22.get());
+    out.R = math::makeDiagonalMatrix(g_R_11_22.get(),
+                                     g_R_11_22.get());
 
-    out.P0 = math::makeDiagonalMatrix(g_P0_11.get(),
-                                      g_P0_22.get(),
+    out.P0 = math::makeDiagonalMatrix(g_P0_11_22.get(),
+                                      g_P0_11_22.get(),
                                       g_P0_33.get(),
                                       g_P0_44.get());
 
@@ -187,20 +184,23 @@ void writeObserverParameters(const foc::ObserverParameters& obj)
         int index = 0;
         for (auto& dst : param_array)
         {
-            assign(*dst, matrix.diagonal()[index++]);
+            if (dst != nullptr)
+            {
+                assign(*dst, matrix.diagonal()[index++]);
+            }
         }
     };
 
-    unpacker(obj.Q, {&g_Q_11,
-                     &g_Q_22,
+    unpacker(obj.Q, {&g_Q_11_22,
+                     nullptr,
                      &g_Q_33,
                      &g_Q_44});
 
-    unpacker(obj.R, {&g_R_11,
-                     &g_R_22});
+    unpacker(obj.R, {&g_R_11_22,
+                     nullptr});
 
-    unpacker(obj.P0, {&g_P0_11,
-                      &g_P0_22,
+    unpacker(obj.P0, {&g_P0_11_22,
+                      nullptr,
                       &g_P0_33,
                       &g_P0_44});
 

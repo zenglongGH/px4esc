@@ -91,7 +91,7 @@ volatile std::uint32_t g_canary_d = CanaryValue;
  * Configuration parameters
  */
 os::config::Param<float> g_config_pwm_frequency_khz             ("drv.pwm_freq_khz",    60.0F,     50.0F,     80.0F);
-os::config::Param<float> g_config_pwm_dead_time_nsec            ("drv.pwm_dead_ns",    200.0F,     50.0F,    900.0F);
+os::config::Param<float> g_config_pwm_dead_time_nsec            ("drv.pwm_deadt_ns",   200.0F,     50.0F,    900.0F);
 
 /*
  * Current state variables

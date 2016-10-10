@@ -38,16 +38,20 @@ namespace foc
  */
 struct ObserverParameters
 {
-    DiagonalMatrix<4> Q  = math::makeDiagonalMatrix(1.0F,
-                                                    1.0F,
+    static constexpr Scalar Q_11_22     = 1.0F;
+    static constexpr Scalar R_11_22     = 2.0F;
+    static constexpr Scalar P0_11_22    = 1000.0F;
+
+    DiagonalMatrix<4> Q  = math::makeDiagonalMatrix(Q_11_22,
+                                                    Q_11_22,
                                                     100.0F,
                                                     1.0F);
 
-    DiagonalMatrix<2> R  = math::makeDiagonalMatrix(2.0F,
-                                                    2.0F);
+    DiagonalMatrix<2> R  = math::makeDiagonalMatrix(R_11_22,
+                                                    R_11_22);
 
-    DiagonalMatrix<4> P0 = math::makeDiagonalMatrix(1000.0F,
-                                                    1000.0F,
+    DiagonalMatrix<4> P0 = math::makeDiagonalMatrix(P0_11_22,
+                                                    P0_11_22,
                                                     0.1F,      // We know that initial angular velocity is zero
                                                     5000.0F);  // We don't know initial angular position
 
