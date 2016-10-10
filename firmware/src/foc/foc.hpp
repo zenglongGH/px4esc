@@ -71,6 +71,7 @@ void beginMotorIdentification(MotorIdentificationMode mode);
  * Begins the asynchronous process of hardware testing.
  * Completion of the process can be detected by means of monitoring the current state of the controller, see @ref State.
  * The result of the test can be obtained via @ref getLastHardwareTestReport().
+ * A side effect of the test is that the HW driver will be recalibrated.
  */
 void beginHardwareTest();
 
