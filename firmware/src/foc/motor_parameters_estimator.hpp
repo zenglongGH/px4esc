@@ -72,7 +72,7 @@ class MotorParametersEstimator
     // reduce phase delay of the current filter.
     static constexpr Scalar PhiMeasurementVoltageSlopeLengthSec = 40.0F;
 
-    static constexpr Scalar LqMinValidSampleRatio       = 0.9F;
+    static constexpr Scalar LqMinValidSampleRatio       = 0.99F;
 
     static constexpr unsigned IdqMovingAverageLength    = 5;
 
