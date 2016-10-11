@@ -17,7 +17,7 @@
 # Author: Pavel Kirienko <pavel.kirienko@zubax.com>
 #
 
-PROJECT = io.px4.px4esc
+PROJECT = com.zubax.px4esc
 
 HW_VERSION = 1
 FW_VERSION_MAJOR = 1
