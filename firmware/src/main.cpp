@@ -395,26 +395,28 @@ void updateUAVCANNodeStatus(const bool board_ok)
 
 led_indicator::Pattern makeLEDPattern(const bool board_ok)
 {
-    static const board::RGB Red         (1.0F, 0,    0);
-    static const board::RGB Yellow      (1.0F, 1.0F, 0);
-    static const board::RGB Green       (0,    1.0F, 0);
-    static const board::RGB Blue        (0,    0,    1.0F);
+    static const board::RGB Red   (1.0F, 0,    0);
+    static const board::RGB Yellow(1.0F, 1.0F, 0);
+    static const board::RGB Green (0,    1.0F, 0);
+    static const board::RGB Blue  (0,    0,    1.0F);
+
+    constexpr float Dim = 0.05F;
 
     using foc::State;
     using Behavior = led_indicator::Pattern::Behavior;
 
-    const auto base_color = board_ok ? Green : Yellow;
+    const auto base = board_ok ? Green : Yellow;
 
     switch (foc::getState())
     {
-    case State::Idle:                   return {base_color * 0.1F};
-    case State::Spinup:                 return {base_color, Behavior::Blinking};
-    case State::Running:                return {base_color};
+    case State::Idle:                   return {base * Dim, Behavior::Solid};
+    case State::Spinup:                 return {base,       Behavior::Blinking};
+    case State::Running:                return {base,       Behavior::Solid};
 
-    case State::MotorIdentification:    return {Blue};
-    case State::HardwareTesting:        return {Blue, Behavior::Blinking};
+    case State::MotorIdentification:    return {Blue,       Behavior::Solid};
+    case State::HardwareTesting:        return {Blue,       Behavior::Blinking};
 
-    case State::Fault:                  return {Red, Behavior::Blinking};
+    case State::Fault:                  return {Red,        Behavior::Blinking};
     }
 
     assert(false);
