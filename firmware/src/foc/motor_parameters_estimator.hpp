@@ -72,7 +72,9 @@ class MotorParametersEstimator
     // reduce phase delay of the current filter.
     static constexpr Scalar PhiMeasurementVoltageSlopeLengthSec = 40.0F;
 
-    static constexpr unsigned IdqMovingAverageLength = 5;
+    static constexpr Scalar LqMinValidSampleRatio       = 0.9F;
+
+    static constexpr unsigned IdqMovingAverageLength    = 5;
 
     /*
      * This constant limits the maximum PWM value.
@@ -130,26 +132,32 @@ class MotorParametersEstimator
 
     const MotorIdentificationMode mode_;
     Const estimation_current_;
-    Const Lq_current_frequency_;
+    Const Lq_angular_velocity_;
     Const Phi_angular_velocity_;
     Const pwm_period_;
     Const pwm_dead_time_;
 
     MotorParameters result_;
 
+    /// During identification, states are traversed top to bottom
     enum class State
     {
         Initialization,
+        // Resistance
         CoarseRsMeasurement,
         RsMeasurementA,
         RsMeasurementB,
         RsMeasurementC,
-        RsMeasurementFinalization,
-        PreLqMeasurement,
+        RsComputation,
+        // Inductance
+        LqMeasurementInitialization,
         LqMeasurement,
+        LqComputation,
+        // Flux linkage
         PhiMeasurementInitialization,
         PhiMeasurementAcceleration,
         PhiMeasurement,
+        // End
         Finalization,
         Finished
     } state_ = State::Initialization;
@@ -206,8 +214,8 @@ public:
                              Const pwm_period,
                              Const pwm_dead_time) :
         mode_(mode),
-        estimation_current_(initial_parameters.max_current * 0.5F),
-        Lq_current_frequency_(Lq_current_frequency),
+        estimation_current_(initial_parameters.max_current * 0.4F),
+        Lq_angular_velocity_(Lq_current_frequency * (math::Pi * 2.0F)),
         Phi_angular_velocity_(Phi_angular_velocity),
         pwm_period_(pwm_period),
         pwm_dead_time_(pwm_dead_time),
@@ -344,7 +352,7 @@ public:
                 Const current = -phase_currents_ab.sum();
                 if (process_once(current, voltage, averagers_[2], getTimeSinceStateSwitch()))
                 {
-                    switchState(State::RsMeasurementFinalization, true);
+                    switchState(State::RsComputation, true);
                 }
             }
             else
@@ -356,12 +364,12 @@ public:
             break;
         }
 
-        case State::RsMeasurementFinalization:
+        case State::RsComputation:
         {
             constexpr unsigned MinSamples = 100;
 
             Scalar r_samples[3]{};
-            std::transform(averagers_.begin(), averagers_.end(), std::begin(r_samples), [](Averager& a)
+            std::transform(averagers_.begin(), averagers_.begin() + 3, std::begin(r_samples), [](Averager& a)
             {
                 return (a.getNumSamples() > MinSamples) ? Scalar(a.getAverage()) : Scalar(0);
             });
@@ -379,7 +387,7 @@ public:
                             [](Const x) { return MotorParameters::getRsLimits().contains(x); }) &&
                 MotorParameters::getRsLimits().contains(result_.rs))    // Megaparanoia!
             {
-                switchState(State::PreLqMeasurement);
+                switchState(State::LqMeasurementInitialization);
             }
             else
             {
@@ -388,7 +396,7 @@ public:
             break;
         }
 
-        case State::PreLqMeasurement:
+        case State::LqMeasurementInitialization:
         {
             /*
              * STOP HERE STRANGER, AND READ THIS.
@@ -422,15 +430,11 @@ public:
 
         case State::LqMeasurement:
         {
-            Const w = Lq_current_frequency_ * (math::Pi * 2.0F);
-
             const auto output = voltage_modulator_wrapper_.access().onNextPWMPeriod(phase_currents_ab,
                                                                                     inverter_voltage,
-                                                                                    w,
+                                                                                    Lq_angular_velocity_,
                                                                                     state_variables_[0],
                                                                                     estimation_current_);
-            const bool Udq_was_constrained =
-                voltage_modulator_wrapper_.access().getUdqNormalizationCounter().get() > 0;
 
             state_variables_[0] = output.extrapolated_angular_position;
             pwm_vector = output.pwm_setpoint;
@@ -439,9 +443,12 @@ public:
             Const dead_time_compensation_mult = 1.0F;
             //Const dead_time_compensation_mult = 1.0F - pwm_dead_time_ / pwm_period_;
 
-            averagers_[0].addSample(output.reference_Udq[0] * dead_time_compensation_mult);
-            averagers_[1].addSample(output.reference_Udq[1] * dead_time_compensation_mult);
-            averagers_[2].addSample(output.estimated_Idq[1]);
+            if (!output.Udq_was_limited)
+            {
+                averagers_[0].addSample(output.reference_Udq[0] * dead_time_compensation_mult);
+                averagers_[1].addSample(output.reference_Udq[1] * dead_time_compensation_mult);
+                averagers_[2].addSample(output.estimated_Idq[1]);
+            }
 
             // Saving internal states into the state variables to make them observable from outside, for debugging.
             state_variables_[1] = output.reference_Udq[0];
@@ -449,57 +456,73 @@ public:
             state_variables_[3] = output.estimated_Idq[0];
             state_variables_[4] = output.estimated_Idq[1];
 
-            if ((getTimeSinceStateSwitch() > LqMeasurementDuration) && !Udq_was_constrained)
+            if (getTimeSinceStateSwitch() > LqMeasurementDuration)
             {
-                Const Ud = Scalar(averagers_[0].getAverage());
-                Const Uq = Scalar(averagers_[1].getAverage());
-                Const Iq = Scalar(averagers_[2].getAverage());
+                const auto min_samples_needed = unsigned((LqMeasurementDuration / pwm_period_) * LqMinValidSampleRatio);
+                const auto num_samples_acquired = averagers_[0].getNumSamples();
 
-                Const LqHF = std::abs(Ud / (w * Iq));           // Normally we'd need to use only this formula
+                assert(std::all_of(averagers_.begin(), averagers_.begin() + 3,
+                                   [=](Averager& x) { return x.getNumSamples() == num_samples_acquired; }));
 
-                Const RoverL = std::abs((w * Uq) / Ud);         // This is a backup solution
-                Const LqRoverL = result_.rs / RoverL;
+                IRQDebugOutputBuffer::setVariableFromIRQ<4>(num_samples_acquired);
 
-                IRQDebugOutputBuffer::setVariableFromIRQ<0>(LqHF);
-                IRQDebugOutputBuffer::setVariableFromIRQ<1>(LqRoverL);
-                IRQDebugOutputBuffer::setVariableFromIRQ<2>(RoverL);
-
-                if (MotorParameters::getLqLimits().contains(LqHF) &&
-                    MotorParameters::getLqLimits().contains(LqRoverL))
+                if (num_samples_acquired >= min_samples_needed)
                 {
-                    /*
-                     * Measured values are valid.
-                     * The LqHF formula is robust and tends to provide reliable results,
-                     * whereas RoverL is highly dependent on frequency.
-                     */
-                    result_.lq = LqHF;
-
-                    // Switching to the next state
-                    if (mode_ == MotorIdentificationMode::Static)
-                    {
-                        switchState(State::Finalization);
-                    }
-                    else if (mode_ == MotorIdentificationMode::RotationWithoutMechanicalLoad)
-                    {
-                        switchState(State::PhiMeasurementInitialization);
-                    }
-                    else
-                    {
-                        assert(false);
-                        switchState(State::Finalization);
-                    }
+                    switchState(State::LqComputation, true);
                 }
                 else
                 {
-                    // Measured values are invalid
+                    // Not enough valid samples collected
                     result_.lq = 0;
                     switchState(State::Finalization);
                 }
             }
+            break;
+        }
 
-            if (Udq_was_constrained)
+        case State::LqComputation:
+        {
+            Const Ud = Scalar(averagers_[0].getAverage());
+            Const Uq = Scalar(averagers_[1].getAverage());
+            Const Iq = Scalar(averagers_[2].getAverage());
+
+            Const LqHF = std::abs(Ud / (Lq_angular_velocity_ * Iq));    // Normally we'd need to use only this formula
+
+            Const RoverL = std::abs((Lq_angular_velocity_ * Uq) / Ud);  // This is a backup solution
+            Const LqRoverL = result_.rs / RoverL;
+
+            IRQDebugOutputBuffer::setVariableFromIRQ<0>(LqHF);
+            IRQDebugOutputBuffer::setVariableFromIRQ<1>(LqRoverL);
+            IRQDebugOutputBuffer::setVariableFromIRQ<2>(RoverL);
+
+            if (MotorParameters::getLqLimits().contains(LqHF) &&
+                MotorParameters::getLqLimits().contains(LqRoverL))
             {
-                // Udq was constrained, therefore the measurements cannot be trusted
+                /*
+                 * Measured values are valid.
+                 * The LqHF formula is robust and tends to provide reliable results,
+                 * whereas RoverL is highly dependent on frequency and current.
+                 */
+                result_.lq = LqHF;
+
+                // Switching to the next state
+                if (mode_ == MotorIdentificationMode::Static)
+                {
+                    switchState(State::Finalization);
+                }
+                else if (mode_ == MotorIdentificationMode::RotationWithoutMechanicalLoad)
+                {
+                    switchState(State::PhiMeasurementInitialization);
+                }
+                else
+                {
+                    assert(false);
+                    switchState(State::Finalization);
+                }
+            }
+            else
+            {
+                // Measured values are invalid
                 result_.lq = 0;
                 switchState(State::Finalization);
             }
@@ -533,9 +556,7 @@ public:
             if (state_ == State::PhiMeasurementInitialization)
             {
                 result_.phi = 0;
-
                 state_variables_[IdxVoltage] = initial_voltage;
-
                 switchState(State::PhiMeasurementAcceleration, true);
             }
             else if (state_ == State::PhiMeasurementAcceleration)
@@ -661,14 +682,15 @@ public:
             state_ == State::RsMeasurementA ||
             state_ == State::RsMeasurementB ||
             state_ == State::RsMeasurementC ||
-            state_ == State::RsMeasurementFinalization)
+            state_ == State::RsComputation)
         {
             const auto val = currents_filter_.getValue();
             out.at(FirstFreeIndex - 1) = val[0];
             out.at(FirstFreeIndex - 0) = val[1];
         }
 
-        if (state_ == State::LqMeasurement)
+        if (state_ == State::LqMeasurement ||
+            state_ == State::LqComputation)
         {
             out.at(FirstFreeIndex) = Scalar(voltage_modulator_wrapper_.access().getUdqNormalizationCounter().get());
         }
@@ -677,7 +699,8 @@ public:
             state_ == State::PhiMeasurementAcceleration ||
             state_ == State::PhiMeasurement)
         {
-            out.at(FirstFreeIndex) = result_.phi * 1e3F;
+            // Overriding the angular position, it's useless anyway
+            out.at(2) = result_.phi * 1e3F;
         }
 
         return out;

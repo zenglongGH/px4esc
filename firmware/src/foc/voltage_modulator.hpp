@@ -115,6 +115,7 @@ public:
         math::Vector<2> estimated_Idq{};
         math::Vector<2> reference_Udq{};
         math::Vector<3> pwm_setpoint{};
+        bool Udq_was_limited = false;
     };
 
     ThreePhaseVoltageModulator(Const Lq,
@@ -167,7 +168,7 @@ public:
         if (out.reference_Udq.norm() > Udq_magnitude_limit)
         {
             out.reference_Udq = out.reference_Udq.normalized() * Udq_magnitude_limit;
-
+            out.Udq_was_limited = true;
             Udq_normalization_count_.increment();
         }
 

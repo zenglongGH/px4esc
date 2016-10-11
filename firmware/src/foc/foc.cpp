@@ -46,7 +46,7 @@ namespace
  */
 constexpr unsigned IdqMovingAverageLength = 5;
 
-constexpr Scalar MotorIdentificationCurrentFrequency = 300.0F;
+constexpr Scalar MotorIdentificationCurrentFrequency = 1000.0F;
 constexpr Scalar MotorIdentificationPhiAngularVelocity = 150.0F;
 
 /*
@@ -708,6 +708,13 @@ void handleMainIRQ(Const period)
         g_debug_tracer.set<6>((g_state == State::Spinup) ?
                               g_context->angular_velocity :
                               g_context->inverter_power / board::motor::getInverterVoltage());
+        {
+            static Scalar prev_Iq = Idq[1];
+            Const Iq_gradient = (Idq[1] - prev_Iq) / period;
+            prev_Iq = Idq[1];
+            g_debug_tracer.set<4>((Udq[1] - g_motor_params.rs * Idq[1] - g_motor_params.lq * Iq_gradient) /
+                                  (g_motor_params.lq * Idq[0] + g_motor_params.phi));
+        }
 
         /*
          * Updating setpoint and handling termination condition.
@@ -787,7 +794,6 @@ void handleFastIRQ(Const period,
         g_debug_tracer.set<1>(g_context->reference_Udq[1]);
         g_debug_tracer.set<2>(g_context->estimated_Idq[0]);
         g_debug_tracer.set<3>(g_context->estimated_Idq[1]);
-        g_debug_tracer.set<4>(g_context->reference_Iq);
     }
 
     /*
