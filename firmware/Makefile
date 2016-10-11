@@ -69,8 +69,9 @@ include libuavcan/libuavcan_drivers/stm32/driver/include.mk
 CPPSRC += $(LIBUAVCAN_STM32_SRC)
 UINCDIR += $(LIBUAVCAN_STM32_INC)
 
-$(info $(shell $(LIBUAVCAN_DSDLC) $(UAVCAN_DSDL_DIR)))
-UINCDIR += dsdlc_generated
+LIBUAVCAN_DSDLC_GENERATED_DIR = build/dsdlc_generated
+$(info $(shell $(LIBUAVCAN_DSDLC) $(UAVCAN_DSDL_DIR) --outdir $(LIBUAVCAN_DSDLC_GENERATED_DIR)))
+UINCDIR += $(LIBUAVCAN_DSDLC_GENERATED_DIR)
 
 #
 # Git commit hash
