@@ -143,8 +143,10 @@ public:
         /*
          * Computing Idq, Udq
          */
-        Const angle_sine   = math::sin(angular_position);
-        Const angle_cosine = math::cos(angular_position);
+        out.extrapolated_angular_position = constrainAngularPosition(angular_position + angular_velocity * pwm_period_);
+
+        Const angle_sine   = math::sin(out.extrapolated_angular_position);
+        Const angle_cosine = math::cos(out.extrapolated_angular_position);
 
         const auto estimated_I_alpha_beta = performClarkeTransform(phase_currents_ab);
 
@@ -191,8 +193,6 @@ public:
         {
             out.pwm_setpoint = pwm_setpoint_and_sector_number.first;
         }
-
-        out.extrapolated_angular_position = constrainAngularPosition(angular_position + angular_velocity * pwm_period_);
 
         return out;
     }
