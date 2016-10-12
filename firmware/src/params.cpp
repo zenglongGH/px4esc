@@ -47,7 +47,7 @@ namespace motor
 {
 
 Real g_spinup_duration    ("m.spinup_sec",        2.0F,       0.1F,    30.0F);
-Real g_min_electr_ang_vel ("m.min_eradsec",     250.0F,      10.0F,  1000.0F);
+Real g_min_electr_ang_vel ("m.min_eradsec",     200.0F,      10.0F,  1000.0F);
 Real g_min_current        ("m.min_ampere",        0.0F,       0.0F,    50.0F);
 Real g_max_current        ("m.max_ampere",        0.0F,       0.0F,   200.0F);
 Real g_spinup_current     ("m.spinup_ampere",     0.0F,       0.0F,    50.0F);

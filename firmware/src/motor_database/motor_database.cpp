@@ -37,7 +37,7 @@ namespace common
 {
 
 constexpr Scalar SpinupDuration         = 2.0F;
-constexpr Scalar MinElectricAngVel      = 250.0F;
+constexpr Scalar MinElectricAngVel      = 200.0F;
 constexpr unsigned NumStallsToLatch     = 10;
 
 }
