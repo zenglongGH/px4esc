@@ -110,14 +110,6 @@ class MotorParametersEstimator
 
     static constexpr unsigned IdqMovingAverageLength    = 5;
 
-    /*
-     * This constant limits the maximum PWM value.
-     * Exceeding this value may cause the ADC samples to occur at the moment when FET are switching,
-     * which leads to incorrect measurements.
-     * TODO: This parameter is heavily hardware-dependent, so it should be provided by the board driver.
-     */
-    static constexpr Scalar PWMLimit = 0.8F;
-
     using Averager = math::CumulativeAverageComputer<>;
 
     class VoltageModulatorWrapper       // This is such a massive reinvented wheel. Do something about it.
@@ -170,6 +162,7 @@ class MotorParametersEstimator
     Const Phi_angular_velocity_;
     Const pwm_period_;
     Const pwm_dead_time_;
+    Const pwm_upper_limit_;
 
     MotorParameters result_;
 
@@ -245,13 +238,15 @@ public:
                              const MotorParameters& initial_parameters,
                              const MotorIdentificationParameters& config,
                              Const pwm_period,
-                             Const pwm_dead_time) :
+                             Const pwm_dead_time,
+                             Const pwm_upper_limit) :
         mode_(mode),
         estimation_current_(initial_parameters.max_current * config.fraction_of_max_current),
         Lq_angular_velocity_(config.current_injection_frequency * (math::Pi * 2.0F)),
         Phi_angular_velocity_(config.phi_estimation_electrical_angular_velocity),
         pwm_period_(pwm_period),
         pwm_dead_time_(pwm_dead_time),
+        pwm_upper_limit_(pwm_upper_limit),
         result_(initial_parameters),
         currents_filter_(Vector<2>::Zero())
     {
@@ -321,7 +316,7 @@ public:
             Const voltage = computeLineVoltageForResistanceMeasurement(estimation_current_, result_.rs);
             Const relative_voltage = computeRelativePhaseVoltage(voltage, inverter_voltage);
 
-            if ((relative_voltage < (PWMLimit - 0.5F)) &&
+            if ((relative_voltage < (pwm_upper_limit_ - 0.5F)) &&
                 MotorParameters::getRsLimits().contains(result_.rs))
             {
                 pwm_vector = {
@@ -463,6 +458,7 @@ public:
                                             estimation_current_,
                                             pwm_period_,
                                             pwm_dead_time_,
+                                            pwm_upper_limit_,
                                             VoltageModulatorWrapper::Modulator::DeadTimeCompensationPolicy::Disabled);
             // Ourowrapos - a wrapper that wraps itself.
             switchState(State::LqMeasurement);
@@ -666,7 +662,7 @@ public:
             {
                 constexpr Scalar MinVoltage = 0.1F;
 
-                Const max_voltage = computeLineVoltageLimit(inverter_voltage, PWMLimit);
+                Const max_voltage = computeLineVoltageLimit(inverter_voltage, pwm_upper_limit_);
 
                 const math::Range<> voltage_range(MinVoltage, max_voltage);
 

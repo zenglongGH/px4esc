@@ -110,6 +110,12 @@ float getPWMPeriod();
 float getPWMDeadTime();
 
 /**
+ * Meaningful results guaranteed only after initialization.
+ * @return Maximum PWM value that is guaranteed to not obscure the ADC sampling region; always within (0, 1].
+ */
+float getPWMUpperLimit();
+
+/**
  * Returns the power stage voltage, aka VBAT, in volts.
  */
 float getInverterVoltage();

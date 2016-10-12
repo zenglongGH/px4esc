@@ -88,18 +88,11 @@ public:
     };
 
 private:
-    /*
-     * This constant limits the maximum PWM value.
-     * Exceeding this value may cause the ADC samples to occur at the moment when FET are switching,
-     * which leads to incorrect measurements.
-     * TODO: This parameter is heavily hardware-dependent, so it should be provided by the board driver.
-     */
-    static constexpr Scalar PWMLimit = 0.8F;
-
     const DeadTimeCompensationPolicy dead_time_compensation_policy_;
 
     Const pwm_period_;
     Const pwm_dead_time_;
+    Const pwm_upper_limit_;
 
     CurrentPIController pid_Id_;
     CurrentPIController pid_Iq_;
@@ -123,10 +116,12 @@ public:
                                Const max_current,
                                Const pwm_period,
                                Const pwm_dead_time,
+                               Const pwm_upper_limit,
                                const DeadTimeCompensationPolicy dtcomp_policy) :
         dead_time_compensation_policy_(dtcomp_policy),
         pwm_period_(pwm_period),
         pwm_dead_time_(pwm_dead_time),
+        pwm_upper_limit_(pwm_upper_limit),
         pid_Id_(Lq, Rs, max_current, pwm_period),
         pid_Iq_(Lq, Rs, max_current, pwm_period),
         estimated_Idq_filter_(Vector<2>::Zero())
@@ -165,7 +160,7 @@ public:
                                                       out.estimated_Idq[1],
                                                       inverter_voltage);
 
-        Const Udq_magnitude_limit = computeLineVoltageLimit(inverter_voltage, PWMLimit);
+        Const Udq_magnitude_limit = computeLineVoltageLimit(inverter_voltage, pwm_upper_limit_);
 
         if (out.reference_Udq.norm() > Udq_magnitude_limit)
         {

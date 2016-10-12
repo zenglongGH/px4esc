@@ -100,6 +100,8 @@ float g_pwm_period;
 
 float g_dead_time;
 
+float g_pwm_upper_limit;
+
 unsigned g_fast_irq_to_main_irq_period_ratio;
 
 /// Sometimes referred to as VBAT (ideally it should be volatile)
@@ -499,6 +501,10 @@ void init()
 
     g_dead_time = float(double(TIM1->BDTR & 0xFFU) / double(TIM1ClockFrequency));
 
+    // TODO FIXME Derive properly from ADC sampling times
+    const float adc_sampling_window = 3e-6F;
+    g_pwm_upper_limit = 1.0F - (adc_sampling_window + g_dead_time) / g_pwm_period;
+
     g_fast_irq_to_main_irq_period_ratio = unsigned(std::ceil(MainIRQMinPeriod / g_pwm_period) + 0.4F);
 
     initADC();
@@ -512,10 +518,11 @@ void init()
         nvicEnableVector(TIM8_CC_IRQn, MainIRQPriority);        // Triggered by software
     }
 
-    g_logger.println("Fast IRQ period: %g us, Main IRQ period: %g us, ratio %u",
+    g_logger.println("Fast IRQ period: %g us, Main IRQ period: %g us, ratio %u; PWM limit: %0.3f",
                      double(g_pwm_period) * 1e6,
                      double(g_pwm_period) * double(g_fast_irq_to_main_irq_period_ratio) * 1e6,
-                     g_fast_irq_to_main_irq_period_ratio);
+                     g_fast_irq_to_main_irq_period_ratio,
+                     double(g_pwm_upper_limit));
 }
 
 /*
@@ -602,6 +609,11 @@ float getPWMPeriod()
 float getPWMDeadTime()
 {
     return g_dead_time;
+}
+
+float getPWMUpperLimit()
+{
+    return g_pwm_upper_limit;
 }
 
 float getInverterVoltage()

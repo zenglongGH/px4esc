@@ -177,6 +177,7 @@ struct Context
                   max_current,
                   pwm_period,
                   pwm_dead_time,
+                  board::motor::getPWMUpperLimit(),
                   modulator.DeadTimeCompensationPolicy::Disabled),
         current_controller(max_current,
                            min_current,
@@ -805,7 +806,8 @@ void handleFastIRQ(Const period,
                                              g_motor_params,
                                              g_controller_params.motor_id,
                                              period,
-                                             board::motor::getPWMDeadTime());
+                                             board::motor::getPWMDeadTime(),
+                                             board::motor::getPWMUpperLimit());
             }
 
             const auto hw_status = board::motor::getStatus();
