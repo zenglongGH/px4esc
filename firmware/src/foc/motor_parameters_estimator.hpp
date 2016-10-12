@@ -586,23 +586,31 @@ public:
                     result_.phi = (Uq - I * result_.rs) / w;
                 }
 
-                Const dIdt = (state_variables_[IdxI] - prev_I) / pwm_period_;
-
-                // TODO: we could automatically learn the worst case di/dt after the acceleration phase?
-                // 2 - triggers false positive
-                // 3 - works fine
-                // 6 - works fine
-                Const dIdt_threshold = prev_I * 4.0F;
-
-                if (dIdt > dIdt_threshold)
+                if (result_.phi >= 0.0F)
                 {
-                    switchState(State::Finalization);
+                    Const dIdt = (state_variables_[IdxI] - prev_I) / pwm_period_;
+
+                    // TODO: we could automatically learn the worst case di/dt after the acceleration phase?
+                    // 2 - triggers false positive
+                    // 3 - works fine
+                    // 6 - works fine
+                    Const dIdt_threshold = prev_I * 4.0F;
+
+                    if (dIdt > dIdt_threshold)
+                    {
+                        switchState(State::Finalization);
+                    }
+                    else
+                    {
+                        // Minimum is not reached yet, continuing to reduce voltage
+                        state_variables_[IdxVoltage] -=
+                            (initial_voltage / PhiMeasurementVoltageSlopeLengthSec) * pwm_period_;
+                    }
                 }
                 else
                 {
-                    // Minimum is not reached yet, continuing to reduce voltage
-                    state_variables_[IdxVoltage] -=
-                        (initial_voltage / PhiMeasurementVoltageSlopeLengthSec) * pwm_period_;
+                    // Negative Phi value encountered at any point indicates that the Rs value is likely too high
+                    switchState(State::Finalization);
                 }
             }
             else
