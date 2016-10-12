@@ -214,7 +214,7 @@ public:
                              Const pwm_period,
                              Const pwm_dead_time) :
         mode_(mode),
-        estimation_current_(initial_parameters.max_current * 0.4F),
+        estimation_current_(initial_parameters.max_current * 0.3F),
         Lq_angular_velocity_(Lq_current_frequency * (math::Pi * 2.0F)),
         Phi_angular_velocity_(Phi_angular_velocity),
         pwm_period_(pwm_period),
@@ -540,7 +540,7 @@ public:
             constexpr int IdxMinI    = 4;
 
             // This is the maximum voltage we start from.
-            Const initial_voltage = estimation_current_ * result_.rs;
+            Const initial_voltage = estimation_current_ * result_.rs * 1.5F;
 
             // Continuously maintaining the smoothed out current estimates throughout the whole process.
             const auto Idq = performParkTransform(performClarkeTransform(phase_currents_ab),
