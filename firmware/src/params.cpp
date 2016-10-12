@@ -37,6 +37,31 @@ using Real = os::config::Param<float>;
 using Natural = os::config::Param<unsigned>;
 
 /**
+ * General controller parameters.
+ */
+namespace controller
+{
+
+using Default = foc::ControllerParameters;
+
+Real g_spinup_duration    ("ctrl.spinup_sec",     Default().nominal_spinup_duration,       0.1F,    10.0F);
+Natural g_num_attempts    ("ctrl.num_attempt",    Default().num_stalls_to_latch,              1, 10000000);
+
+Real g_frac_of_max_current("mid.max_cur_frac",
+                           Default().motor_id.fraction_of_max_current,
+                           0.1F,   1.0F);
+
+Real g_high_frequency     ("mid.hifreq_hertz",
+                           Default().motor_id.current_injection_frequency,
+                           100.0F, 5000.0F);
+
+Real g_phi_eradsec        ("mid.phi_eradsec",
+                           Default().motor_id.phi_estimation_electrical_angular_velocity,
+                           50.0F, 900.0F);
+
+}
+
+/**
  * Motor profile parameters.
  * All of these values should be provided by the motor manufacturer.
  * If not, automatic identification can be used (see below).
@@ -46,7 +71,6 @@ using Natural = os::config::Param<unsigned>;
 namespace motor
 {
 
-Real g_spinup_duration    ("m.spinup_sec",        2.0F,       0.1F,    30.0F);
 Real g_min_electr_ang_vel ("m.min_eradsec",     200.0F,      10.0F,  1000.0F);
 Real g_min_current        ("m.min_ampere",        0.0F,       0.0F,    50.0F);
 Real g_max_current        ("m.max_ampere",        0.0F,       0.0F,   200.0F);
@@ -56,7 +80,6 @@ Real g_field_flux         ("m.phi_milliweber",    0.0F,       0.0F, foc::MotorPa
 Real g_phase_resistance   ("m.rs_ohm",            0.0F,       0.0F, foc::MotorParameters::getRsLimits().max);
 Real g_inductance_quadr   ("m.lq_microhenry",     0.0F,       0.0F, foc::MotorParameters::getLqLimits().max * 1e6F);
 Natural g_num_poles       ("m.num_poles",            0,          0,      200);
-Natural g_num_attempts    ("m.num_attempts",        10,          1, 10000000);
 
 } // namespace motor
 
@@ -102,6 +125,42 @@ void assign(os::config::Param<T>& destination, const Src source)
 
 } // namespace
 
+
+foc::ControllerParameters readControllerParameters()
+{
+    os::MutexLocker locker(g_mutex);
+
+    foc::ControllerParameters out;
+
+    using namespace controller;
+
+    out.nominal_spinup_duration = g_spinup_duration.get();
+    out.num_stalls_to_latch = g_num_attempts.get();
+
+    out.motor_id.fraction_of_max_current = g_frac_of_max_current.get();
+    out.motor_id.current_injection_frequency = g_high_frequency.get();
+    out.motor_id.phi_estimation_electrical_angular_velocity = g_phi_eradsec.get();
+
+    assert(out.isValid());
+
+    return out;
+}
+
+void writeControllerParameters(const foc::ControllerParameters& obj)
+{
+    os::MutexLocker locker(g_mutex);
+
+    using namespace controller;
+
+    assign(g_spinup_duration,           obj.nominal_spinup_duration);
+    assign(g_num_attempts,              obj.num_stalls_to_latch);
+
+    assign(g_frac_of_max_current,       obj.motor_id.fraction_of_max_current);
+    assign(g_high_frequency,            obj.motor_id.current_injection_frequency);
+    assign(g_phi_eradsec,               obj.motor_id.phi_estimation_electrical_angular_velocity);
+}
+
+
 foc::MotorParameters readMotorParameters()
 {
     os::MutexLocker locker(g_mutex);
@@ -110,7 +169,6 @@ foc::MotorParameters readMotorParameters()
 
     using namespace motor;
 
-    out.nominal_spinup_duration = g_spinup_duration.get();
     out.min_electrical_ang_vel  = g_min_electr_ang_vel.get();
     out.min_current             = g_min_current.get();
     out.max_current             = g_max_current.get();
@@ -120,7 +178,6 @@ foc::MotorParameters readMotorParameters()
     out.rs                      = g_phase_resistance.get();
     out.lq                      = g_inductance_quadr.get() * 1e-6F;
     out.num_poles               = g_num_poles.get();
-    out.num_stalls_to_latch     = g_num_attempts.get();
 
     out.deduceMissingParameters();
 
@@ -133,7 +190,6 @@ void writeMotorParameters(const foc::MotorParameters& obj)
 
     using namespace motor;
 
-    assign(g_spinup_duration,    obj.nominal_spinup_duration);
     assign(g_min_electr_ang_vel, obj.min_electrical_ang_vel);
     assign(g_min_current,        obj.min_current);
     assign(g_max_current,        obj.max_current);
@@ -143,7 +199,6 @@ void writeMotorParameters(const foc::MotorParameters& obj)
     assign(g_phase_resistance,   obj.rs);
     assign(g_inductance_quadr,   obj.lq * 1e6F);
     assign(g_num_poles,          obj.num_poles);
-    assign(g_num_attempts,       obj.num_stalls_to_latch);
 }
 
 

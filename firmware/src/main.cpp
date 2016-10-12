@@ -198,6 +198,7 @@ auto onFirmwareUpdateRequestedFromUAVCAN(
  */
 void reloadConfigurationParameters()
 {
+    foc::setControllerParameters(params::readControllerParameters());
     foc::setMotorParameters(params::readMotorParameters());
     foc::setObserverParameters(params::readObserverParameters());
 }

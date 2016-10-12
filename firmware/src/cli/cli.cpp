@@ -184,6 +184,8 @@ class StatusCommand : public os::shell::ICommandHandler
     {
         foc::printStatusInfo();
 
+        std::printf("\nController:\n%s\n", foc::getControllerParameters().toString().c_str());
+
         std::printf("\nMotor:\n%s\n", foc::getMotorParameters().toString().c_str());
 
         std::printf("\nObserver:\n%s\n", foc::getObserverParameters().toString().c_str());

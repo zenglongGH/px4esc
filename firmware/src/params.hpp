@@ -24,12 +24,14 @@
 
 #pragma once
 
-#include <foc/motor_parameters.hpp>
-#include <foc/observer.hpp>
+#include <foc/foc.hpp>
 
 
 namespace params
 {
+
+foc::ControllerParameters readControllerParameters();
+void writeControllerParameters(const foc::ControllerParameters& obj);
 
 foc::MotorParameters readMotorParameters();
 void writeMotorParameters(const foc::MotorParameters& obj);

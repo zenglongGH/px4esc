@@ -56,6 +56,40 @@ enum class MotorIdentificationMode
 };
 
 /**
+ * Parameters used by the motor parameters estimator logic.
+ * Provided defaults should be valid for most, if not all, use cases.
+ */
+struct MotorIdentificationParameters
+{
+    /// Fraction of the maximum motor current used for identification
+    Scalar fraction_of_max_current = 0.3F;
+
+    /// Current frequency used for inductance identification, Hertz
+    Scalar current_injection_frequency = 1000.0F;
+
+    /// Electrical angular velocity used for magnetic flux linkage identification, radian/second
+    Scalar phi_estimation_electrical_angular_velocity = 150.0F;
+
+
+    bool isValid() const
+    {
+        return math::Range<>(0.01F, 1.0F).contains(fraction_of_max_current) &&
+               math::Range<>(10.0F, 100000.0F).contains(current_injection_frequency) &&
+               math::Range<>(10.0F, 10000.0F).contains(phi_estimation_electrical_angular_velocity);
+    }
+
+    auto toString() const
+    {
+        return os::heapless::format("FracI: %.0f %%\n"
+                                    "Finj : %.1f Hz\n"
+                                    "Wphi : %.1f rad/s",
+                                    double(fraction_of_max_current * 100.0F),
+                                    double(current_injection_frequency),
+                                    double(phi_estimation_electrical_angular_velocity));
+    }
+};
+
+/**
  * Magical and hard-to-use class that estimates parameters of a given motor, such as magnetic flux and inductance.
  * The business logic of this class outstretches its tentacles of dependency to a lot of other stuff,
  * so it's really hard to encapsulate it cleanly. Or maybe I'm just a shitty architect, you never know.
@@ -209,19 +243,24 @@ class MotorParametersEstimator
 public:
     MotorParametersEstimator(MotorIdentificationMode mode,
                              const MotorParameters& initial_parameters,
-                             Const Lq_current_frequency,
-                             Const Phi_angular_velocity,
+                             const MotorIdentificationParameters& config,
                              Const pwm_period,
                              Const pwm_dead_time) :
         mode_(mode),
-        estimation_current_(initial_parameters.max_current * 0.3F),
-        Lq_angular_velocity_(Lq_current_frequency * (math::Pi * 2.0F)),
-        Phi_angular_velocity_(Phi_angular_velocity),
+        estimation_current_(initial_parameters.max_current * config.fraction_of_max_current),
+        Lq_angular_velocity_(config.current_injection_frequency * (math::Pi * 2.0F)),
+        Phi_angular_velocity_(config.phi_estimation_electrical_angular_velocity),
         pwm_period_(pwm_period),
         pwm_dead_time_(pwm_dead_time),
         result_(initial_parameters),
         currents_filter_(Vector<2>::Zero())
-    { }
+    {
+        assert(config.isValid());
+
+        IRQDebugOutputBuffer::setVariableFromIRQ<0>(estimation_current_);
+        IRQDebugOutputBuffer::setVariableFromIRQ<1>(Lq_angular_velocity_);
+        IRQDebugOutputBuffer::setVariableFromIRQ<2>(Phi_angular_velocity_);
+    }
 
     /**
      * Must be invoked on every PWM period with appropriate measurements.
@@ -247,7 +286,9 @@ public:
                 result_.phi = 0;
             }
 
-            if (estimation_current_ > 0.1F)
+            if (estimation_current_ > 0.1F &&
+                Lq_angular_velocity_ > 10.0F &&
+                Phi_angular_velocity_ > 1.0F)
             {
                 switchState(State::CoarseRsMeasurement);
             }

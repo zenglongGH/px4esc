@@ -38,7 +38,6 @@ namespace foc
  */
 struct MotorParameters
 {
-    Scalar nominal_spinup_duration = 0; ///< Preferred duration of spinup, real duration may slightly differ, seconds
     Scalar min_electrical_ang_vel = 0;  ///< Min electric angular velocity for stable operation, radian/second
 
     Scalar min_current = 0;             ///< Min phase current for stable observer operation, Ampere
@@ -52,8 +51,6 @@ struct MotorParameters
     Scalar lq = 0;                      ///< Quadrature phase inductance, Henry
 
     std::uint_fast8_t num_poles = 0;    ///< Number of magnetic poles (not pairs!); must be a positive even number
-
-    std::uint32_t num_stalls_to_latch = 0; ///< If the rotor stalled this many times in a row, latch into FAULT state
 
 
     static math::Range<> getPhiLimits()
@@ -88,8 +85,7 @@ struct MotorParameters
     {
         static const auto is_positive = [](Const x) { return (x > 0) && std::isfinite(x); };
 
-        return is_positive(nominal_spinup_duration)     &&
-               is_positive(min_electrical_ang_vel)      &&
+        return is_positive(min_electrical_ang_vel)      &&
                is_positive(min_current)                 &&
                is_positive(max_current)                 &&
                is_positive(spinup_current)              &&
@@ -99,7 +95,6 @@ struct MotorParameters
                getLqLimits().contains(lq)               &&
                (num_poles >= 2)                         &&
                (num_poles % 2 == 0)                     &&
-               (num_stalls_to_latch >= 1)               &&
                (max_current > min_current)              &&
                (max_current >= spinup_current)          &&
                (spinup_current > min_current);
@@ -123,8 +118,7 @@ struct MotorParameters
         }
 
         return os::heapless::String<240>(
-            "Tspup: %-7.1f s\n"
-            "Wmin : %-7.1f Rad/s, %.1f MRPM\n"
+            "Wmin : %-7.1f rad/s, %.1f MRPM\n"
             "Imin : %-7.1f A\n"
             "Imax : %-7.1f A\n"
             "Ispup: %-7.1f A\n"
@@ -133,9 +127,7 @@ struct MotorParameters
             "Rs   : %-7.3f Ohm\n"
             "Lq   : %-7.3f uH\n"
             "Npols: %u, %.1f MRPM/V\n"
-            "Nstlt: %u\n"
             "Valid: %s").format(
-            double(nominal_spinup_duration),
             double(min_electrical_ang_vel),
             double(min_mrpm),
             double(min_current),
@@ -147,7 +139,6 @@ struct MotorParameters
             double(lq) * 1e6,
             unsigned(num_poles),
             double(kv),
-            unsigned(num_stalls_to_latch),
             isValid() ? "YES" : "NO");
     }
 };

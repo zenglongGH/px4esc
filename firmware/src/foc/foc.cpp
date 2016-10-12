@@ -46,9 +46,6 @@ namespace
  */
 constexpr unsigned IdqMovingAverageLength = 5;
 
-constexpr Scalar MotorIdentificationCurrentFrequency    = 1000.0F;
-constexpr Scalar MotorIdentificationPhiAngularVelocity  = 150.0F;
-
 constexpr Scalar MinimumSpinupDurationFraction          = 0.2F;
 constexpr Scalar SpinupAngularVelocityHysteresis        = 1.5F;
 
@@ -56,6 +53,8 @@ constexpr Scalar SpinupAngularVelocityHysteresis        = 1.5F;
  * State variables
  */
 volatile State g_state = State::Idle;
+
+ControllerParameters g_controller_params;
 
 MotorParameters g_motor_params;
 
@@ -226,7 +225,7 @@ bool isStatusOk()
     return g_last_hardware_test_report.isSuccessful() &&
            g_motor_params.isValid() &&
            board::motor::getStatus().isOkay() &&
-           (g_num_successive_rotor_stalls < g_motor_params.num_stalls_to_latch);
+           (g_num_successive_rotor_stalls < g_controller_params.num_stalls_to_latch);
 }
 
 } // namespace
@@ -246,6 +245,18 @@ void init()
     board::motor::beginCalibration();
 }
 
+
+void setControllerParameters(const ControllerParameters& params)
+{
+    AbsoluteCriticalSectionLocker locker;
+    g_controller_params = params;
+}
+
+ControllerParameters getControllerParameters()
+{
+    AbsoluteCriticalSectionLocker locker;
+    return g_controller_params;
+}
 
 void setMotorParameters(const MotorParameters& params)
 {
@@ -642,7 +653,7 @@ void handleMainIRQ(Const period)
                 if (std::abs(g_context->reference_Iq) < g_motor_params.spinup_current)
                 {
                     Const current_delta =
-                        (g_motor_params.spinup_current / g_motor_params.nominal_spinup_duration) * period;
+                        (g_motor_params.spinup_current / g_controller_params.nominal_spinup_duration) * period;
 
                     g_context->reference_Iq += std::copysign(current_delta, g_setpoint);
                 }
@@ -652,7 +663,8 @@ void handleMainIRQ(Const period)
 
                 g_context->spinup_time += period;
 
-                if (g_context->spinup_time > g_motor_params.nominal_spinup_duration * MinimumSpinupDurationFraction)
+                if (g_context->spinup_time >
+                    (g_controller_params.nominal_spinup_duration * MinimumSpinupDurationFraction))
                 {
                     Const ang_vel_threshold = g_motor_params.min_electrical_ang_vel * SpinupAngularVelocityHysteresis;
 
@@ -664,7 +676,7 @@ void handleMainIRQ(Const period)
                     }
                     else
                     {
-                        if (g_context->spinup_time > g_motor_params.nominal_spinup_duration)
+                        if (g_context->spinup_time > g_controller_params.nominal_spinup_duration)
                         {
                             // Timed out
                             g_setpoint = 0;
@@ -791,8 +803,7 @@ void handleFastIRQ(Const period,
                 estimator = new (estimator_storage)
                     MotorParametersEstimator(g_requested_motor_identification_mode,
                                              g_motor_params,
-                                             MotorIdentificationCurrentFrequency,
-                                             MotorIdentificationPhiAngularVelocity,
+                                             g_controller_params.motor_id,
                                              period,
                                              board::motor::getPWMDeadTime());
             }

@@ -37,11 +37,53 @@
 namespace foc
 {
 /**
+ * General parameters not pertaining to the observer or the motor.
+ */
+struct ControllerParameters
+{
+    /// Preferred duration of spinup, real duration may slightly differ, seconds
+    Scalar nominal_spinup_duration = 2.0F;
+
+    /// If the rotor stalled this many times in a row, latch into FAULT state
+    std::uint32_t num_stalls_to_latch = 10;
+
+    /// Refer to the definition for details
+    MotorIdentificationParameters motor_id;
+
+
+    bool isValid() const
+    {
+        return math::Range<>(0.1F, 60.0F).contains(nominal_spinup_duration) &&
+               num_stalls_to_latch > 0 &&
+               motor_id.isValid();
+    }
+
+    auto toString() const
+    {
+        return os::heapless::format("Tspinup: %.1f sec\n"
+                                    "Nslatch: %u\n"
+                                    "Motor ID parameters:\n%s",
+                                    double(nominal_spinup_duration),
+                                    unsigned(num_stalls_to_latch),
+                                    motor_id.toString().c_str());
+    }
+};
+
+/**
  * Must be invoked in the first order, exactly once.
  * This function may block for a few seconds.
  * All other API functions are non-blocking, except stated otherwise.
  */
 void init();
+
+/**
+ * Controller parameters have sensible values initialized by default.
+ * They can be overwritten after initialization.
+ * The new values should take effect immediately.
+ */
+void setControllerParameters(const ControllerParameters& params);
+
+ControllerParameters getControllerParameters();
 
 /**
  * Motor parameters must be set after initialization before the motor can be started.
