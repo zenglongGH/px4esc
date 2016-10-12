@@ -46,8 +46,11 @@ namespace
  */
 constexpr unsigned IdqMovingAverageLength = 5;
 
-constexpr Scalar MotorIdentificationCurrentFrequency = 1000.0F;
-constexpr Scalar MotorIdentificationPhiAngularVelocity = 150.0F;
+constexpr Scalar MotorIdentificationCurrentFrequency    = 1000.0F;
+constexpr Scalar MotorIdentificationPhiAngularVelocity  = 150.0F;
+
+constexpr Scalar MinimumSpinupDurationFraction          = 0.2F;
+constexpr Scalar SpinupAngularVelocityHysteresis        = 1.5F;
 
 /*
  * State variables
@@ -649,14 +652,15 @@ void handleMainIRQ(Const period)
 
                 g_context->spinup_time += period;
 
-                if (g_context->spinup_time > g_motor_params.nominal_spinup_duration * 0.2F)
+                if (g_context->spinup_time > g_motor_params.nominal_spinup_duration * MinimumSpinupDurationFraction)
                 {
-                    if (std::abs(g_context->angular_velocity) > g_motor_params.min_electrical_ang_vel)
+                    Const ang_vel_threshold = g_motor_params.min_electrical_ang_vel * SpinupAngularVelocityHysteresis;
+
+                    if (std::abs(g_context->angular_velocity) > ang_vel_threshold)
                     {
                         // Running fast enough, switching to normal mode
                         g_state = State::Running;
-                        g_context->remaining_time_before_stall_detection_enabled =
-                            g_motor_params.nominal_spinup_duration;
+                        g_context->remaining_time_before_stall_detection_enabled = g_context->spinup_time;
                     }
                     else
                     {
