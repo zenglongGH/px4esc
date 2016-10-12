@@ -72,8 +72,8 @@ static const Entry g_entries[] =
         p.max_current             = 24.0F;
         p.current_ramp_amp_per_s  = 300.0F;
         p.phi                     = 3.938e-3F;
-        p.rs                      = 0.1F;
-        p.lq                      = 67e-6F;
+        p.rs                      = 0.11F;
+        p.lq                      = 78.7e-6F;
         p.num_poles               = 28;
         p.num_stalls_to_latch     = common::NumStallsToLatch;
         return p;
