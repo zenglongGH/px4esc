@@ -777,18 +777,40 @@ void handleFastIRQ(Const period,
     if (g_state == State::Running ||
         g_state == State::Spinup)
     {
-        const auto output = g_context->modulator.onNextPWMPeriod(phase_currents_ab,
-                                                                 inverter_voltage,
-                                                                 g_context->angular_velocity,
-                                                                 g_context->angular_position,
-                                                                 g_context->reference_Iq);
+        if (g_state == State::Running)
+        {
+            const auto output = g_context->modulator.onNextPWMPeriod(phase_currents_ab,
+                                                                     inverter_voltage,
+                                                                     g_context->angular_velocity,
+                                                                     g_context->angular_position,
+                                                                     g_context->reference_Iq);
 
-        g_pwm_handle.setPWM(output.pwm_setpoint);
+            g_pwm_handle.setPWM(output.pwm_setpoint);
 
-        g_context->estimated_Idq = output.estimated_Idq;
-        g_context->reference_Udq = output.reference_Udq;
+            g_context->estimated_Idq = output.estimated_Idq;
+            g_context->reference_Udq = output.reference_Udq;
+            g_context->angular_position = output.extrapolated_angular_position;
+        }
+        else
+        {
+            g_context->reference_Udq = {
+                0.0F,
+                std::min(g_context->reference_Iq * g_motor_params.rs * 1.5F,
+                         computeLineVoltageLimit(inverter_voltage, 0.8F))       // TODO FIXME 0.8
+            };
 
-        g_context->angular_position = output.extrapolated_angular_position;
+            Const angle_sine   = math::sin(g_context->angular_position);
+            Const angle_cosine = math::cos(g_context->angular_position);
+
+            const auto reference_U_alpha_beta = performInverseParkTransform(g_context->reference_Udq,
+                                                                            angle_sine,
+                                                                            angle_cosine);
+
+            const auto pwm_setpoint_and_sector_number = performSpaceVectorTransform(reference_U_alpha_beta,
+                                                                                    inverter_voltage);
+
+            g_pwm_handle.setPWM(pwm_setpoint_and_sector_number.first);
+        }
 
         g_debug_tracer.set<0>(g_context->reference_Udq[0]);
         g_debug_tracer.set<1>(g_context->reference_Udq[1]);
