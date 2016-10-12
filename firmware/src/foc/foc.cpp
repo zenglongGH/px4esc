@@ -784,7 +784,6 @@ void handleFastIRQ(Const period,
                                                                      g_context->angular_velocity,
                                                                      g_context->angular_position,
                                                                      g_context->reference_Iq);
-
             g_pwm_handle.setPWM(output.pwm_setpoint);
 
             g_context->estimated_Idq = output.estimated_Idq;
@@ -793,14 +792,17 @@ void handleFastIRQ(Const period,
         }
         else
         {
+            g_context->angular_position =
+                constrainAngularPosition(g_context->angular_position + g_context->angular_velocity * period);
+
+            Const angle_sine   = math::sin(g_context->angular_position);
+            Const angle_cosine = math::cos(g_context->angular_position);
+
             g_context->reference_Udq = {
                 0.0F,
                 std::min(g_context->reference_Iq * g_motor_params.rs * 1.5F,
                          computeLineVoltageLimit(inverter_voltage, 0.8F))       // TODO FIXME 0.8
             };
-
-            Const angle_sine   = math::sin(g_context->angular_position);
-            Const angle_cosine = math::cos(g_context->angular_position);
 
             const auto reference_U_alpha_beta = performInverseParkTransform(g_context->reference_Udq,
                                                                             angle_sine,
