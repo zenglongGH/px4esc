@@ -150,9 +150,11 @@ struct Context
 
     Scalar reference_Iq = 0;                                    ///< Ampere, read in the fast IRQ
 
-    Scalar inverter_power = 0;                                 ///< Watt, updated from the main IRQ
+    Scalar inverter_power = 0;                                  ///< Watt, updated from the main IRQ
 
     Scalar remaining_time_before_stall_detection_enabled = 0;
+
+    Scalar spinup_time = 0;
 
     Context(const ObserverParameters& observer_params,
             Const field_flux,
@@ -626,75 +628,34 @@ void handleMainIRQ(Const period)
             }
             else
             {
-                Const variable_delta = period / g_motor_params.nominal_spinup_duration;
-
-                // Direction change requests and current setpoint initialization
                 if (((g_setpoint > 0) != (g_context->reference_Iq > 0)) ||
                     os::float_eq::closeToZero(g_context->reference_Iq))
                 {
                     g_context->reference_Iq = std::copysign(g_motor_params.spinup_current, g_setpoint);
-                    g_context->angular_velocity = 0;
+                    g_context->spinup_time = 0;
                 }
 
-                // Steady acceleration
-                g_context->angular_velocity += std::copysign(g_motor_params.min_electrical_ang_vel * variable_delta,
-                                                             g_setpoint);
+                g_context->angular_velocity = g_context->observer.getAngularVelocity();
+                g_context->angular_position = g_context->observer.getAngularPosition();
 
-                // Observer synchronization
-                if (std::abs(g_context->angular_velocity) > g_motor_params.min_electrical_ang_vel)
+                g_context->spinup_time += period;
+
+                if (g_context->spinup_time > g_motor_params.nominal_spinup_duration * 0.2F)
                 {
-                    // Current adjustment
-                    {
-                        Scalar dI = g_motor_params.max_current * variable_delta;
-
-                        if (std::abs(g_context->observer.getAngularVelocity()) > std::abs(g_context->angular_velocity))
-                        {
-                            // Decrease current if the observer reports higher speed, increase otherwise
-                            dI = -dI;
-                        }
-
-                        if (g_setpoint < 0)
-                        {
-                            // We're spinning in the opposite direction, all signs flipped
-                            dI = -dI;
-                        }
-
-                        g_context->reference_Iq =
-                            math::Range<>(-g_motor_params.max_current, g_motor_params.max_current).
-                            constrain(g_context->reference_Iq + dI);
-                    }
-
-                    // Evaluating the observer synchronization precision
-                    Const ang_pos_error = math::subtractAngles(g_context->observer.getAngularPosition(),
-                                                               g_context->angular_position);
-                    Const ang_vel_rel_error =
-                        std::abs(g_context->observer.getAngularVelocity() - g_context->angular_velocity) /
-                        std::abs(g_context->angular_velocity);
-
-                    // Decision to hand-off control to the normal mode.
-                    // Not sure if the hardcoded thresholds are okay.
-                    const bool ang_pos_ok = std::abs(ang_pos_error) < math::convertDegreesToRadian(20.0F);
-                    const bool ang_vel_ok = ang_vel_rel_error < 0.1F;
-                    if (ang_vel_ok && ang_pos_ok)
+                    if (std::abs(g_context->angular_velocity) > (g_motor_params.min_electrical_ang_vel * 2.0F) ||
+                        (g_context->spinup_time > (g_motor_params.nominal_spinup_duration * 0.5F) &&
+                         std::abs(g_context->angular_velocity) > g_motor_params.min_electrical_ang_vel))
                     {
                         g_state = State::Running;
-                        g_context->remaining_time_before_stall_detection_enabled =
-                            g_motor_params.nominal_spinup_duration;
+                        g_context->remaining_time_before_stall_detection_enabled = g_motor_params.nominal_spinup_duration;
                     }
                 }
 
-                // Fault detection
-                const math::Range<> abs_current_range(g_motor_params.min_current, g_motor_params.max_current);
-
-                Const max_angular_velocity = g_motor_params.min_electrical_ang_vel * 3.0F; // FIXME hardcoded constant
-
-                const bool failed = !abs_current_range.contains(std::abs(g_context->reference_Iq)) ||
-                                    std::abs(g_context->angular_velocity) > max_angular_velocity;
-
-                if (failed)
+                if (g_context->spinup_time > g_motor_params.nominal_spinup_duration)
                 {
+                    // Timed out
+                    g_setpoint = 0;
                     g_num_successive_rotor_stalls++;
-                    g_setpoint = 0;     // Stopping
                 }
             }
         }
@@ -708,6 +669,7 @@ void handleMainIRQ(Const period)
         g_debug_tracer.set<6>((g_state == State::Spinup) ?
                               g_context->angular_velocity :
                               g_context->inverter_power / board::motor::getInverterVoltage());
+#if 0
         {
             static Scalar prev_Iq = Idq[1];
             Const Iq_gradient = (Idq[1] - prev_Iq) / period;
@@ -715,6 +677,9 @@ void handleMainIRQ(Const period)
             g_debug_tracer.set<4>((Udq[1] - g_motor_params.rs * Idq[1] - g_motor_params.lq * Iq_gradient) /
                                   (g_motor_params.lq * Idq[0] + g_motor_params.phi));
         }
+#else
+        g_debug_tracer.set<4>(g_context->reference_Iq);
+#endif
 
         /*
          * Updating setpoint and handling termination condition.
@@ -777,45 +742,16 @@ void handleFastIRQ(Const period,
     if (g_state == State::Running ||
         g_state == State::Spinup)
     {
-        if (g_state == State::Running)
-        {
-            const auto output = g_context->modulator.onNextPWMPeriod(phase_currents_ab,
-                                                                     inverter_voltage,
-                                                                     g_context->angular_velocity,
-                                                                     g_context->angular_position,
-                                                                     g_context->reference_Iq);
-            g_pwm_handle.setPWM(output.pwm_setpoint);
+        const auto output = g_context->modulator.onNextPWMPeriod(phase_currents_ab,
+                                                                 inverter_voltage,
+                                                                 g_context->angular_velocity,
+                                                                 g_context->angular_position,
+                                                                 g_context->reference_Iq);
+        g_pwm_handle.setPWM(output.pwm_setpoint);
 
-            g_context->estimated_Idq = output.estimated_Idq;
-            g_context->reference_Udq = output.reference_Udq;
-            g_context->angular_position = output.extrapolated_angular_position;
-        }
-        else
-        {
-            g_context->angular_position =
-                constrainAngularPosition(g_context->angular_position + g_context->angular_velocity * period);
-
-            Const angle_sine   = math::sin(g_context->angular_position);
-            Const angle_cosine = math::cos(g_context->angular_position);
-
-            const auto estimated_I_alpha_beta = performClarkeTransform(phase_currents_ab);
-            g_context->estimated_Idq = performParkTransform(estimated_I_alpha_beta, angle_sine, angle_cosine);
-
-            g_context->reference_Udq = {
-                0.0F,
-                std::min(g_motor_params.spinup_current * g_motor_params.rs * 1.5F,
-                         computeLineVoltageLimit(inverter_voltage, 0.8F))       // TODO FIXME 0.8
-            };
-
-            const auto reference_U_alpha_beta = performInverseParkTransform(g_context->reference_Udq,
-                                                                            angle_sine,
-                                                                            angle_cosine);
-
-            const auto pwm_setpoint_and_sector_number = performSpaceVectorTransform(reference_U_alpha_beta,
-                                                                                    inverter_voltage);
-
-            g_pwm_handle.setPWM(pwm_setpoint_and_sector_number.first);
-        }
+        g_context->estimated_Idq = output.estimated_Idq;
+        g_context->reference_Udq = output.reference_Udq;
+        g_context->angular_position = output.extrapolated_angular_position;
 
         g_debug_tracer.set<0>(g_context->reference_Udq[0]);
         g_debug_tracer.set<1>(g_context->reference_Udq[1]);
