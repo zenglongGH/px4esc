@@ -628,11 +628,20 @@ void handleMainIRQ(Const period)
             }
             else
             {
-                if (((g_setpoint > 0) != (g_context->reference_Iq > 0)) ||
-                    os::float_eq::closeToZero(g_context->reference_Iq))
+                // Change of direction while starting
+                if ((g_setpoint > 0) != (g_context->reference_Iq > 0))
                 {
-                    g_context->reference_Iq = std::copysign(g_motor_params.spinup_current, g_setpoint);
+                    g_context->reference_Iq = 0.0F;
                     g_context->spinup_time = 0;
+                }
+
+                // Slowly increasing current
+                if (std::abs(g_context->reference_Iq) < g_motor_params.spinup_current)
+                {
+                    Const current_delta =
+                        (g_motor_params.spinup_current / g_motor_params.nominal_spinup_duration) * period;
+
+                    g_context->reference_Iq += std::copysign(current_delta, g_setpoint);
                 }
 
                 g_context->angular_velocity = g_context->observer.getAngularVelocity();
@@ -642,20 +651,22 @@ void handleMainIRQ(Const period)
 
                 if (g_context->spinup_time > g_motor_params.nominal_spinup_duration * 0.2F)
                 {
-                    if (std::abs(g_context->angular_velocity) > (g_motor_params.min_electrical_ang_vel * 2.0F) ||
-                        (g_context->spinup_time > (g_motor_params.nominal_spinup_duration * 0.5F) &&
-                         std::abs(g_context->angular_velocity) > g_motor_params.min_electrical_ang_vel))
+                    if (std::abs(g_context->angular_velocity) > g_motor_params.min_electrical_ang_vel)
                     {
+                        // Running fast enough, switching to normal mode
                         g_state = State::Running;
-                        g_context->remaining_time_before_stall_detection_enabled = g_motor_params.nominal_spinup_duration;
+                        g_context->remaining_time_before_stall_detection_enabled =
+                            g_motor_params.nominal_spinup_duration;
                     }
-                }
-
-                if (g_context->spinup_time > g_motor_params.nominal_spinup_duration)
-                {
-                    // Timed out
-                    g_setpoint = 0;
-                    g_num_successive_rotor_stalls++;
+                    else
+                    {
+                        if (g_context->spinup_time > g_motor_params.nominal_spinup_duration)
+                        {
+                            // Timed out
+                            g_setpoint = 0;
+                            g_num_successive_rotor_stalls++;
+                        }
+                    }
                 }
             }
         }
