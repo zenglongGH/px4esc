@@ -798,9 +798,12 @@ void handleFastIRQ(Const period,
             Const angle_sine   = math::sin(g_context->angular_position);
             Const angle_cosine = math::cos(g_context->angular_position);
 
+            const auto estimated_I_alpha_beta = performClarkeTransform(phase_currents_ab);
+            g_context->estimated_Idq = performParkTransform(estimated_I_alpha_beta, angle_sine, angle_cosine);
+
             g_context->reference_Udq = {
                 0.0F,
-                std::min(g_context->reference_Iq * g_motor_params.rs * 1.5F,
+                std::min(g_motor_params.spinup_current * g_motor_params.rs * 1.5F,
                          computeLineVoltageLimit(inverter_voltage, 0.8F))       // TODO FIXME 0.8
             };
 
