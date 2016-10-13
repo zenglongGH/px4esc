@@ -374,11 +374,15 @@ class SetpointCommand : public os::shell::ICommandHandler
         {
             foc::stop();
 
-            ios.print("Set setpoint in the range [-1, 1] (negative for reverse rotation).\n");
-            ios.print("By default, ratiometric setpoint will be used; option A/a selects current setpoint.\n");
-            ios.print("Execute without arguments to stop the motor.\n");
-            ios.print("Option -p will plot the real time values.\n");
-            ios.print("\t%s [setpoint=0 [A|a] [-p]]\n", argv[0]);
+            ios.puts("Apply setpoint in the specified control mode; negative values specify reverse rotation.");
+            ios.puts("The following control mode suffixes are supported (case insensitive):\n"
+                     " - a      Current\n"
+                     " - ra     Ratiometric Current\n"
+                     " - v      Voltage\n"
+                     " - (none) Ratiometric Voltage");
+            ios.puts("Execute without arguments to stop the motor.");
+            ios.puts("Option -p will plot the real time values.");
+            ios.print("\t%s [setpoint=0 [a|ra|v] [-p]]\n", argv[0]);
             return;
         }
 
@@ -395,15 +399,9 @@ class SetpointCommand : public os::shell::ICommandHandler
                 do_plot = true;
             }
 
-            if (arg.toLowerCase() == "a")
-            {
-                control_mode = foc::ControlMode::Current;
-            }
-
-            if (arg.toLowerCase() == "v")
-            {
-                control_mode = foc::ControlMode::Voltage;
-            }
+            if (arg.toLowerCase() == "a")  { control_mode = foc::ControlMode::Current; }
+            if (arg.toLowerCase() == "ra") { control_mode = foc::ControlMode::RatiometricCurrent; }
+            if (arg.toLowerCase() == "v")  { control_mode = foc::ControlMode::Voltage; }
         }
 
         using namespace std;
