@@ -38,10 +38,19 @@ enum class ControlMode
     RatiometricCurrent,         ///< Value in [-1, 1] that defines the current setpoint relative to the maximum
     RatiometricMRPM,            ///< Ditto, RPM setpoint relative to the maximum
     RatiometricVoltage,         ///< Ditto, voltage setpoint relative to the inverter supply voltage (Vbus)
+
     Current,                    ///< Ampere
     MRPM,                       ///< Mechanical RPM
     Voltage                     ///< Voltage applied in the quadrature axis
 };
+
+
+constexpr unsigned FirstRatiometricControlMode = unsigned(ControlMode::RatiometricCurrent);
+constexpr unsigned LastRatiometricControlMode  = unsigned(ControlMode::RatiometricVoltage);
+
+static_assert(FirstRatiometricControlMode < LastRatiometricControlMode,
+              "Ford, you're turning into a penguin. Stop it.");
+
 
 /**
  * This class encapsulates the transfer function from the input setpoint value in different units

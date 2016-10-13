@@ -47,6 +47,11 @@ os::config::Param<float>        g_param_esc_cmd_ttl                ("uavcan.esc_
 os::config::Param<float>        g_param_esc_status_interval        ("uavcan.esc_si",   0.05F,  0.01F,    1.0F);
 os::config::Param<float>        g_param_esc_status_interval_passive("uavcan.esc_sip",   0.5F,  0.01F,   10.0F);
 
+os::config::Param<unsigned>     g_param_esc_raw_control_mode       ("uavcan.esc_rcm",
+                                                                    unsigned(foc::ControlMode::RatiometricVoltage),
+                                                                    foc::FirstRatiometricControlMode,
+                                                                    foc::LastRatiometricControlMode);
+
 
 uavcan::LazyConstructor<uavcan::Publisher<uavcan::equipment::esc::Status>> g_pub_status;
 uavcan::LazyConstructor<uavcan::Publisher<uavcan::protocol::debug::KeyValue>> g_pub_key_value;
@@ -54,6 +59,7 @@ uavcan::LazyConstructor<uavcan::Timer> g_timer;
 
 std::uint8_t g_self_index;
 float g_command_ttl;
+foc::ControlMode g_raw_control_mode;
 
 
 void cbRawCommand(const uavcan::ReceivedDataStructure<uavcan::equipment::esc::RawCommand>& msg)
@@ -64,7 +70,7 @@ void cbRawCommand(const uavcan::ReceivedDataStructure<uavcan::equipment::esc::Ra
             float(msg.cmd[g_self_index]) /
             float(uavcan::equipment::esc::RawCommand::FieldTypes::cmd::RawValueType::max());
 
-        foc::setSetpoint(foc::ControlMode::RatiometricCurrent, command, g_command_ttl);
+        foc::setSetpoint(g_raw_control_mode, command, g_command_ttl);
     }
 }
 
@@ -144,6 +150,7 @@ int init(uavcan::INode& node)
      */
     g_self_index  = g_param_esc_index.get();
     g_command_ttl = g_param_esc_cmd_ttl.get();
+    g_raw_control_mode = foc::ControlMode(g_param_esc_raw_control_mode.get());
 
     /*
      * Publishers
