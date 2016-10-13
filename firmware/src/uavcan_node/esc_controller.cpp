@@ -109,7 +109,8 @@ void cbTimer(const uavcan::TimerEvent& event)
         status.temperature = hw_status.inverter_temperature;
         status.current     = foc::getInstantCurrent();
         status.rpm         = static_cast<std::int32_t>(std::round(foc::getInstantMechanicalRPM()));
-        status.power_rating_pct = std::uint8_t(foc::getInstantDemandFactor() * 100.0F + 0.5F);
+        status.power_rating_pct =
+            std::uint8_t(std::min(foc::getInstantDemandFactor() * 100.0F + 0.5F, 126.0F));
 
         (void) g_pub_status->broadcast(status);
     }
