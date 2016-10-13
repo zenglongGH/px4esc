@@ -48,7 +48,7 @@ constexpr unsigned IdqMovingAverageLength = 5;
 
 constexpr Scalar MinimumSpinupDurationFraction          = 0.1F;
 constexpr Scalar MaximumSpinupDurationFraction          = 1.5F;
-constexpr Scalar SpinupAngularVelocityHysteresis        = 1.5F;
+constexpr Scalar SpinupAngularVelocityHysteresis        = 3.0F;
 
 /*
  * State variables
