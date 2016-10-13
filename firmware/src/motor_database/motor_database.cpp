@@ -51,7 +51,6 @@ static const Entry g_entries[] =
     {
         MotorParameters p;
         p.min_electrical_ang_vel  = common::MinElectricAngVel;
-        p.min_current             = 0.3F;
         p.max_current             = 18.0F;
         p.current_ramp_amp_per_s  = common::CurrentRamp;
         p.voltage_ramp_volt_per_s = common::VoltageRamp;
@@ -66,7 +65,6 @@ static const Entry g_entries[] =
     {
         MotorParameters p;
         p.min_electrical_ang_vel  = common::MinElectricAngVel;
-        p.min_current             = 0.5F;
         p.max_current             = 24.0F;
         p.current_ramp_amp_per_s  = common::CurrentRamp;
         p.voltage_ramp_volt_per_s = common::VoltageRamp;
@@ -81,7 +79,6 @@ static const Entry g_entries[] =
     {
         MotorParameters p;
         p.min_electrical_ang_vel  = common::MinElectricAngVel;
-        p.min_current             = 0.2F;
         p.max_current             = 3.5F;
         p.current_ramp_amp_per_s  = common::CurrentRamp;
         p.voltage_ramp_volt_per_s = common::VoltageRamp;

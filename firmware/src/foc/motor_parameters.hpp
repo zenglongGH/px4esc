@@ -75,6 +75,12 @@ struct MotorParameters
 
     void deduceMissingParameters()
     {
+        if (!os::float_eq::positive(min_current) &&
+            os::float_eq::positive(max_current))
+        {
+            min_current = max_current * 0.02F;
+        }
+
         if (!os::float_eq::positive(spinup_current) &&
             os::float_eq::positive(max_current))
         {
