@@ -467,11 +467,15 @@ public:
 
         case State::LqMeasurement:
         {
+            VoltageModulatorWrapper::Modulator::Setpoint modulator_setpoint;
+            modulator_setpoint.mode = VoltageModulatorWrapper::Modulator::Setpoint::Mode::Iq;
+            modulator_setpoint.value = estimation_current_;
+
             const auto output = voltage_modulator_wrapper_.access().onNextPWMPeriod(phase_currents_ab,
                                                                                     inverter_voltage,
                                                                                     Lq_angular_velocity_,
                                                                                     state_variables_[0],
-                                                                                    estimation_current_);
+                                                                                    modulator_setpoint);
 
             state_variables_[0] = output.extrapolated_angular_position;
             pwm_vector = output.pwm_setpoint;

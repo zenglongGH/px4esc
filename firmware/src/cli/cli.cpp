@@ -383,22 +383,26 @@ class SetpointCommand : public os::shell::ICommandHandler
         }
 
         // Parsing optional stuff
-        auto control_mode = foc::ControlMode::RatiometricCurrent;      // This is the default
+        auto control_mode = foc::ControlMode::RatiometricVoltage;      // This is the default
         bool do_plot = false;
 
         for (int i = 1; i < argc; i++)
         {
-            const os::heapless::String<> arg(argv[i]);
+            const os::heapless::String<20> arg(argv[i]);
 
             if (arg == "-p")
             {
                 do_plot = true;
             }
 
-            if (arg == "a" ||
-                arg == "A")
+            if (arg.toLowerCase() == "a")
             {
                 control_mode = foc::ControlMode::Current;
+            }
+
+            if (arg.toLowerCase() == "v")
+            {
+                control_mode = foc::ControlMode::Voltage;
             }
         }
 
@@ -408,6 +412,7 @@ class SetpointCommand : public os::shell::ICommandHandler
         switch (control_mode)
         {
         case foc::ControlMode::RatiometricCurrent:
+        case foc::ControlMode::RatiometricVoltage:
         {
             static constexpr math::Range<> UnityLimits(-1.0F, 1.0F);
 
@@ -424,12 +429,23 @@ class SetpointCommand : public os::shell::ICommandHandler
         {
             const auto Imax = foc::getMotorParameters().max_current;
             const math::Range<> CurrentLimits(-Imax, Imax);
-
             if (!CurrentLimits.contains(sp))
             {
                 sp = 0;
-                ios.print("ERROR: Current out of range [%g, %g]\n",
-                          double(CurrentLimits.min), double(CurrentLimits.max));
+                ios.print("ERROR: Current out of range %s\n", CurrentLimits.toString().c_str());
+            }
+            break;
+        }
+
+        case foc::ControlMode::Voltage:
+        {
+            const auto Vmax = foc::computeLineVoltageLimit(board::motor::getInverterVoltage(),
+                                                           board::motor::getPWMUpperLimit());
+            const math::Range<> VoltageLimits(-Vmax, Vmax);
+            if (!VoltageLimits.contains(sp))
+            {
+                sp = 0;
+                ios.print("ERROR: Voltage out of range %s\n", VoltageLimits.toString().c_str());
             }
             break;
         }

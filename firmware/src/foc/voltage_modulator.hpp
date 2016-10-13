@@ -72,6 +72,11 @@ public:
 
         return kp_ * (error + ui_);                             // a poluchil kozu
     }
+
+    void resetIntegrator()
+    {
+        ui_ = 0;
+    }
 };
 
 /**
@@ -111,6 +116,17 @@ public:
         bool Udq_was_limited = false;
     };
 
+    struct Setpoint
+    {
+        Scalar value = 0;
+
+        enum class Mode : std::uint8_t
+        {
+            Iq,
+            Uq
+        } mode = Mode::Iq;
+    };
+
     ThreePhaseVoltageModulator(Const Lq,
                                Const Rs,
                                Const max_current,
@@ -131,7 +147,7 @@ public:
                            Const inverter_voltage,
                            Const angular_velocity,
                            Const angular_position,
-                           Const reference_Iq)
+                           const Setpoint setpoint)
     {
         Output out;
 
@@ -156,9 +172,21 @@ public:
                                                       out.estimated_Idq[0],
                                                       inverter_voltage);
 
-        out.reference_Udq[1] = pid_Iq_.computeVoltage(reference_Iq,
-                                                      out.estimated_Idq[1],
-                                                      inverter_voltage);
+        if (setpoint.mode == Setpoint::Mode::Iq)
+        {
+            out.reference_Udq[1] = pid_Iq_.computeVoltage(setpoint.value,
+                                                          out.estimated_Idq[1],
+                                                          inverter_voltage);
+        }
+        else if (setpoint.mode == Setpoint::Mode::Uq)
+        {
+            out.reference_Udq[1] = setpoint.value;
+            pid_Iq_.resetIntegrator();
+        }
+        else
+        {
+            assert(false);
+        }
 
         Const Udq_magnitude_limit = computeLineVoltageLimit(inverter_voltage, pwm_upper_limit_);
 
