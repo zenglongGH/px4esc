@@ -429,7 +429,8 @@ bool isBoardHealthOK()
     const auto s = board::motor::getStatus();
     const auto lim = board::motor::getLimits().safe_operating_area;
     return lim.inverter_temperature.contains(s.inverter_temperature) &&
-           lim.inverter_voltage.contains(s.inverter_voltage);
+           lim.inverter_voltage.contains(s.inverter_voltage) &&
+           s.isOkay();
 }
 
 }
