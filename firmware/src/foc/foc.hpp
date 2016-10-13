@@ -45,7 +45,7 @@ struct ControllerParameters
     Scalar nominal_spinup_duration = 1.5F;
 
     /// If the rotor stalled this many times in a row, latch into FAULT state
-    std::uint32_t num_stalls_to_latch = 10;
+    std::uint32_t num_stalls_to_latch = 100;
 
     /// Refer to the definition for details
     MotorIdentificationParameters motor_id;
