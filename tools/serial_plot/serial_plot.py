@@ -26,6 +26,11 @@ except ImportError:
 
 from pyqtgraph import PlotWidget, mkPen, InfiniteLine
 
+try:
+    import readline
+except ImportError:
+    print('Install the readline package to get better CLI experience', file=sys.stderr)
+
 
 if len(sys.argv) > 1:
     SER_PORT = sys.argv[1]
