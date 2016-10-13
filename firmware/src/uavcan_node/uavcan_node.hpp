@@ -100,6 +100,7 @@ void init(std::uint32_t bit_rate_hint,
  */
 void setNodeHealth(NodeHealth ns);
 void setNodeMode(NodeMode mode);
+void setVendorSpecificNodeStatusCode(std::uint16_t value);
 
 /**
  * Returns current node ID (possibly invalid if it is not yet known).

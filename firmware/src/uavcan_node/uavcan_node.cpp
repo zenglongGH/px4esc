@@ -64,6 +64,7 @@ std::uint32_t g_can_bit_rate;
 uavcan::NodeID g_node_id;
 std::uint8_t g_node_status_mode = uavcan::protocol::NodeStatus::MODE_INITIALIZATION;
 std::uint8_t g_node_status_health = uavcan::protocol::NodeStatus::HEALTH_OK;
+std::uint16_t g_vendor_specific_status = 0;
 
 // TODO: This flag thing is horrible and needs to be redesigned, but I'm not sure how
 volatile bool g_do_print_status = false;
@@ -488,6 +489,7 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
 
             getNode().getNodeStatusProvider().setHealth(g_node_status_health);
             getNode().getNodeStatusProvider().setMode(g_node_status_mode);
+            getNode().getNodeStatusProvider().setVendorSpecificStatusCode(g_vendor_specific_status);
 
             const int spin_res = getNode().spin(uavcan::MonotonicDuration::fromMSec(100));
             if (spin_res < 0)
@@ -569,6 +571,11 @@ void setNodeMode(NodeMode mode)
         break;
     }
     }
+}
+
+void setVendorSpecificNodeStatusCode(std::uint16_t value)
+{
+    g_vendor_specific_status = value;
 }
 
 uavcan::NodeID getNodeID()

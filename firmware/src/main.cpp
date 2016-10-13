@@ -360,7 +360,8 @@ public:
 };
 
 
-void updateUAVCANNodeStatus(const bool board_ok)
+void updateUAVCANNodeStatus(const bool board_ok,
+                            const std::uint16_t vendor_specific_status_code)
 {
     using foc::State;
     using uavcan_node::NodeHealth;
@@ -392,6 +393,8 @@ void updateUAVCANNodeStatus(const bool board_ok)
         break;
     }
     }
+
+    uavcan_node::setVendorSpecificNodeStatusCode(vendor_specific_status_code);
 }
 
 led_indicator::Pattern makeLEDPattern(const bool board_ok)
@@ -424,13 +427,23 @@ led_indicator::Pattern makeLEDPattern(const bool board_ok)
     return {};
 }
 
-bool isBoardHealthOK()
+std::pair<bool, std::uint8_t> analyzeBoardHealth()
 {
     const auto s = board::motor::getStatus();
     const auto lim = board::motor::getLimits().safe_operating_area;
-    return lim.inverter_temperature.contains(s.inverter_temperature) &&
-           lim.inverter_voltage.contains(s.inverter_voltage) &&
-           s.isOkay();
+
+    const auto code =
+        (unsigned(s.power_ok) << 0) |
+        (unsigned(s.overload) << 1) |
+        (unsigned(s.fault) << 2) |
+        (unsigned(board::motor::isCalibrationInProgress()) << 3);
+
+    return {
+        lim.inverter_temperature.contains(s.inverter_temperature) &&
+        lim.inverter_voltage.contains(s.inverter_voltage) &&
+        s.isOkay(),
+        std::uint8_t(code)
+    };
 }
 
 }
@@ -482,12 +495,14 @@ int main()
             led_indicator.flash();
         }
 
-        const bool board_ok = app::isBoardHealthOK();
+        const auto board_health = app::analyzeBoardHealth();
 
-        led_indicator.setPattern(app::makeLEDPattern(board_ok));
+        led_indicator.setPattern(app::makeLEDPattern(board_health.first));
         led_indicator.onNextTimeFrame();
 
-        app::updateUAVCANNodeStatus(board_ok);  // This will also switch the node away from the Initialization state
+        // This will also switch the node away from the Initialization state
+        app::updateUAVCANNodeStatus(board_health.first,
+                                    board_health.second);
 
         next_step_at += MS2ST(LoopPeriodMSec);
         os::sleepUntilChTime(next_step_at);
