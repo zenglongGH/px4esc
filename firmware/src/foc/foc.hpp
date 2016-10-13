@@ -42,7 +42,7 @@ namespace foc
 struct ControllerParameters
 {
     /// Preferred duration of spinup, real duration may slightly differ, seconds
-    Scalar nominal_spinup_duration = 2.0F;
+    Scalar nominal_spinup_duration = 1.5F;
 
     /// If the rotor stalled this many times in a row, latch into FAULT state
     std::uint32_t num_stalls_to_latch = 10;

@@ -46,7 +46,8 @@ namespace
  */
 constexpr unsigned IdqMovingAverageLength = 5;
 
-constexpr Scalar MinimumSpinupDurationFraction          = 0.2F;
+constexpr Scalar MinimumSpinupDurationFraction          = 0.1F;
+constexpr Scalar MaximumSpinupDurationFraction          = 1.5F;
 constexpr Scalar SpinupAngularVelocityHysteresis        = 1.5F;
 
 /*
@@ -659,31 +660,35 @@ void handleMainIRQ(Const period)
                     g_context->reference_Iq += std::copysign(current_delta, g_setpoint);
                 }
 
+                // State update
                 g_context->angular_velocity = g_context->observer.getAngularVelocity();
                 g_context->angular_position = g_context->observer.getAngularPosition();
-
                 g_context->spinup_time += period;
 
-                if (g_context->spinup_time >
-                    (g_controller_params.nominal_spinup_duration * MinimumSpinupDurationFraction))
+                // Checking if spinup is finished, switching to Running if so
+                const bool spinup_in_progress_long_enough = g_context->spinup_time >
+                    (g_controller_params.nominal_spinup_duration * MinimumSpinupDurationFraction);
+
+                const bool min_current_exceeded = std::abs(g_context->reference_Iq) > g_motor_params.min_current;
+
+                if (spinup_in_progress_long_enough && min_current_exceeded)
                 {
                     Const ang_vel_threshold = g_motor_params.min_electrical_ang_vel * SpinupAngularVelocityHysteresis;
-
                     if (std::abs(g_context->angular_velocity) > ang_vel_threshold)
                     {
                         // Running fast enough, switching to normal mode
                         g_state = State::Running;
                         g_context->remaining_time_before_stall_detection_enabled = g_context->spinup_time;
                     }
-                    else
-                    {
-                        if (g_context->spinup_time > g_controller_params.nominal_spinup_duration)
-                        {
-                            // Timed out
-                            g_setpoint = 0;
-                            g_num_successive_rotor_stalls++;
-                        }
-                    }
+                }
+
+                // Checking failure conditions
+                Const spinup_timeout = g_controller_params.nominal_spinup_duration * MaximumSpinupDurationFraction;
+                if (g_context->spinup_time > spinup_timeout)
+                {
+                    // Timed out
+                    g_setpoint = 0;
+                    g_num_successive_rotor_stalls++;
                 }
             }
         }

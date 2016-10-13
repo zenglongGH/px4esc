@@ -77,7 +77,7 @@ struct MotorParameters
         if (!os::float_eq::positive(spinup_current) &&
             os::float_eq::positive(max_current))
         {
-            spinup_current = max_current * 0.5F;
+            spinup_current = max_current * 0.85F;
         }
     }
 
