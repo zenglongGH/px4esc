@@ -197,10 +197,31 @@ Context* g_context = nullptr;
 
 void initializeContext()
 {
-    // TODO: Proper current to voltage conversion, use Phi
-    Const min_voltage  = g_motor_params.rs * 1.5F * g_motor_params.min_current;
-    Const voltage_ramp = g_motor_params.rs * 1.5F * g_motor_params.current_ramp_amp_per_s;
+    // Deriving min voltage from known parameters
+    Scalar min_voltage = 0;
 
+    if (g_motor_params.isValid())
+    {
+        Const min_mrpm =
+            convertRotationRateElectricalToMechanical(
+                convertAngularVelocityToRPM(g_motor_params.min_electrical_ang_vel),
+                g_motor_params.num_poles);
+
+        Const kv = convertFluxLinkageToKV(g_motor_params.phi, g_motor_params.num_poles);
+
+        min_voltage = min_mrpm / kv;
+    }
+
+    IRQDebugOutputBuffer::setVariableFromIRQ<0>(min_voltage);
+
+    // Sanity checks
+    if (!std::isfinite(min_voltage) ||
+        !math::Range<>(0.01F, 10.0F).contains(min_voltage))
+    {
+        min_voltage = 0.0F;
+    }
+
+    // Instantiation
     alignas(16) static std::uint8_t context_storage[sizeof(Context)];
     std::fill(std::begin(context_storage), std::end(context_storage), 0);       // Paranoia time
 
@@ -212,7 +233,7 @@ void initializeContext()
                                               g_motor_params.min_current,
                                               min_voltage,
                                               g_motor_params.current_ramp_amp_per_s,
-                                              voltage_ramp,
+                                              g_motor_params.voltage_ramp_volt_per_s,
                                               board::motor::getPWMPeriod(),
                                               board::motor::getPWMDeadTime());
 }

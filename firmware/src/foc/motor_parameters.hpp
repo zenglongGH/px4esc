@@ -45,6 +45,7 @@ struct MotorParameters
     Scalar spinup_current = 0;          ///< Initial current applied at spinup, Ampere
 
     Scalar current_ramp_amp_per_s = 0;  ///< Current setpoint slope, Ampere/second.
+    Scalar voltage_ramp_volt_per_s = 0; ///< Voltage setpoint slope, Volt/second.
 
     Scalar phi = 0;                     ///< Magnetic field flux linkage, Weber
     Scalar rs = 0;                      ///< Phase resistance (half of phase-to-phase resistance), Ohm
@@ -90,6 +91,7 @@ struct MotorParameters
                is_positive(max_current)                 &&
                is_positive(spinup_current)              &&
                is_positive(current_ramp_amp_per_s)      &&
+               is_positive(voltage_ramp_volt_per_s)     &&
                getPhiLimits().contains(phi)             &&
                getRsLimits().contains(rs)               &&
                getLqLimits().contains(lq)               &&
@@ -123,6 +125,7 @@ struct MotorParameters
             "Imax : %-7.1f A\n"
             "Ispup: %-7.1f A\n"
             "Iramp: %-7.1f A/s\n"
+            "Vramp: %-7.1f V/s\n"
             "Phi  : %-7.3f mWb\n"
             "Rs   : %-7.3f Ohm\n"
             "Lq   : %-7.3f uH\n"
@@ -134,6 +137,7 @@ struct MotorParameters
             double(max_current),
             double(spinup_current),
             double(current_ramp_amp_per_s),
+            double(voltage_ramp_volt_per_s),
             double(phi) * 1e3,
             double(rs),
             double(lq) * 1e6,

@@ -37,6 +37,8 @@ namespace common
 {
 
 constexpr Scalar MinElectricAngVel      = 200.0F;
+constexpr Scalar CurrentRamp            = 300.0F;
+constexpr Scalar VoltageRamp            = 10.0F;
 
 }
 
@@ -51,7 +53,8 @@ static const Entry g_entries[] =
         p.min_electrical_ang_vel  = common::MinElectricAngVel;
         p.min_current             = 0.3F;
         p.max_current             = 18.0F;
-        p.current_ramp_amp_per_s  = 300.0F;
+        p.current_ramp_amp_per_s  = common::CurrentRamp;
+        p.voltage_ramp_volt_per_s = common::VoltageRamp;
         p.phi                     = 1.06e-3F;
         p.rs                      = 0.11F;
         p.lq                      = 23e-6F;
@@ -65,7 +68,8 @@ static const Entry g_entries[] =
         p.min_electrical_ang_vel  = common::MinElectricAngVel;
         p.min_current             = 0.5F;
         p.max_current             = 24.0F;
-        p.current_ramp_amp_per_s  = 300.0F;
+        p.current_ramp_amp_per_s  = common::CurrentRamp;
+        p.voltage_ramp_volt_per_s = common::VoltageRamp;
         p.phi                     = 3.938e-3F;
         p.rs                      = 0.11F;
         p.lq                      = 78.7e-6F;
@@ -79,7 +83,8 @@ static const Entry g_entries[] =
         p.min_electrical_ang_vel  = common::MinElectricAngVel;
         p.min_current             = 0.2F;
         p.max_current             = 3.5F;
-        p.current_ramp_amp_per_s  = 300.0F;
+        p.current_ramp_amp_per_s  = common::CurrentRamp;
+        p.voltage_ramp_volt_per_s = common::VoltageRamp;
         p.phi                     = 1.814e-3F;
         p.rs                      = 0.232F;
         p.lq                      = 161e-6F;
