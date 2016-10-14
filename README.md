@@ -1,5 +1,9 @@
 # PX4ESC
 
+<a href="https://scan.coverity.com/projects/px4esc">
+  <img alt="Coverity Scan Build Status" src="https://scan.coverity.com/projects/10506/badge.svg"/>
+</a>
+
 PX4ESC is a state-of-the-art open source motor controller firmware for electrically propelled aircraft.
 
 ## Features
