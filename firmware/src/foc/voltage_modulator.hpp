@@ -99,6 +99,8 @@ private:
     Const pwm_dead_time_;
     Const pwm_upper_limit_;
 
+    Const Lq_;
+
     CurrentPIController pid_Id_;
     CurrentPIController pid_Iq_;
 
@@ -138,6 +140,7 @@ public:
         pwm_period_(pwm_period),
         pwm_dead_time_(pwm_dead_time),
         pwm_upper_limit_(pwm_upper_limit),
+        Lq_(Lq),
         pid_Id_(Lq, Rs, max_current, pwm_period),
         pid_Iq_(Lq, Rs, max_current, pwm_period),
         estimated_Idq_filter_(Vector<2>::Zero())
@@ -187,6 +190,9 @@ public:
         {
             assert(false);
         }
+
+        out.reference_Udq[0] -= angular_velocity * Lq_ * out.estimated_Idq[1];
+        out.reference_Udq[1] += angular_velocity * Lq_ * out.estimated_Idq[0];
 
         Const Udq_magnitude_limit = computeLineVoltageLimit(inverter_voltage, pwm_upper_limit_);
 
