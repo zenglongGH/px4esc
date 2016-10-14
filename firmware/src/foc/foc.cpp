@@ -740,7 +740,7 @@ void handleMainIRQ(Const period)
                     {
                         // Running fast enough, switching to normal mode
                         g_state = State::Running;
-                        g_context->remaining_time_before_stall_detection_enabled = g_context->spinup_time;
+                        g_context->remaining_time_before_stall_detection_enabled = g_context->spinup_time * 2.0F;
                     }
                 }
 
@@ -764,13 +764,19 @@ void handleMainIRQ(Const period)
         g_debug_tracer.set<6>((g_state == State::Spinup) ?
                               g_context->angular_velocity :
                               g_context->inverter_power / board::motor::getInverterVoltage());
-#if 0
+#if 1
         {
             static Scalar prev_Iq = Idq[1];
             Const Iq_gradient = (Idq[1] - prev_Iq) / period;
             prev_Iq = Idq[1];
-            g_debug_tracer.set<4>((Udq[1] - g_motor_params.rs * Idq[1] - g_motor_params.lq * Iq_gradient) /
-                                  (g_motor_params.lq * Idq[0] + g_motor_params.phi));
+
+            Const angvel = (Udq[1] - g_motor_params.rs * Idq[1] - g_motor_params.lq * Iq_gradient) /
+                           (g_motor_params.lq * Idq[0] + g_motor_params.phi);
+
+            static Scalar filtered;
+            filtered += 0.01F * (angvel - filtered);
+
+            g_debug_tracer.set<4>(filtered);
         }
 #else
         g_debug_tracer.set<4>(g_context->use_voltage_setpoint ? g_context->setpoint_Uq : g_context->setpoint_Iq);
