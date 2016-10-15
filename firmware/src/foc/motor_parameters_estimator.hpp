@@ -137,7 +137,6 @@ class MotorParametersEstimator
         {
             if (modulator_ != nullptr)
             {
-                assert(false);
                 modulator_->~ThreePhaseVoltageModulator();
             }
             modulator_ = new (storage_) Modulator(args...);
@@ -193,9 +192,10 @@ class MotorParametersEstimator
     Scalar state_switched_at_ = 0;
 
     std::array<Averager, 3> averagers_;
-    std::array<Scalar, 5> state_variables_{};
+    std::array<Scalar, 7> state_variables_{};
 
     math::SimpleMovingAverageFilter<500, Vector<2>> currents_filter_;
+    math::SimpleMovingAverageFilter<500, Vector<2>> voltage_filter_;
 
     void switchState(State new_state, bool retain_states = false)
     {
@@ -248,7 +248,8 @@ public:
         pwm_dead_time_(pwm_dead_time),
         pwm_upper_limit_(pwm_upper_limit),
         result_(initial_parameters),
-        currents_filter_(Vector<2>::Zero())
+        currents_filter_(Vector<2>::Zero()),
+        voltage_filter_(Vector<2>::Zero())
     {
         assert(config.isValid());
 
@@ -453,14 +454,15 @@ public:
              */
             constexpr Scalar OneSizeFitsAllLq = 50.0e-6F;
 
-            voltage_modulator_wrapper_.init(OneSizeFitsAllLq,
-                                            result_.rs,
-                                            estimation_current_,
-                                            pwm_period_,
-                                            pwm_dead_time_,
-                                            pwm_upper_limit_,
-                                            VoltageModulatorWrapper::Modulator::DeadTimeCompensationPolicy::Disabled);
-            // Ourowrapos - a wrapper that wraps itself.
+            voltage_modulator_wrapper_.init(
+                OneSizeFitsAllLq,
+                result_.rs,
+                result_.max_current,
+                pwm_period_,
+                pwm_dead_time_,
+                pwm_upper_limit_,
+                VoltageModulatorWrapper::Modulator::DeadTimeCompensationPolicy::Disabled,
+                VoltageModulatorWrapper::Modulator::CrossCouplingCompensationPolicy::Disabled);
             switchState(State::LqMeasurement);
             break;
         }
@@ -574,33 +576,70 @@ public:
         case State::PhiMeasurementAcceleration:
         case State::PhiMeasurement:
         {
-            constexpr int IdxVoltage = 0;
+            constexpr int IdxUq      = 0;
             constexpr int IdxAngVel  = 1;
             constexpr int IdxAngPos  = 2;
-            constexpr int IdxI       = 3;
-            constexpr int IdxMinI    = 4;
+            constexpr int IdxMinI    = 3;
+            constexpr int IdxI       = 4;
+            constexpr int IdxU       = 5;
+            constexpr int IdxPhi     = 6;
 
-            // This is the maximum voltage we start from.
+            constexpr Scalar MinVoltage = 0.01F;
+
+            Const low_pass_filter_innovation = pwm_period_ * 10.0F;
             Const initial_voltage = estimation_current_ * result_.rs * 1.5F;
-
-            // Continuously maintaining the smoothed out current estimates throughout the whole process.
-            const auto Idq = performParkTransform(performClarkeTransform(phase_currents_ab),
-                                                  math::sin(state_variables_[IdxAngPos]),
-                                                  math::cos(state_variables_[IdxAngPos]));
-            currents_filter_.update(Idq);
-
-            // Additional Iq filtering
             Const prev_I = state_variables_[IdxI];
-            state_variables_[IdxI] += pwm_period_ * 10.0F *
-                (currents_filter_.getValue().norm() - state_variables_[IdxI]);
 
             if (state_ == State::PhiMeasurementInitialization)
             {
                 result_.phi = 0;
-                state_variables_[IdxVoltage] = initial_voltage;
+                state_variables_[IdxUq] = initial_voltage;
+
+                voltage_modulator_wrapper_.init(
+                    result_.lq,
+                    result_.rs,
+                    result_.max_current,
+                    pwm_period_,
+                    pwm_dead_time_,
+                    pwm_upper_limit_,
+                    VoltageModulatorWrapper::Modulator::DeadTimeCompensationPolicy::Disabled,
+                    VoltageModulatorWrapper::Modulator::CrossCouplingCompensationPolicy::Enabled);
+
                 switchState(State::PhiMeasurementAcceleration, true);
             }
-            else if (state_ == State::PhiMeasurementAcceleration)
+
+            if (state_variables_[IdxUq] > MinVoltage)
+            {
+                VoltageModulatorWrapper::Modulator::Setpoint setpoint;
+                setpoint.mode = VoltageModulatorWrapper::Modulator::Setpoint::Mode::Uq;
+                setpoint.value = state_variables_[IdxUq];
+
+                const auto out = voltage_modulator_wrapper_.access().onNextPWMPeriod(phase_currents_ab,
+                                                                                     inverter_voltage,
+                                                                                     state_variables_[IdxAngVel],
+                                                                                     state_variables_[IdxAngPos],
+                                                                                     setpoint);
+                pwm_vector = out.pwm_setpoint;
+                state_variables_[IdxAngPos] = out.extrapolated_angular_position;
+
+                // Current filter update
+                currents_filter_.update(out.estimated_Idq);
+                state_variables_[IdxI] +=
+                    low_pass_filter_innovation * (currents_filter_.getValue().norm() - state_variables_[IdxI]);
+
+                // Voltage filter update
+                voltage_filter_.update(out.reference_Udq);
+                state_variables_[IdxU] +=
+                    low_pass_filter_innovation * (voltage_filter_.getValue().norm() - state_variables_[IdxU]);
+            }
+            else
+            {
+                // Voltage is not in the valid range, aborting
+                result_.phi = 0;
+                switchState(State::Finalization);
+            }
+
+            if (state_ == State::PhiMeasurementAcceleration)
             {
                 state_variables_[IdxAngVel] +=
                     (Phi_angular_velocity_ / (PhiMeasurementVoltageSlopeLengthSec / 2.0F)) * pwm_period_;
@@ -610,21 +649,36 @@ public:
                     switchState(State::PhiMeasurement, true);
                 }
             }
-            else if (state_ == State::PhiMeasurement)
-            {
-                // TODO: Compensation disabled, since it yields lower values than expected
-                Const dead_time_compensation_mult = 1.0F;
-                //Const dead_time_compensation_mult = 1.0F - pwm_dead_time_ / pwm_period_;
 
-                Const Uq = state_variables_[IdxVoltage] * dead_time_compensation_mult;
-                Const I  = state_variables_[IdxI];
-                Const w  = state_variables_[IdxAngVel];
+            if (state_ == State::PhiMeasurement)
+            {
+                Const I = state_variables_[IdxI];
+
+                {
+                    // TODO: Compensation disabled, since it yields lower values than expected
+                    Const dead_time_compensation_mult = 1.0F;
+                    //Const dead_time_compensation_mult = 1.0F - pwm_dead_time_ / pwm_period_;
+
+                    Const U = state_variables_[IdxU] * dead_time_compensation_mult;
+                    Const w = state_variables_[IdxAngVel];
+
+                    Const new_phi = (U - I * result_.rs) / w;
+
+                    if (state_variables_[IdxPhi] > 0)
+                    {
+                        state_variables_[IdxPhi] += low_pass_filter_innovation * (new_phi - state_variables_[IdxPhi]);
+                    }
+                    else
+                    {
+                        state_variables_[IdxPhi] = new_phi;
+                    }
+                }
 
                 if ((I < state_variables_[IdxMinI]) ||
                     (state_variables_[IdxMinI] <= 0))
                 {
                     state_variables_[IdxMinI] = I;
-                    result_.phi = (Uq - I * result_.rs) / w;
+                    result_.phi = state_variables_[IdxPhi];
                 }
 
                 if (result_.phi >= 0.0F)
@@ -644,47 +698,13 @@ public:
                     else
                     {
                         // Minimum is not reached yet, continuing to reduce voltage
-                        state_variables_[IdxVoltage] -=
+                        state_variables_[IdxUq] -=
                             (initial_voltage / PhiMeasurementVoltageSlopeLengthSec) * pwm_period_;
                     }
                 }
                 else
                 {
                     // Negative Phi value encountered at any point indicates that the Rs value is likely too high
-                    switchState(State::Finalization);
-                }
-            }
-            else
-            {
-                assert(false);
-            }
-
-            // Voltage modulation
-            if (state_ == State::PhiMeasurementInitialization ||
-                state_ == State::PhiMeasurementAcceleration ||
-                state_ == State::PhiMeasurement)
-            {
-                constexpr Scalar MinVoltage = 0.1F;
-
-                Const max_voltage = computeLineVoltageLimit(inverter_voltage, pwm_upper_limit_);
-
-                const math::Range<> voltage_range(MinVoltage, max_voltage);
-
-                if (voltage_range.contains(state_variables_[IdxVoltage]))
-                {
-                    state_variables_[IdxAngPos] = constrainAngularPosition(state_variables_[IdxAngPos] +
-                                                                           state_variables_[IdxAngVel] * pwm_period_);
-
-                    const auto Uab = performInverseParkTransform({0.0F, state_variables_[IdxVoltage]},
-                                                                 math::sin(state_variables_[IdxAngPos]),
-                                                                 math::cos(state_variables_[IdxAngPos]));
-
-                    pwm_vector = performSpaceVectorTransform(Uab, inverter_voltage).first;
-                }
-                else
-                {
-                    // Voltage is not in the valid range, aborting
-                    result_.phi = 0;
                     switchState(State::Finalization);
                 }
             }
@@ -725,8 +745,6 @@ public:
         std::array<Scalar, 7> out{};
         std::copy(state_variables_.begin(), state_variables_.end(), out.begin());
 
-        const unsigned FirstFreeIndex = state_variables_.size();
-
         if (state_ == State::CoarseRsMeasurement ||
             state_ == State::RsMeasurementA ||
             state_ == State::RsMeasurementB ||
@@ -734,14 +752,15 @@ public:
             state_ == State::RsComputation)
         {
             const auto val = currents_filter_.getValue();
-            out.at(FirstFreeIndex - 1) = val[0];
-            out.at(FirstFreeIndex - 0) = val[1];
+            out.at(4) = val[0];
+            out.at(5) = val[1];
         }
 
         if (state_ == State::LqMeasurement ||
             state_ == State::LqComputation)
         {
-            out.at(FirstFreeIndex) = Scalar(voltage_modulator_wrapper_.access().getUdqNormalizationCounter().get());
+            // Overriding the angular position, it's useless anyway
+            out.at(0) = Scalar(voltage_modulator_wrapper_.access().getUdqNormalizationCounter().get());
         }
 
         if (state_ == State::PhiMeasurementInitialization ||

@@ -92,8 +92,15 @@ public:
         Enabled
     };
 
+    enum class CrossCouplingCompensationPolicy
+    {
+        Disabled,
+        Enabled
+    };
+
 private:
     const DeadTimeCompensationPolicy dead_time_compensation_policy_;
+    const CrossCouplingCompensationPolicy cross_coupling_compensation_policy_;
 
     Const pwm_period_;
     Const pwm_dead_time_;
@@ -135,8 +142,10 @@ public:
                                Const pwm_period,
                                Const pwm_dead_time,
                                Const pwm_upper_limit,
-                               const DeadTimeCompensationPolicy dtcomp_policy) :
+                               const DeadTimeCompensationPolicy dtcomp_policy,
+                               const CrossCouplingCompensationPolicy cccomp_policy) :
         dead_time_compensation_policy_(dtcomp_policy),
+        cross_coupling_compensation_policy_(cccomp_policy),
         pwm_period_(pwm_period),
         pwm_dead_time_(pwm_dead_time),
         pwm_upper_limit_(pwm_upper_limit),
@@ -191,8 +200,11 @@ public:
             assert(false);
         }
 
-        out.reference_Udq[0] -= angular_velocity * Lq_ * out.estimated_Idq[1];
-        out.reference_Udq[1] += angular_velocity * Lq_ * out.estimated_Idq[0];
+        if (cross_coupling_compensation_policy_ == CrossCouplingCompensationPolicy::Enabled)
+        {
+            out.reference_Udq[0] -= angular_velocity * Lq_ * out.estimated_Idq[1];
+            out.reference_Udq[1] += angular_velocity * Lq_ * out.estimated_Idq[0];
+        }
 
         Const Udq_magnitude_limit = computeLineVoltageLimit(inverter_voltage, pwm_upper_limit_);
 
