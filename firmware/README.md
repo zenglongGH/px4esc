@@ -5,6 +5,13 @@ PX4ESC Firmware
 
 Coding conventions used in this project are available at <https://github.com/Zubax/zubax_style_guide>.
 
+### Static Analysis using Coverity Scan
+
+Download the [Coverity Build Tool](https://scan.coverity.com/download?tab=cxx),
+make sure its `bin` directory is listed in the PATH environment variable,
+then build the firmware using the script `coverity_scan_build.sh`.
+Once the build is finished, submit the resulting archive to Coverity Scan.
+
 ## Building
 
 Development requires a machine with Linux or OSX; if you're using Windows, you're on your own.
