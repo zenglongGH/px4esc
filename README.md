@@ -29,6 +29,19 @@ List of publications that refer to PX4ESC:
 
 Feel free to send pull requests extending this list.
 
+## Compatible Hardware
+
+This list contains all known hardware designs that can run the PX4ESC firmware.
+We accept extensions to this list via pull requests.
+
+* [Pixhawk ESC v1.6](http://www.auav.co/product-p/pixhawkesc16dev.htm)
+  * Voltage: 9~26 V (intended to support 55 V, but a hardware bug limits the maximum voltage)
+  * Dual CAN bus, USB, UART, RCPWM
+* Zubax Macaroni (coming soon!)
+  * Voltage: 9~55 V
+  * DC current: 20 A continuous, 100 A peak
+  * Dual CAN bus, USB, UART, RCPWM
+
 ## Repository Layout
 
 The repository contains the following directories:
