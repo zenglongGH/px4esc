@@ -197,7 +197,7 @@ struct Context
                   pwm_dead_time,
                   board::motor::getPWMUpperLimit(),
                   modulator.DeadTimeCompensationPolicy::Disabled,
-                  modulator.CrossCouplingCompensationPolicy::Enabled),
+                  modulator.CrossCouplingCompensationPolicy::Disabled),
         current_controller(max_current,
                            min_current,
                            min_voltage,

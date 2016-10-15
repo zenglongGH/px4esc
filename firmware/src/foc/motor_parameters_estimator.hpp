@@ -603,7 +603,7 @@ public:
                     pwm_dead_time_,
                     pwm_upper_limit_,
                     VoltageModulatorWrapper::Modulator::DeadTimeCompensationPolicy::Disabled,
-                    VoltageModulatorWrapper::Modulator::CrossCouplingCompensationPolicy::Enabled);
+                    VoltageModulatorWrapper::Modulator::CrossCouplingCompensationPolicy::Disabled);
 
                 switchState(State::PhiMeasurementAcceleration, true);
             }
