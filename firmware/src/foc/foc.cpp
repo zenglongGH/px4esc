@@ -161,6 +161,19 @@ struct Context
     Scalar setpoint_Uq = 0;
     bool use_voltage_setpoint = false;
 
+    struct LowPassFilteredValues
+    {
+        static constexpr Scalar InnovationWeight = 0.05F;
+
+        static void update(Scalar& value, const Scalar& new_value)
+        {
+            value += InnovationWeight * (new_value - value);
+        }
+
+        Scalar inverter_power = 0;
+        Scalar demand_factor = 0;
+    } low_pass_filtered_values;
+
     Context(const ObserverParameters& observer_params,
             Const field_flux,
             Const Lq,
@@ -413,7 +426,7 @@ void stop()
 }
 
 
-Scalar getInstantCurrent()
+Scalar getInstantCurrentFiltered()
 {
     Const voltage = board::motor::getInverterVoltage();
 
@@ -422,24 +435,19 @@ Scalar getInstantCurrent()
         AbsoluteCriticalSectionLocker locker;
         if (g_context != nullptr)
         {
-            return g_context->inverter_power / voltage;
+            return g_context->low_pass_filtered_values.inverter_power / voltage;
         }
     }
 
     return 0;
 }
 
-Scalar getInstantDemandFactor()
+Scalar getInstantDemandFactorFiltered()
 {
-    Const max_current = g_motor_params.max_current;
-
-    if (os::float_eq::positive(max_current))
+    AbsoluteCriticalSectionLocker locker;
+    if (g_context != nullptr)
     {
-        AbsoluteCriticalSectionLocker locker;
-        if (g_context != nullptr)
-        {
-            return std::abs(g_context->estimated_Idq[1]) / max_current;
-        }
+        return g_context->low_pass_filtered_values.demand_factor;
     }
 
     return 0;
@@ -508,6 +516,7 @@ void printStatusInfo()
     Scalar setpoint_Iq = 0;
     Scalar setpoint_Uq = 0;
     Scalar inverter_power = 0;
+    Scalar demand_factor = 0;
 
     {
         AbsoluteCriticalSectionLocker locker;
@@ -527,7 +536,8 @@ void printStatusInfo()
             reference_Udq       = g_context->reference_Udq;
             setpoint_Iq         = g_context->setpoint_Iq;
             setpoint_Uq         = g_context->setpoint_Uq;
-            inverter_power      = g_context->inverter_power;
+            inverter_power      = g_context->low_pass_filtered_values.inverter_power;
+            demand_factor       = g_context->low_pass_filtered_values.demand_factor;
         }
     }
 
@@ -558,14 +568,16 @@ void printStatusInfo()
                 "Reference Udq: %s A\n"
                 "Setpoint  Iq : %.1f A\n"
                 "Setpoint  Uq : %.1f A\n"
-                "Inverter Pwr : %.1f\n",
+                "Inverter Pwr : %.1f W\n"
+                "Demand Factor: %.0f %%\n",
                 double(angular_velocity),
                 double(mrpm),
                 math::toString(estimated_Idq).c_str(),
                 math::toString(reference_Udq).c_str(),
                 double(setpoint_Iq),
                 double(setpoint_Uq),
-                double(inverter_power));
+                double(inverter_power),
+                double(demand_factor) * 100.0);
 }
 
 
@@ -654,10 +666,7 @@ void handleMainIRQ(Const period)
             {
                 // Updating the state estimation from observer
                 g_context->angular_velocity = g_context->observer.getAngularVelocity();
-
-                Const angle_slip = g_context->observer.getAngularVelocity() * period;
-                g_context->angular_position =
-                    math::normalizeAngle(g_context->observer.getAngularPosition() + angle_slip);
+                g_context->angular_position = g_context->observer.getAngularPosition();
 
                 // Computing new setpoint using the appropriate control mode (current, voltage, RPM)
                 if (g_requested_control_mode == ControlMode::RatiometricVoltage ||
@@ -760,6 +769,12 @@ void handleMainIRQ(Const period)
          * Stuff that does not require synchronization with the fast IRQ
          */
         g_context->inverter_power = (Udq.transpose() * Idq)[0] * 1.5F;
+
+        Context::LowPassFilteredValues::update(g_context->low_pass_filtered_values.inverter_power,
+                                               g_context->inverter_power);
+
+        Context::LowPassFilteredValues::update(g_context->low_pass_filtered_values.demand_factor,
+                                               std::abs(g_context->estimated_Idq[1]) / g_motor_params.max_current);
 
         g_debug_tracer.set<5>(g_context->observer.getAngularVelocity());
         g_debug_tracer.set<6>((g_state == State::Spinup) ?

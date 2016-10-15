@@ -217,12 +217,12 @@ void stop();
 /**
  * Returns the instant motor current in Amperes.
  */
-Scalar getInstantCurrent();
+Scalar getInstantCurrentFiltered();
 
 /**
  * Returns the instant relative power in percent of the maximum.
  */
-Scalar getInstantDemandFactor();
+Scalar getInstantDemandFactorFiltered();
 
 /**
  * Returns the current mechanical angular velocity of the rotor in RPM.
