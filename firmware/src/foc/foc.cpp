@@ -664,9 +664,12 @@ void handleMainIRQ(Const period)
 
             if (g_state == State::Running)
             {
-                // Updating the state estimation from observer
                 g_context->angular_velocity = g_context->observer.getAngularVelocity();
-                g_context->angular_position = g_context->observer.getAngularPosition();
+
+                // Correcting the angle estimation latency, assuming that the observer runs for about half period.
+                Const angle_slip = g_context->angular_velocity * (period * 0.5F);
+                g_context->angular_position =
+                    math::normalizeAngle(g_context->observer.getAngularPosition() + angle_slip);
 
                 // Computing new setpoint using the appropriate control mode (current, voltage, RPM)
                 if (g_requested_control_mode == ControlMode::RatiometricVoltage ||
