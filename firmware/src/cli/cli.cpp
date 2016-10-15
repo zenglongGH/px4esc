@@ -331,8 +331,7 @@ class SpinCommand : public os::shell::ICommandHandler
             const auto inverter_voltage = board::motor::getInverterVoltage();
 
             const auto Ualphabeta = foc::performInverseParkTransform({0.0F, voltage},
-                                                                     math::sin(angle),
-                                                                     math::cos(angle));
+                                                                     math::sincos(angle));
 
             const auto setpoint = foc::performSpaceVectorTransform(Ualphabeta, inverter_voltage).first;
 

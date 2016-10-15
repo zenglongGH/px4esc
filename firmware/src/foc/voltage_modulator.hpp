@@ -168,12 +168,11 @@ public:
          */
         out.extrapolated_angular_position = constrainAngularPosition(angular_position + angular_velocity * pwm_period_);
 
-        Const angle_sine   = math::sin(out.extrapolated_angular_position);
-        Const angle_cosine = math::cos(out.extrapolated_angular_position);
+        const auto angle_sincos = math::sincos(out.extrapolated_angular_position);
 
         const auto estimated_I_alpha_beta = performClarkeTransform(phase_currents_ab);
 
-        const Vector<2> new_Idq = performParkTransform(estimated_I_alpha_beta, angle_sine, angle_cosine);
+        const Vector<2> new_Idq = performParkTransform(estimated_I_alpha_beta, angle_sincos);
         estimated_Idq_filter_.update(new_Idq);
         out.estimated_Idq = estimated_Idq_filter_.getValue();
 
@@ -218,7 +217,7 @@ public:
         /*
          * Transforming back to the stationary reference frame, updating the PWM outputs
          */
-        auto reference_U_alpha_beta = performInverseParkTransform(out.reference_Udq, angle_sine, angle_cosine);
+        auto reference_U_alpha_beta = performInverseParkTransform(out.reference_Udq, angle_sincos);
 
         const auto pwm_setpoint_and_sector_number = performSpaceVectorTransform(reference_U_alpha_beta,
                                                                                 inverter_voltage);

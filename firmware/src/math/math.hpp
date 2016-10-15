@@ -212,34 +212,14 @@ public:
     auto getNumSamples() const { return num_samples_; }
 };
 
-/**
- * Wrappers over the CMSIS DSP library.
- * Note that the CMSIS math headers MUST NOT be included, because they dump a pile of garbage into the global scope.
- * @{
- */
-namespace impl_
-{
-extern "C"
-{
 
-float arm_sin_f32(float);
-float arm_cos_f32(float);
-
-}
-}
-
-inline Scalar sin(Scalar x)
+inline Vector<2> sincos(Scalar x)
 {
-    return impl_::arm_sin_f32(x);
+    // Normally this should be replaced with a call to sincos(), but this is not a part of C++ standard library.
+    // However, the compiler should be able to replace the two separate but localized calls to
+    // sin()/cos() with one sincos().
+    return { std::sin(x), std::cos(x) };
 }
-
-inline Scalar cos(Scalar x)
-{
-    return impl_::arm_cos_f32(x);
-}
-/**
- * @}
- */
 
 /**
  * Implementation details, do not use directly.

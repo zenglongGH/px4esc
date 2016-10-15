@@ -203,22 +203,20 @@ inline Vector<2> performClarkeTransform(const Vector<2>& ab)
  * Park transform, assming increasing Theta during direct rotation.
  */
 inline Vector<2> performParkTransform(const Vector<2>& alpha_beta,
-                                      Const angle_sine,
-                                      Const angle_cosine)
+                                      const Vector<2>& angle_sincos)
 {
-    return { alpha_beta[0] * angle_cosine + alpha_beta[1] * angle_sine,
-            -alpha_beta[0] * angle_sine   + alpha_beta[1] * angle_cosine };
+    return { alpha_beta[0] * angle_sincos[1] + alpha_beta[1] * angle_sincos[0],
+            -alpha_beta[0] * angle_sincos[0] + alpha_beta[1] * angle_sincos[1] };
 }
 
 /**
  * Inverse Park transform to the above defined.
  */
 inline Vector<2> performInverseParkTransform(const Vector<2>& dq,
-                                             Const angle_sine,
-                                             Const angle_cosine)
+                                             const Vector<2>& angle_sincos)
 {
-    return { dq[0] * angle_cosine - dq[1] * angle_sine,
-             dq[0] * angle_sine   + dq[1] * angle_cosine };
+    return { dq[0] * angle_sincos[1] - dq[1] * angle_sincos[0],
+             dq[0] * angle_sincos[0] + dq[1] * angle_sincos[1] };
 }
 
 /* The code above was validated using the following script:
