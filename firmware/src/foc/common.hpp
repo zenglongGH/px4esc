@@ -58,27 +58,6 @@ public:
 };
 
 /**
- * Constrains the angle within [0, Pi*2]
- */
-inline math::Scalar constrainAngularPosition(math::Const x)
-{
-    constexpr math::Const Pi2 = math::Pi * 2.0F;
-
-    if (x >= Pi2)
-    {
-        return x - Pi2;
-    }
-    else if (x < 0)
-    {
-        return x + Pi2;
-    }
-    else
-    {
-        return x;
-    }
-}
-
-/**
  * @param flux_linkage  Positive, in Weber.
  * @param num_poles     Positive, even.
  * @return              KV if inputs are valid; zero and assertion failure if not.

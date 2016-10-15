@@ -62,29 +62,26 @@ constexpr inline Scalar convertCelsiusToKelvin(Const kelvin)
 /**
  * Constants
  */
-constexpr auto Pi = Scalar(3.141592653589793);
+constexpr auto Pi  = Scalar(3.141592653589793);
+constexpr auto Pi2 = Scalar(6.283185307179586);
 
 /**
- * Substracts right angle from left angle, result will be in the range (-180, 180].
- * Apply std::abs() to the result to get the absolute angular difference.
+ * Constrains the angle within [0, Pi*2]
  */
-constexpr inline Scalar subtractAngles(Const left, Const right)
+inline Scalar normalizeAngle(Scalar x)
 {
-    Const diff = left - right;
-    if (diff > Pi)
+    if (x >= Pi2)
     {
-        return diff - Pi * 2.0F;
+        return x - Pi2;
     }
-    if (diff < -Pi)
+    else if (x < 0)
     {
-        return diff + Pi * 2.0F;
+        return x + Pi2;
     }
-    return diff;
-}
-
-constexpr inline Scalar convertDegreesToRadian(Const deg)
-{
-    return deg / (180.0F / Pi);
+    else
+    {
+        return x;
+    }
 }
 
 /**

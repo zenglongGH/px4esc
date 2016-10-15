@@ -657,7 +657,7 @@ void handleMainIRQ(Const period)
 
                 Const angle_slip = g_context->observer.getAngularVelocity() * period;
                 g_context->angular_position =
-                    constrainAngularPosition(g_context->observer.getAngularPosition() + angle_slip);
+                    math::normalizeAngle(g_context->observer.getAngularPosition() + angle_slip);
 
                 // Computing new setpoint using the appropriate control mode (current, voltage, RPM)
                 if (g_requested_control_mode == ControlMode::RatiometricVoltage ||

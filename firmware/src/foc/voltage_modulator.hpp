@@ -166,7 +166,7 @@ public:
         /*
          * Computing Idq, Udq
          */
-        out.extrapolated_angular_position = constrainAngularPosition(angular_position + angular_velocity * pwm_period_);
+        out.extrapolated_angular_position = math::normalizeAngle(angular_position + angular_velocity * pwm_period_);
 
         const auto angle_sincos = math::sincos(out.extrapolated_angular_position);
 

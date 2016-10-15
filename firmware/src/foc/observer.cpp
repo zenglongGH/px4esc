@@ -120,7 +120,7 @@ void Observer::update(Const dt,
     const Matrix<4, 2> K = Pout * C_.transpose() * (C_ * Pout * C_.transpose() + R_).inverse();
 
     x_ = Xout + K * (y - C_ * Xout);
-    x_[StateIndexAngularPosition] = constrainAngularPosition(x_[StateIndexAngularPosition]);
+    x_[StateIndexAngularPosition] = math::normalizeAngle(x_[StateIndexAngularPosition]);
 
     P_ = (Matrix<4, 4>::Identity() - K * C_) * Pout;
 

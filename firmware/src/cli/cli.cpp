@@ -326,7 +326,7 @@ class SpinCommand : public os::shell::ICommandHandler
             prev_ts = new_ts;
 
             // Computing PWM settings
-            angle = foc::constrainAngularPosition(angle + angular_velocity * dt);
+            angle = math::normalizeAngle(angle + angular_velocity * dt);
 
             const auto inverter_voltage = board::motor::getInverterVoltage();
 
