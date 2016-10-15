@@ -33,15 +33,6 @@ namespace
 using foc::MotorParameters;
 using math::Scalar;
 
-namespace common
-{
-
-constexpr Scalar MinElectricAngVel      = 200.0F;
-constexpr Scalar CurrentRamp            = 300.0F;
-constexpr Scalar VoltageRamp            = 10.0F;
-
-}
-
 /**
  * Motor database entries go here.
  */
@@ -50,42 +41,33 @@ static const Entry g_entries[] =
     Entry("T-Motor MT2216-12", []()
     {
         MotorParameters p;
-        p.min_electrical_ang_vel  = common::MinElectricAngVel;
+        p.num_poles               = 14;
         p.max_current             = 18.0F;
-        p.current_ramp_amp_per_s  = common::CurrentRamp;
-        p.voltage_ramp_volt_per_s = common::VoltageRamp;
         p.phi                     = 1.06e-3F;
         p.rs                      = 0.11F;
         p.lq                      = 23e-6F;
-        p.num_poles               = 14;
         return p;
     }),
 
     Entry("T-Motor U8-16", []()
     {
         MotorParameters p;
-        p.min_electrical_ang_vel  = common::MinElectricAngVel;
+        p.num_poles               = 28;
         p.max_current             = 24.0F;
-        p.current_ramp_amp_per_s  = common::CurrentRamp;
-        p.voltage_ramp_volt_per_s = common::VoltageRamp;
         p.phi                     = 3.938e-3F;
         p.rs                      = 0.11F;
         p.lq                      = 78.7e-6F;
-        p.num_poles               = 28;
         return p;
     }),
 
     Entry("Maxon 339285", []()
     {
         MotorParameters p;
-        p.min_electrical_ang_vel  = common::MinElectricAngVel;
+        p.num_poles               = 16;
         p.max_current             = 3.5F;
-        p.current_ramp_amp_per_s  = common::CurrentRamp;
-        p.voltage_ramp_volt_per_s = common::VoltageRamp;
         p.phi                     = 1.814e-3F;
         p.rs                      = 0.232F;
         p.lq                      = 161e-6F;
-        p.num_poles               = 16;
         return p;
     })
 };

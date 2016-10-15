@@ -35,23 +35,71 @@ namespace foc
 /**
  * This structure entails all information about the connected load.
  * Some of these parameters can be automatically identified.
+ * Values that are initialized to zero are considered undefined by default, and should be provided by the application.
  */
 struct MotorParameters
 {
-    Scalar min_electrical_ang_vel = 0;  ///< Min electric angular velocity for stable operation, radian/second
+    /**
+     * Number of magnetic poles (not pairs!); must be a positive even number.
+     * This is a mandatory parameter.
+     */
+    std::uint_fast8_t num_poles = 0;
 
-    Scalar min_current = 0;             ///< Min phase current for stable observer operation, Ampere
-    Scalar max_current = 0;             ///< Max phase current, Ampere
-    Scalar spinup_current = 0;          ///< Initial current applied at spinup, Ampere
+    /**
+     * Max phase current, Ampere.
+     * This is a mandatory parameter.
+     */
+    Scalar max_current = 0;
 
-    Scalar current_ramp_amp_per_s = 0;  ///< Current setpoint slope, Ampere/second.
-    Scalar voltage_ramp_volt_per_s = 0; ///< Voltage setpoint slope, Volt/second.
+    /**
+     * Min phase current for stable observer operation. [ampere]
+     * If not specified, this parameter will be automatically inferred from the max current;
+     * @ref deduceMissingParameters().
+     */
+    Scalar min_current = 0;
 
-    Scalar phi = 0;                     ///< Magnetic field flux linkage, Weber
-    Scalar rs = 0;                      ///< Phase resistance (half of phase-to-phase resistance), Ohm
-    Scalar lq = 0;                      ///< Quadrature phase inductance, Henry
+    /**
+     * Initial current used during spinup. [ampere]
+     * If not specified, this parameter will be automatically inferred from the max current;
+     * @ref deduceMissingParameters().
+     */
+    Scalar spinup_current = 0;
 
-    std::uint_fast8_t num_poles = 0;    ///< Number of magnetic poles (not pairs!); must be a positive even number
+    /**
+     * Magnetic field flux linkage. [weber]
+     * This is a mandatory parameter; it can be estimated using the motor identification procedure.
+     */
+    Scalar phi = 0;
+
+    /**
+     * Phase resistance (half of phase-to-phase resistance) at the typical working temperature. [ohm]
+     * This is a mandatory parameter; it can be estimated using the motor identification procedure.
+     */
+    Scalar rs = 0;
+
+    /**
+     * Phase inductance in the quadrature axis. [henry]
+     * This is a mandatory parameter; it can be estimated using the motor identification procedure.
+     */
+    Scalar lq = 0;
+
+    /**
+     * Min electric angular velocity for stable operation. [radian/second]
+     * Default value is provided, so this parameter is optional.
+     */
+    Scalar min_electrical_ang_vel = 200;
+
+    /**
+     * Current setpoint slope. [ampere/second]
+     * Used in all control modes except voltage control.
+     */
+    Scalar current_ramp_amp_per_s = 300;
+
+    /**
+     * Voltage setpoint slope. [volt/second]
+     * Used only in voltage control modes.
+     */
+    Scalar voltage_ramp_volt_per_s = 10;
 
 
     static math::Range<> getPhiLimits()
@@ -92,20 +140,21 @@ struct MotorParameters
     {
         static const auto is_positive = [](Const x) { return (x > 0) && std::isfinite(x); };
 
-        return is_positive(min_electrical_ang_vel)      &&
-               is_positive(min_current)                 &&
-               is_positive(max_current)                 &&
-               is_positive(spinup_current)              &&
-               is_positive(current_ramp_amp_per_s)      &&
-               is_positive(voltage_ramp_volt_per_s)     &&
-               getPhiLimits().contains(phi)             &&
-               getRsLimits().contains(rs)               &&
-               getLqLimits().contains(lq)               &&
-               (num_poles >= 2)                         &&
-               (num_poles % 2 == 0)                     &&
-               (max_current > min_current)              &&
-               (max_current >= spinup_current)          &&
-               (spinup_current > min_current);
+        return
+            (num_poles >= 2)                         &&
+            (num_poles % 2 == 0)                     &&
+            is_positive(max_current)                 &&
+            is_positive(min_current)                 &&
+            is_positive(spinup_current)              &&
+            (max_current > min_current)              &&
+            (max_current >= spinup_current)          &&
+            (spinup_current > min_current)           &&
+            getPhiLimits().contains(phi)             &&
+            getRsLimits().contains(rs)               &&
+            getLqLimits().contains(lq)               &&
+            is_positive(min_electrical_ang_vel)      &&
+            is_positive(current_ramp_amp_per_s)      &&
+            is_positive(voltage_ramp_volt_per_s);
     }
 
     auto toString() const
@@ -126,29 +175,27 @@ struct MotorParameters
         }
 
         return os::heapless::String<240>(
-            "Wmin : %-7.1f rad/s, %.1f MRPM\n"
-            "Imin : %-7.1f A\n"
+            "Npols: %u\n"
             "Imax : %-7.1f A\n"
+            "Imin : %-7.1f A\n"
             "Ispup: %-7.1f A\n"
-            "Iramp: %-7.1f A/s\n"
-            "Vramp: %-7.1f V/s\n"
-            "Phi  : %-7.3f mWb\n"
+            "Phi  : %-7.3f mWb, %.1f MRPM/V\n"
             "Rs   : %-7.3f Ohm\n"
             "Lq   : %-7.3f uH\n"
-            "Npols: %u, %.1f MRPM/V\n"
+            "Wmin : %-7.1f rad/s, %.1f MRPM\n"
+            "Iramp: %-7.1f A/s\n"
+            "Vramp: %-7.1f V/s\n"
             "Valid: %s").format(
-            double(min_electrical_ang_vel),
-            double(min_mrpm),
-            double(min_current),
+            unsigned(num_poles),
             double(max_current),
+            double(min_current),
             double(spinup_current),
-            double(current_ramp_amp_per_s),
-            double(voltage_ramp_volt_per_s),
-            double(phi) * 1e3,
+            double(phi) * 1e3, double(kv),
             double(rs),
             double(lq) * 1e6,
-            unsigned(num_poles),
-            double(kv),
+            double(min_electrical_ang_vel), double(min_mrpm),
+            double(current_ramp_amp_per_s),
+            double(voltage_ramp_volt_per_s),
             isValid() ? "YES" : "NO");
     }
 };
