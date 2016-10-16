@@ -489,8 +489,12 @@ int main()
         watchdog.reset();
 
         config_manager.poll();
-        if (config_manager.hasBeenReloaded() ||
-            config_manager.hasBeenSaved())
+        if (config_manager.hasBeenSaved())
+        {
+            uavcan_node::log(uavcan_node::LogLevel::INFO, app::g_logger.getName(), "Config Saved");
+            led_indicator.flash();
+        }
+        if (config_manager.hasBeenReloaded())
         {
             led_indicator.flash();
         }
