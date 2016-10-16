@@ -58,7 +58,7 @@ static_assert(FirstRatiometricControlMode < LastRatiometricControlMode,
  * At the time of writing this I am not yet sure about whether it will fit the design well, so we may need
  * to refactor it later.
  */
-class CurrentSetpointController
+class SetpointController
 {
     Const max_current_;
     Const min_current_;
@@ -67,11 +67,11 @@ class CurrentSetpointController
     Const voltage_ramp_volt_s_;
 
 public:
-    CurrentSetpointController(Const max_current,
-                              Const min_current,
-                              Const min_voltage,
-                              Const current_ramp_amp_s,
-                              Const voltage_ramp_volt_s) :
+    SetpointController(Const max_current,
+                       Const min_current,
+                       Const min_voltage,
+                       Const current_ramp_amp_s,
+                       Const voltage_ramp_volt_s) :
         max_current_(max_current),
         min_current_(min_current),
         min_voltage_(min_voltage),

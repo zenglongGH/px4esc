@@ -26,7 +26,7 @@
 
 #include "motor_parameters.hpp"
 #include "motor_id/estimator.hpp"
-#include "current_setpoint_controller.hpp"
+#include "setpoint_controller.hpp"
 #include "hardware_tester.hpp"
 #include "observer.hpp"
 #include <math/math.hpp>
