@@ -25,7 +25,7 @@
 #pragma once
 
 #include "motor_parameters.hpp"
-#include "motor_parameters_estimator.hpp"
+#include "motor_id/estimator.hpp"
 #include "current_setpoint_controller.hpp"
 #include "hardware_tester.hpp"
 #include "observer.hpp"
@@ -36,6 +36,9 @@
 
 namespace foc
 {
+
+using MotorIdentificationMode = motor_id::Mode;
+
 /**
  * General parameters not pertaining to the observer or the motor.
  */
@@ -48,7 +51,7 @@ struct ControllerParameters
     std::uint32_t num_stalls_to_latch = 100;
 
     /// Refer to the definition for details
-    MotorIdentificationParameters motor_id;
+    motor_id::Parameters motor_id;
 
 
     bool isValid() const
@@ -107,7 +110,7 @@ ObserverParameters getObserverParameters();
  * Completion of the process can be detected by means of monitoring the current state of the controller, see @ref State.
  * The identified parameters can be read via @ref getMotorParameters().
  */
-void beginMotorIdentification(MotorIdentificationMode mode);
+void beginMotorIdentification(motor_id::Mode mode);
 
 /**
  * Begins the asynchronous process of hardware testing.

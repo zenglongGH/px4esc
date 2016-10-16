@@ -71,7 +71,7 @@ volatile std::uint32_t g_num_successive_rotor_stalls = 0;
 
 board::motor::PWMHandle g_pwm_handle;
 
-MotorIdentificationMode g_requested_motor_identification_mode;
+motor_id::Mode g_requested_motor_identification_mode;
 
 HardwareTester::TestReport g_last_hardware_test_report;
 
@@ -332,7 +332,7 @@ ObserverParameters getObserverParameters()
 }
 
 
-void beginMotorIdentification(MotorIdentificationMode mode)
+void beginMotorIdentification(motor_id::Mode mode)
 {
     AbsoluteCriticalSectionLocker locker;
 
@@ -896,23 +896,23 @@ void handleFastIRQ(Const period,
      * Motor identification
      */
     {
-        static MotorParametersEstimator* estimator = nullptr;
+        static motor_id::Estimator* estimator = nullptr;
 
         if (g_state == State::MotorIdentification)
         {
-            alignas(16) static std::uint8_t estimator_storage[sizeof(MotorParametersEstimator)];
+            alignas(16) static std::uint8_t estimator_storage[sizeof(motor_id::Estimator)];
 
             if (estimator == nullptr)
             {
                 board::motor::beginCalibration();
 
                 estimator = new (estimator_storage)
-                    MotorParametersEstimator(g_requested_motor_identification_mode,
-                                             g_motor_params,
-                                             g_controller_params.motor_id,
-                                             period,
-                                             board::motor::getPWMDeadTime(),
-                                             board::motor::getPWMUpperLimit());
+                    motor_id::Estimator(g_requested_motor_identification_mode,
+                                        g_motor_params,
+                                        g_controller_params.motor_id,
+                                        period,
+                                        board::motor::getPWMDeadTime(),
+                                        board::motor::getPWMUpperLimit());
             }
 
             const auto hw_status = board::motor::getStatus();
@@ -969,7 +969,7 @@ void handleFastIRQ(Const period,
         {
             if (estimator != nullptr)
             {
-                estimator->~MotorParametersEstimator();
+                estimator->~Estimator();
                 estimator = nullptr;
             }
         }
