@@ -76,7 +76,7 @@ class Estimator
     bool finished_ = false;
     unsigned current_task_index_ = 0;
     ITask* current_task_ = nullptr;
-    void (Estimator::* const* current_task_chain_)() = nullptr;
+    void (Estimator::* const* const current_task_chain_)();
 
     alignas(32) std::uint8_t vinnie_the_pool_[std::max({
         sizeof(ResistanceTask),
@@ -161,8 +161,14 @@ public:
         context_.pwm_output_vector = Vector<3>::Zero(); // Default
         context_.pwm_period_counter++;
 
+        if (finished_)
+        {
+            return context_.pwm_output_vector;
+        }
+
         if (current_task_ == nullptr)
         {
+            IRQDebugOutputBuffer::setVariableFromIRQ<4>(current_task_index_);
             const auto constructor = current_task_chain_[current_task_index_++];
             if (constructor == nullptr)
             {
@@ -183,6 +189,7 @@ public:
                 result_ = current_task_->getEstimatedMotorParameters();
 
                 destroyCurrentTask();
+                IRQDebugOutputBuffer::setVariableFromIRQ<3>(status);
 
                 if (status == ITask::Status::Failed)
                 {
