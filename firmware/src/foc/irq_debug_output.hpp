@@ -33,8 +33,10 @@ namespace foc
 
 class IRQDebugOutputBuffer
 {
+public:
     static constexpr unsigned NumVariables = 5;
 
+private:
     std::array<Scalar, NumVariables> vars_{};
     std::array<bool, NumVariables> update_flags_{};
 

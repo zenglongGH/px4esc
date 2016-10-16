@@ -89,12 +89,23 @@ public:
                   Modulator::CrossCouplingCompensationPolicy::Disabled)
     {
        result_.lq = 0;
-       assert(result_.getRsLimits().contains(result_.rs));
+
+       if (!context_.params.isValid() ||
+           !result_.getRsLimits().contains(result_.rs) ||
+           !os::float_eq::positive(result_.max_current))
+       {
+           status_ = Status::Failed;
+       }
     }
 
     void onNextPWMPeriod(const Vector<2>& phase_currents_ab,
                          Const inverter_voltage) override
     {
+        if (status_ != Status::InProgress)
+        {
+            return;
+        }
+
         if (started_at_ < 0)
         {
             started_at_ = context_.getTime();
@@ -122,6 +133,7 @@ public:
             context_.setDebugVariable(1, output.reference_Udq[1]);
             context_.setDebugVariable(2, output.estimated_Idq[0]);
             context_.setDebugVariable(3, output.estimated_Idq[1]);
+            context_.setDebugVariable(4, modulator_.getUdqNormalizationCounter().get());
 
             // TODO: Compensation disabled, since it yields lower values than expected
             Const dead_time_compensation_mult = 1.0F;

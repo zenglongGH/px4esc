@@ -35,10 +35,7 @@ namespace foc
 namespace motor_id
 {
 /**
- * Magical and hard-to-use class that estimates parameters of a given motor, such as magnetic flux and inductance.
- * The business logic of this class outstretches its tentacles of dependency to a lot of other stuff,
- * so it's really hard to encapsulate it cleanly. Or maybe I'm just a shitty architect, you never know.
- *
+ * Motor identification logic.
  * Refer to the Dmitry's doc for derivations and explanation of what's going on here.
  */
 class Estimator
@@ -82,7 +79,7 @@ class Estimator
         sizeof(ResistanceTask),
         sizeof(InductanceTask),
         sizeof(MagneticFluxTask)
-    })];
+    })]{};
 
     void destroyCurrentTask()
     {
@@ -98,6 +95,7 @@ class Estimator
     {
         static_assert(sizeof(Task) <= sizeof(vinnie_the_pool_), "Vinnie the Pool is not large enough :(");
         destroyCurrentTask();
+        std::fill(std::begin(vinnie_the_pool_), std::end(vinnie_the_pool_), 0);
         current_task_ = new (vinnie_the_pool_) Task(context_, result_);
     }
 
@@ -168,14 +166,28 @@ public:
 
         if (current_task_ == nullptr)
         {
-            IRQDebugOutputBuffer::setVariableFromIRQ<4>(current_task_index_);
-            const auto constructor = current_task_chain_[current_task_index_++];
+            // Making sure the parameters are sane
+            if (!context_.params.isValid())
+            {
+                finished_ = true;
+                result_ = MotorParameters();
+                return context_.pwm_output_vector;
+            }
+
+            // Overwriting all variables in order to remove old values and indicate that the state has been switched
+            for (unsigned i = 0; i < IRQDebugOutputBuffer::NumVariables; i++)
+            {
+                IRQDebugOutputBuffer::setVariableFromIRQ(i, current_task_index_);
+            }
+
+            const auto constructor = current_task_chain_[current_task_index_];
             if (constructor == nullptr)
             {
                 finished_ = true;
             }
             else
             {
+                current_task_index_++;
                 (this->*constructor)();
             }
         }
@@ -189,7 +201,6 @@ public:
                 result_ = current_task_->getEstimatedMotorParameters();
 
                 destroyCurrentTask();
-                IRQDebugOutputBuffer::setVariableFromIRQ<3>(status);
 
                 if (status == ITask::Status::Failed)
                 {

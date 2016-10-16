@@ -114,9 +114,16 @@ public:
                    const MotorParameters& initial_parameters) :
         context_(context),
         result_(initial_parameters),
-        estimation_current_(initial_parameters.max_current * context.params.fraction_of_max_current)
+        estimation_current_(initial_parameters.max_current * context.params.fraction_of_max_current),
+        currents_filter_(Vector<2>::Zero())
     {
         result_.rs = 0;
+
+        if (!context_.params.isValid() ||
+            !os::float_eq::positive(result_.max_current))
+        {
+            state_ = State::Failed;
+        }
     }
 
     void onNextPWMPeriod(const Vector<2>& phase_currents_ab,

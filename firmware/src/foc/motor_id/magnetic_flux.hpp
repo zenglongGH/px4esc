@@ -80,14 +80,29 @@ public:
                    context.pwm_upper_limit,
                    Modulator::DeadTimeCompensationPolicy::Disabled,
                    Modulator::CrossCouplingCompensationPolicy::Disabled),
+        currents_filter_(Vector<2>::Zero()),
+        voltage_filter_(Vector<2>::Zero()),
         Uq_(initial_Uq_)
     {
         result_.phi = 0;
+
+        if (!context_.params.isValid() ||
+            !result_.getRsLimits().contains(result_.rs) ||
+            !result_.getLqLimits().contains(result_.lq) ||
+            !os::float_eq::positive(result_.max_current))
+        {
+            status_ = Status::Failed;
+        }
     }
 
     void onNextPWMPeriod(const Vector<2>& phase_currents_ab,
                          Const inverter_voltage) override
     {
+        if (status_ != Status::InProgress)
+        {
+            return;
+        }
+
         if (started_at_ < 0)
         {
             started_at_ = context_.getTime();
@@ -112,7 +127,7 @@ public:
                                                         angular_position_,
                                                         setpoint);
             context_.setPWM(out.pwm_setpoint);
-            angular_velocity_ = out.extrapolated_angular_position;
+            angular_position_ = out.extrapolated_angular_position;
 
             // Current filter update
             currents_filter_.update(out.estimated_Idq);
@@ -193,6 +208,15 @@ public:
                 status_ = Status::Failed;
             }
         }
+
+        /*
+         * Debug outputs
+         */
+        context_.setDebugVariable(0, angular_velocity_);
+        context_.setDebugVariable(1, Uq_);
+        context_.setDebugVariable(2, I_);
+        context_.setDebugVariable(3, U_);
+        context_.setDebugVariable(4, phi_ * 1e3F);
     }
 
     Status getStatus() const override { return status_; }
