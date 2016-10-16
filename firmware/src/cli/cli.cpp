@@ -568,42 +568,60 @@ class MotorIdentificationCommand : public os::shell::ICommandHandler
         if (foc::getState() != foc::State::Idle &&
             foc::getState() != foc::State::Fault)
         {
-            ios.print("ERROR: Invalid state\n");
+            ios.puts("ERROR: Invalid state");
             return;
+        }
+
+        ios.puts("PRESS ANY KEY TO ABORT");
+
+        while (ios.getChar(1) > 0)
+        {
+            ;   // Clearing the input buffer
         }
 
         foc::beginMotorIdentification(mode);
 
-        if (do_plot)
+        bool aborted = false;
+
+        while (foc::getState() == foc::State::MotorIdentification)
         {
-            while (foc::getState() == foc::State::MotorIdentification)
+            if (do_plot)
             {
                 foc::plotRealTimeValues();
             }
-            foc::plotRealTimeValues();
-        }
-        else
-        {
-            while (foc::getState() == foc::State::MotorIdentification)
+            else
             {
                 ios.putChar('.');
-                ::sleep(1);
             }
-            ios.puts(" Done.");
+
+            if (ios.getChar(do_plot ? 0 : 1000) > 0)
+            {
+                foc::stop();
+                aborted = true;
+            }
         }
 
         // Handling the result
-        const auto params = foc::getMotorParameters();
-        ios.puts(params.toString().c_str());
-
-        if (params.isValid())
+        if (aborted)
         {
-            ios.puts("Overwriting custom motor params with identified values");
-            params::writeMotorParameters(params);
+            ios.puts("ABORTED");
         }
         else
         {
-            ios.puts("Params are incomplete or identification failed, custom params are left unchanged");
+            ios.puts("Done");
+
+            const auto params = foc::getMotorParameters();
+            ios.puts(params.toString().c_str());
+
+            if (params.isValid())
+            {
+                ios.puts("Overwriting custom motor params with identified values");
+                params::writeMotorParameters(params);
+            }
+            else
+            {
+                ios.puts("Params are incomplete or identification failed, custom params are left unchanged");
+            }
         }
     }
 } static cmd_motor_identification;

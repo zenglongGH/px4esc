@@ -423,6 +423,11 @@ void stop()
     g_setpoint = 0;
     g_setpoint_remaining_ttl = 0;
     g_num_successive_rotor_stalls = 0;
+
+    if (g_state == State::MotorIdentification)
+    {
+        g_state = State::Fault;     // Will switch back to Idle later from IRQ
+    }
 }
 
 
