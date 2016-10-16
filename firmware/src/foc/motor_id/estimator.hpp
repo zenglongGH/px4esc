@@ -61,9 +61,11 @@ class Estimator
             pwm_output_vector = pwm;
         }
 
-        void setDebugVariable(unsigned index, Const value) override
+        void reportDebugVariables(const std::initializer_list<Scalar>& variables) override
         {
-            debug_values_.at(index) = value;
+            std::copy_n(variables.begin(),
+                        std::min(variables.size(), debug_values_.size()),
+                        debug_values_.begin());
         }
 
         Scalar getTime() const override { return Scalar(pwm_period_counter) * pwm_period; }

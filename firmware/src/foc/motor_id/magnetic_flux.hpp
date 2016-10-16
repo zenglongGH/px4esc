@@ -212,11 +212,13 @@ public:
         /*
          * Debug outputs
          */
-        context_.setDebugVariable(0, angular_velocity_);
-        context_.setDebugVariable(1, Uq_);
-        context_.setDebugVariable(2, I_);
-        context_.setDebugVariable(3, U_);
-        context_.setDebugVariable(4, phi_ * 1e3F);
+        context_.reportDebugVariables({
+            angular_velocity_,
+            Uq_,
+            I_,
+            U_,
+            phi_ * 1e3F
+        });
     }
 
     Status getStatus() const override { return status_; }

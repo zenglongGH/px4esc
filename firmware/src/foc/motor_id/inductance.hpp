@@ -128,12 +128,13 @@ public:
             angular_position_ = output.extrapolated_angular_position;
             context_.setPWM(output.pwm_setpoint);
 
-            // Debug output
-            context_.setDebugVariable(0, output.reference_Udq[0]);
-            context_.setDebugVariable(1, output.reference_Udq[1]);
-            context_.setDebugVariable(2, output.estimated_Idq[0]);
-            context_.setDebugVariable(3, output.estimated_Idq[1]);
-            context_.setDebugVariable(4, modulator_.getUdqNormalizationCounter().get());
+            context_.reportDebugVariables({
+                output.reference_Udq[0],
+                output.reference_Udq[1],
+                output.estimated_Idq[0],
+                output.estimated_Idq[1],
+                Scalar(modulator_.getUdqNormalizationCounter().get())
+            });
 
             // TODO: Compensation disabled, since it yields lower values than expected
             Const dead_time_compensation_mult = 1.0F;

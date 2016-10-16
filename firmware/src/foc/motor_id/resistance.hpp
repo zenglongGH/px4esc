@@ -130,13 +130,11 @@ public:
                          Const inverter_voltage) override
     {
         currents_filter_.update(phase_currents_ab);
-
         const auto filtered_currents = currents_filter_.getValue();
-
-        for (unsigned i = 0; i < 2; i++)
-        {
-            context_.setDebugVariable(i, filtered_currents[i]);
-        }
+        context_.reportDebugVariables({
+            filtered_currents[0],
+            filtered_currents[1]
+        });
 
         switch (state_)
         {
