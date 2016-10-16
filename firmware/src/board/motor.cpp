@@ -90,8 +90,11 @@ volatile std::uint32_t g_canary_d = CanaryValue;
 /*
  * Configuration parameters
  */
-os::config::Param<float> g_config_pwm_frequency_khz             ("drv.pwm_freq_khz",    60.0F,     50.0F,     80.0F);
-os::config::Param<float> g_config_pwm_dead_time_nsec            ("drv.pwm_deadt_ns",   200.0F,     50.0F,    900.0F);
+constexpr math::Range<> PWMFrequencyRangeKHz(40.0F,  80.0F);
+constexpr math::Range<> PWMDeadTimeRangeNSec(50.0F, 500.0F);
+
+os::config::Param<float> g_config_pwm_frequency_khz ("drv.pwm_freq_khz", 0.0F, 0.0F, PWMFrequencyRangeKHz.max);
+os::config::Param<float> g_config_pwm_dead_time_nsec("drv.pwm_deadt_ns", 0.0F, 0.0F, PWMDeadTimeRangeNSec.max);
 
 /*
  * Current state variables
@@ -489,6 +492,23 @@ void init()
     g_board_features = &board_features;
 
     g_logger.println("Detected board: %s", g_board_features->getBoardName());
+
+    /*
+     * Initializing defaults if needed, and constraining the values of configuration parameters
+     */
+    if (!os::float_eq::positive(g_config_pwm_frequency_khz.get()))
+    {
+        g_config_pwm_frequency_khz.set(g_board_features->getDefaultSettings().pwm_frequency * 1e-3F);
+        assert(PWMFrequencyRangeKHz.contains(g_config_pwm_frequency_khz.get()));
+    }
+    g_config_pwm_frequency_khz.set(PWMFrequencyRangeKHz.constrain(g_config_pwm_frequency_khz.get()));
+
+    if (!os::float_eq::positive(g_config_pwm_dead_time_nsec.get()))
+    {
+        g_config_pwm_dead_time_nsec.set(g_board_features->getDefaultSettings().pwm_dead_time * 1e9F);
+        assert(PWMDeadTimeRangeNSec.contains(g_config_pwm_dead_time_nsec.get()));
+    }
+    g_config_pwm_dead_time_nsec.set(PWMDeadTimeRangeNSec.constrain(g_config_pwm_dead_time_nsec.get()));
 
     /*
      * Initializing the MCU peripherals.

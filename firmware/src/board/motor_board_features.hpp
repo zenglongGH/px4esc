@@ -82,11 +82,21 @@ class BoardFeatures final
     struct BoardConfig
     {
         const char* name = "<UNKNOWN>";
+
         float inverter_voltage_gain = 0.0F;
+
         float current_shunt_resistance = 0.0F;
         std::array<float, 2> current_amplifier_low_high_gains{};
+
         std::function<float (float)> temperature_transfer_function = [](float) { return 0; };
+
         Limits limits;
+
+        struct DefaultSettings
+        {
+            float pwm_frequency = 0;
+            float pwm_dead_time = 0;
+        } default_settings;
     };
 
     // Board-dependent constants
@@ -139,7 +149,11 @@ class BoardFeatures final
                 1 * 1e-3F,
                 { 10.0F, 40.0F },
                 temp_tf_MCP9700,
-                lim
+                lim,
+                {
+                    50e3F,
+                    200e-9F
+                }
             };
         }
 
@@ -161,6 +175,8 @@ public:
     const char* getBoardName() const { return board_config_.name; }
 
     const Limits& getLimits() const { return board_config_.limits; }
+
+    const BoardConfig::DefaultSettings& getDefaultSettings() const { return board_config_.default_settings; }
 
     float convertADCVoltageToInverterVoltage(float voltage) const
     {
