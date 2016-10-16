@@ -28,6 +28,7 @@
 #include <motor_database/motor_database.hpp>
 #include <unistd.h>
 #include <foc/foc.hpp>
+#include <uavcan_node/uavcan_node.hpp>
 
 
 namespace aux_cmd_iface
@@ -64,11 +65,16 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
         watchdog_.reset();
     }
 
+    template <typename... Args>
+    void log(decltype(uavcan_node::LogLevel::INFO) level, const char* format, Args... args) const
+    {
+        uavcan_node::log(level, g_logger.getName(), format, args...);
+    }
+
     void doLoadMotorParams(unsigned db_index) const
     {
         const auto entry = motor_database::getByIndex(db_index);
-        g_logger.println("Overwriting motor params from the selected Motor DB entry %u '%s'...",
-                         db_index, entry.name.c_str());
+        log(uavcan_node::LogLevel::INFO, "MotorDB selected '%s'", entry.name.c_str());
 
         params::writeMotorParameters(entry.parameters);
     }
@@ -80,7 +86,9 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
         {
             waitFor(0.01F);
         }
-        g_logger.println("HW test result: %s", foc::getLastHardwareTestReport().toString().c_str());
+        const auto report = foc::getLastHardwareTestReport();
+        log(report.isSuccessful() ? uavcan_node::LogLevel::INFO : uavcan_node::LogLevel::WARNING,
+            "HW test result: %s", report.toString().c_str());
     }
 
     void doMotorID(foc::MotorIdentificationMode mode) const

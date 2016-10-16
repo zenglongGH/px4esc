@@ -33,6 +33,9 @@
 
 namespace uavcan_node
 {
+
+using uavcan::protocol::debug::LogLevel;
+
 /**
  * Refer to @ref setNodeHealth().
  */
@@ -101,6 +104,25 @@ void init(std::uint32_t bit_rate_hint,
 void setNodeHealth(NodeHealth ns);
 void setNodeMode(NodeMode mode);
 void setVendorSpecificNodeStatusCode(std::uint16_t value);
+
+/**
+ * Emits a UAVCAN log message to the bus.
+ */
+void log(const uavcan::StorageType<LogLevel::FieldTypes::value>::Type level,
+         const char* const source,
+         const char* const text);
+
+template <typename... Args>
+inline void log(const uavcan::StorageType<LogLevel::FieldTypes::value>::Type level,
+                const char* const source,
+                const char* const format,
+                const Args... args)
+{
+    uavcan::protocol::debug::LogMessage::FieldTypes::text text;
+    uavcan::CharArrayFormatter<typename uavcan::protocol::debug::LogMessage::FieldTypes::text> formatter(text);
+    formatter.write(format, args...);
+    log(level, source, text.c_str());
+}
 
 /**
  * Returns current node ID (possibly invalid if it is not yet known).

@@ -82,6 +82,40 @@ RebootRequestCallback g_on_reboot_requested;
 
 os::Logger g_logger("UAVCAN");
 
+/// An experiment in minimalism.
+class LogMessageQueue
+{
+    chibios_rt::Mutex mutex_;
+    std::array<std::pair<bool, uavcan::protocol::debug::LogMessage>, 2> buffer_{};
+    bool write_pos_ = false;
+
+public:
+    void push(const uavcan::protocol::debug::LogMessage& msg)
+    {
+        os::MutexLocker locker(mutex_);
+        buffer_[int(write_pos_)] = {true, msg};
+        write_pos_ = !write_pos_;
+    }
+
+    bool pop(uavcan::protocol::debug::LogMessage& out_msg)
+    {
+        if (std::any_of(buffer_.begin(), buffer_.end(), [](auto& x) { return x.first; }))
+        {
+            os::MutexLocker locker(mutex_);
+            for (auto& x : buffer_)
+            {
+                if (x.first)
+                {
+                    x.first = false;
+                    out_msg = x.second;
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+} g_log_message_queue_;
+
 /**
  * Implementation details.
  * Functions that return references to statics are designed this way as means to implement late initialization.
@@ -260,6 +294,20 @@ void handleBeginFirmwareUpdateRequest(
 }
 
 /**
+ * Log sink that prints to the system log.
+ */
+class LogSink : public uavcan::ILogSink
+{
+    void log(const uavcan::protocol::debug::LogMessage& message) override
+    {
+        g_logger.println("LogSink: [%u] %s: %s",
+                         message.level.value,
+                         message.source.c_str(),
+                         message.text.c_str());
+    }
+} g_log_sink;
+
+/**
  * Node thread.
  */
 class NodeThread : public chibios_rt::BaseStaticThread<4096>
@@ -385,6 +433,9 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
             getNode().setHardwareVersion(hwver);
         }
 
+        getNode().getLogger().setExternalSink(&g_log_sink);
+        getNode().getLogger().setLevel(LogLevel::INFO);
+
         /*
          * Starting the node
          */
@@ -498,6 +549,16 @@ class NodeThread : public chibios_rt::BaseStaticThread<4096>
             }
 
             pollCommandFlags();
+
+            uavcan::protocol::debug::LogMessage log_message;
+            if (g_log_message_queue_.pop(log_message))
+            {
+                const int result = getNode().getLogger().log(log_message);
+                if (result < 0)
+                {
+                    g_logger.println("Log: %d", result);
+                }
+            }
         }
 
         g_logger.puts("Goodbye");
@@ -576,6 +637,17 @@ void setNodeMode(NodeMode mode)
 void setVendorSpecificNodeStatusCode(std::uint16_t value)
 {
     g_vendor_specific_status = value;
+}
+
+void log(const uavcan::StorageType<LogLevel::FieldTypes::value>::Type level,
+         const char* const source,
+         const char* const text)
+{
+    uavcan::protocol::debug::LogMessage msg;
+    msg.level.value = level;
+    msg.source = source;
+    msg.text   = text;
+    g_log_message_queue_.push(msg);
 }
 
 uavcan::NodeID getNodeID()
