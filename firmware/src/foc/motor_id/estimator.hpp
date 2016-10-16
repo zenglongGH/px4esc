@@ -107,7 +107,7 @@ class Estimator
         {
         case Mode::Static:
         {
-            static constexpr void (Estimator::* chain[3])() = {
+            static constexpr void (Estimator::* chain[])() = {
                 &Estimator::switchTask<ResistanceTask>,
                 &Estimator::switchTask<InductanceTask>,
                 nullptr
@@ -116,7 +116,7 @@ class Estimator
         }
         case Mode::RotationWithoutMechanicalLoad:
         {
-            static constexpr void (Estimator::* chain[4])() = {
+            static constexpr void (Estimator::* chain[])() = {
                 &Estimator::switchTask<ResistanceTask>,
                 &Estimator::switchTask<InductanceTask>,
                 &Estimator::switchTask<MagneticFluxTask>,
