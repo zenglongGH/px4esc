@@ -99,11 +99,7 @@ os::config::Param<float> g_config_pwm_dead_time_nsec("drv.pwm_deadt_ns", 0.0F, 0
 /*
  * Current state variables
  */
-float g_pwm_period;
-
-float g_dead_time;
-
-float g_pwm_upper_limit;
+PWMParameters g_pwm_params;
 
 unsigned g_fast_irq_to_main_irq_period_ratio;
 
@@ -517,15 +513,15 @@ void init()
     initPWM(double(g_config_pwm_frequency_khz.get()) * 1e3,
             double(g_config_pwm_dead_time_nsec.get()) * 1e-9);
 
-    g_pwm_period = float(double((TIM1->ARR + 1U) * 2U) / double(TIM1ClockFrequency));
+    g_pwm_params.period = float(double((TIM1->ARR + 1U) * 2U) / double(TIM1ClockFrequency));
 
-    g_dead_time = float(double(TIM1->BDTR & 0xFFU) / double(TIM1ClockFrequency));
+    g_pwm_params.dead_time = float(double(TIM1->BDTR & 0xFFU) / double(TIM1ClockFrequency));
 
     // TODO FIXME Derive properly from ADC sampling times
     const float adc_sampling_window = 3e-6F;
-    g_pwm_upper_limit = 1.0F - (adc_sampling_window + g_dead_time) / g_pwm_period;
+    g_pwm_params.upper_limit = 1.0F - (adc_sampling_window + g_pwm_params.dead_time) / g_pwm_params.period;
 
-    g_fast_irq_to_main_irq_period_ratio = unsigned(std::ceil(MainIRQMinPeriod / g_pwm_period) + 0.4F);
+    g_fast_irq_to_main_irq_period_ratio = unsigned(std::ceil(MainIRQMinPeriod / g_pwm_params.period) + 0.4F);
 
     initADC();
 
@@ -539,10 +535,10 @@ void init()
     }
 
     g_logger.println("Fast IRQ period: %g us, Main IRQ period: %g us, ratio %u; PWM limit: %0.3f",
-                     double(g_pwm_period) * 1e6,
-                     double(g_pwm_period) * double(g_fast_irq_to_main_irq_period_ratio) * 1e6,
+                     double(g_pwm_params.period) * 1e6,
+                     double(g_pwm_params.period) * double(g_fast_irq_to_main_irq_period_ratio) * 1e6,
                      g_fast_irq_to_main_irq_period_ratio,
-                     double(g_pwm_upper_limit));
+                     double(g_pwm_params.upper_limit));
 }
 
 /*
@@ -621,19 +617,9 @@ bool isCalibrationInProgress()
     return g_board_features->isCalibrationInProgress();
 }
 
-float getPWMPeriod()
+PWMParameters getPWMParameters()
 {
-    return g_pwm_period;
-}
-
-float getPWMDeadTime()
-{
-    return g_dead_time;
-}
-
-float getPWMUpperLimit()
-{
-    return g_pwm_upper_limit;
+    return g_pwm_params;
 }
 
 float getInverterVoltage()
@@ -764,7 +750,7 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
         g_inverter_voltage += InverterVoltageInnovationWeight * (new_inverter_voltage - g_inverter_voltage);
     }
 
-    handleFastIRQ(g_pwm_period,
+    handleFastIRQ(g_pwm_params.period,
                   phase_currents,
                   g_inverter_voltage);
 
@@ -773,11 +759,11 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
      */
     if (g_board_features->isCalibrationInProgress())
     {
-        g_board_features->processCalibration(g_pwm_period, phase_currents_adc_voltages);
+        g_board_features->processCalibration(g_pwm_params.period, phase_currents_adc_voltages);
     }
     else
     {
-        g_board_features->adjustCurrentGain(g_pwm_period, phase_currents);
+        g_board_features->adjustCurrentGain(g_pwm_params.period, phase_currents);
     }
 
     /*
@@ -821,7 +807,7 @@ CH_FAST_IRQ_HANDLER(STM32_TIM8_CC_HANDLER)
 
     board::RAIIToggler<board::setTestPointA> tp_toggler;
 
-    handleMainIRQ(g_pwm_period * float(g_fast_irq_to_main_irq_period_ratio));
+    handleMainIRQ(g_pwm_params.period * float(g_fast_irq_to_main_irq_period_ratio));
 
     /*
      * Temperature processing.

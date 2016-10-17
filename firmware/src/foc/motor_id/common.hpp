@@ -101,20 +101,13 @@ struct Context
 {
     const Parameters params;
 
-    Const pwm_period;           ///< Seconds
-    Const pwm_dead_time;        ///< Seconds
-    Const pwm_upper_limit;
+    const board::motor::PWMParameters pwm_params;
 
     Context(const Parameters& config,
-            Const pwm_period,
-            Const pwm_dead_time,
-            Const pwm_upper_limit) :
+            const board::motor::PWMParameters& pwm_params) :
         params(config),
-        pwm_period(pwm_period),
-        pwm_dead_time(pwm_dead_time),
-        pwm_upper_limit(pwm_upper_limit)
+        pwm_params(pwm_params)
     { }
-
 
     virtual ~Context() { }
 

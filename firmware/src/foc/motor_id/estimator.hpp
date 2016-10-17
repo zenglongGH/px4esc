@@ -47,13 +47,9 @@ class Estimator
         std::array<Scalar, 7> debug_values_{};
 
         ContextImplementation(const Parameters& config,
-                              Const pwm_period,
-                              Const pwm_dead_time,
-                              Const pwm_upper_limit) :
+                              const board::motor::PWMParameters& pwm_params) :
             Context(config,
-                    pwm_period,
-                    pwm_dead_time,
-                    pwm_upper_limit)
+                    pwm_params)
         { }
 
         void setPWM(const Vector<3>& pwm) override
@@ -73,7 +69,7 @@ class Estimator
         Scalar getTime() const override
         {
             // Locking is not necessary because the read is atomic
-            return Scalar(pwm_period_counter) * pwm_period;
+            return Scalar(pwm_period_counter) * pwm_params.period;
         }
     } context_;
 
@@ -139,13 +135,9 @@ public:
     Estimator(Mode mode,
               const MotorParameters& initial_parameters,
               const Parameters& config,
-              Const pwm_period,
-              Const pwm_dead_time,
-              Const pwm_upper_limit) :
+              const board::motor::PWMParameters& pwm_params) :
         context_(config,
-                 pwm_period,
-                 pwm_dead_time,
-                 pwm_upper_limit),
+                 pwm_params),
         result_(initial_parameters),
         task_chain_(selectTaskChain(mode))
     {

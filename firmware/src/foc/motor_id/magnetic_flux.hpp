@@ -75,9 +75,7 @@ public:
         modulator_(result_.lq,
                    result_.rs,
                    result_.max_current,
-                   context.pwm_period,
-                   context.pwm_dead_time,
-                   context.pwm_upper_limit,
+                   context.pwm_params,
                    Modulator::DeadTimeCompensationPolicy::Disabled,
                    Modulator::CrossCouplingCompensationPolicy::Disabled),
         currents_filter_(Vector<2>::Zero()),
@@ -120,7 +118,7 @@ public:
             started_at_ = context_.getTime();
         }
 
-        Const low_pass_filter_innovation = context_.pwm_period * 10.0F;
+        Const low_pass_filter_innovation = context_.pwm_params.period * 10.0F;
 
         Const prev_I = I_;
 
@@ -165,7 +163,7 @@ public:
             // Acceleration
             angular_velocity_ +=
                 (context_.params.phi_estimation_electrical_angular_velocity / (VoltageSlopeLengthSec / 2.0F)) *
-                context_.pwm_period;
+                context_.pwm_params.period;
         }
         else
         {
@@ -196,7 +194,7 @@ public:
 
             if (result_.phi >= 0.0F)
             {
-                Const dIdt = (I_ - prev_I) / context_.pwm_period;
+                Const dIdt = (I_ - prev_I) / context_.pwm_params.period;
 
                 // TODO: we could automatically learn the worst case di/dt after the acceleration phase?
                 // 2 - triggers false positive
@@ -211,7 +209,7 @@ public:
                 else
                 {
                     // Minimum is not reached yet, continuing to reduce voltage
-                    Uq_ -= (initial_Uq_ / VoltageSlopeLengthSec) * context_.pwm_period;
+                    Uq_ -= (initial_Uq_ / VoltageSlopeLengthSec) * context_.pwm_params.period;
                 }
             }
             else

@@ -102,9 +102,7 @@ private:
     const DeadTimeCompensationPolicy dead_time_compensation_policy_;
     const CrossCouplingCompensationPolicy cross_coupling_compensation_policy_;
 
-    Const pwm_period_;
-    Const pwm_dead_time_;
-    Const pwm_upper_limit_;
+    board::motor::PWMParameters pwm_params_;
 
     Const Lq_;
 
@@ -139,19 +137,15 @@ public:
     ThreePhaseVoltageModulator(Const Lq,
                                Const Rs,
                                Const max_current,
-                               Const pwm_period,
-                               Const pwm_dead_time,
-                               Const pwm_upper_limit,
+                               const board::motor::PWMParameters& pwm_params,
                                const DeadTimeCompensationPolicy dtcomp_policy,
                                const CrossCouplingCompensationPolicy cccomp_policy) :
         dead_time_compensation_policy_(dtcomp_policy),
         cross_coupling_compensation_policy_(cccomp_policy),
-        pwm_period_(pwm_period),
-        pwm_dead_time_(pwm_dead_time),
-        pwm_upper_limit_(pwm_upper_limit),
+        pwm_params_(pwm_params),
         Lq_(Lq),
-        pid_Id_(Lq, Rs, max_current, pwm_period),
-        pid_Iq_(Lq, Rs, max_current, pwm_period),
+        pid_Id_(Lq, Rs, max_current, pwm_params_.period),
+        pid_Iq_(Lq, Rs, max_current, pwm_params_.period),
         estimated_Idq_filter_(Vector<2>::Zero())
     { }
 
@@ -166,7 +160,8 @@ public:
         /*
          * Computing Idq, Udq
          */
-        out.extrapolated_angular_position = math::normalizeAngle(angular_position + angular_velocity * pwm_period_);
+        out.extrapolated_angular_position =
+            math::normalizeAngle(angular_position + angular_velocity * pwm_params_.period);
 
         const auto angle_sincos = math::sincos(out.extrapolated_angular_position);
 
@@ -205,7 +200,7 @@ public:
             out.reference_Udq[1] += angular_velocity * Lq_ * out.estimated_Idq[0];
         }
 
-        Const Udq_magnitude_limit = computeLineVoltageLimit(inverter_voltage, pwm_upper_limit_);
+        Const Udq_magnitude_limit = computeLineVoltageLimit(inverter_voltage, pwm_params_.upper_limit);
 
         if (out.reference_Udq.norm() > Udq_magnitude_limit)
         {
@@ -226,8 +221,8 @@ public:
         {
             out.pwm_setpoint = performDeadTimeCompensation(pwm_setpoint_and_sector_number.first,
                                                            phase_currents_ab,
-                                                           pwm_period_,
-                                                           pwm_dead_time_);
+                                                           pwm_params_.period,
+                                                           pwm_params_.dead_time);
         }
         else
         {

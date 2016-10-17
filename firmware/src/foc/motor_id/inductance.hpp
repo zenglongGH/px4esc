@@ -83,9 +83,7 @@ public:
        modulator_(OneSizeFitsAllLq,
                   result_.rs,
                   result_.max_current,
-                  context.pwm_period,
-                  context.pwm_dead_time,
-                  context.pwm_upper_limit,
+                  context.pwm_params,
                   Modulator::DeadTimeCompensationPolicy::Disabled,
                   Modulator::CrossCouplingCompensationPolicy::Disabled)
     {
@@ -156,7 +154,8 @@ public:
         }
         else
         {
-            const auto min_samples_needed = unsigned((MeasurementDuration / context_.pwm_period) * MinValidSampleRatio);
+            const auto min_samples_needed =
+                unsigned((MeasurementDuration / context_.pwm_params.period) * MinValidSampleRatio);
             const auto num_samples_acquired = averagers_[0].getNumSamples();
 
             assert(std::all_of(averagers_.begin(), averagers_.begin() + 3, [=](math::CumulativeAverageComputer<>& x) {

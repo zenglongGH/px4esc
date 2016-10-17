@@ -193,13 +193,15 @@ class StatusCommand : public os::shell::ICommandHandler
         std::puts("\nMotor control HW:");
         board::motor::printStatus();
 
+        const auto pwm_params = board::motor::getPWMParameters();
+
         std::printf("\nPWM:\n"
                     "Active handles: %u\n"
                     "Frequency     : %.6f kHz\n"
                     "DeadTime      : %.1f nsec\n",
                     board::motor::PWMHandle::getTotalNumberOfActiveHandles(),
-                    1e-3 / double(board::motor::getPWMPeriod()),
-                    double(board::motor::getPWMDeadTime()) * 1e9);
+                    1e-3 / double(pwm_params.period),
+                    double(pwm_params.dead_time) * 1e9);
     }
 } static cmd_status;
 
@@ -437,7 +439,7 @@ class SetpointCommand : public os::shell::ICommandHandler
         case foc::ControlMode::Voltage:
         {
             const auto Vmax = foc::computeLineVoltageLimit(board::motor::getInverterVoltage(),
-                                                           board::motor::getPWMUpperLimit());
+                                                           board::motor::getPWMParameters().upper_limit);
             const math::Range<> VoltageLimits(-Vmax, Vmax);
             if (!VoltageLimits.contains(sp))
             {

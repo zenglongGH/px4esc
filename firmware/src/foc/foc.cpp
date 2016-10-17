@@ -119,7 +119,7 @@ public:
         }
 
         std::printf("$%.4f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
-                    double(pwm_cycles) * double(board::motor::getPWMPeriod()),
+                    double(pwm_cycles) * double(board::motor::getPWMParameters().period),
                     double(vars_copy[0]),
                     double(vars_copy[1]),
                     double(vars_copy[2]),
@@ -141,6 +141,8 @@ struct BeepCommand
 
 struct Context
 {
+    const board::motor::PWMParameters pwm_params;
+
     Observer observer;
 
     ThreePhaseVoltageModulator<IdqMovingAverageLength> modulator;
@@ -184,9 +186,8 @@ struct Context
             Const min_current,
             Const min_voltage,
             Const current_ramp,
-            Const voltage_ramp,
-            Const pwm_period,
-            Const pwm_dead_time) :
+            Const voltage_ramp) :
+        pwm_params(board::motor::getPWMParameters()),
         observer(observer_params,
                  field_flux,
                  Lq,            // ASSUMPTION: Ld ~= Lq
@@ -195,9 +196,7 @@ struct Context
         modulator(Lq,
                   Rs,
                   max_current,
-                  pwm_period,
-                  pwm_dead_time,
-                  board::motor::getPWMUpperLimit(),
+                  pwm_params,
                   modulator.DeadTimeCompensationPolicy::Disabled,
                   modulator.CrossCouplingCompensationPolicy::Disabled),
         setpoint_controller(max_current,
@@ -249,9 +248,7 @@ void initializeContext()
                                               g_motor_params.min_current,
                                               min_voltage,
                                               g_motor_params.current_ramp_amp_per_s,
-                                              g_motor_params.voltage_ramp_volt_per_s,
-                                              board::motor::getPWMPeriod(),
-                                              board::motor::getPWMDeadTime());
+                                              g_motor_params.voltage_ramp_volt_per_s);
 }
 
 
@@ -683,7 +680,7 @@ void handleMainIRQ(Const period)
                     g_requested_control_mode == ControlMode::Voltage)
                 {
                     const auto max_voltage = computeLineVoltageLimit(board::motor::getInverterVoltage(),
-                                                                     board::motor::getPWMUpperLimit());
+                                                                     g_c->pwm_params.upper_limit);
                     g_c->use_voltage_setpoint = true;
                     g_c->setpoint_Iq = g_c->estimated_Idq[1];
                     g_c->setpoint_Uq = g_c->setpoint_controller.update(period,
@@ -863,9 +860,7 @@ void handleMainIRQ(Const period)
                 motor_id::Estimator(g_requested_motor_identification_mode,
                                     g_motor_params,
                                     g_controller_params.motor_id,
-                                    board::motor::getPWMPeriod(),
-                                    board::motor::getPWMDeadTime(),
-                                    board::motor::getPWMUpperLimit());
+                                    board::motor::getPWMParameters());
         }
 
         const auto hw_status = board::motor::getStatus();

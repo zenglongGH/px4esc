@@ -83,7 +83,8 @@ class ResistanceTask : public ITask
         assert(desired_voltage > 0);
         assert(inverter_voltage > 0);
 
-        Const voltage_drop_due_to_dead_time = (context_.pwm_dead_time / context_.pwm_period) * inverter_voltage;
+        Const voltage_drop_due_to_dead_time =
+            (context_.pwm_params.dead_time / context_.pwm_params.period) * inverter_voltage;
 
         return (desired_voltage + voltage_drop_due_to_dead_time) / inverter_voltage;
     }
@@ -149,8 +150,9 @@ public:
             // We're supplying phase C in order to be able to use both current sensors with maximum resolution.
             if ((-filtered_currents.sum()) < estimation_current_)
             {
+                // Very coarse initial estimation
                 result_.rs = std::max(MotorParameters::getRsLimits().min,
-                                      result_.rs + OhmPerSec * context_.pwm_period); // Very coarse initial estimation
+                                      result_.rs + OhmPerSec * context_.pwm_params.period);
             }
             else
             {
@@ -161,7 +163,7 @@ public:
             Const voltage = computeLineVoltageForResistanceMeasurement(estimation_current_, result_.rs);
             Const relative_voltage = computeRelativePhaseVoltage(voltage, inverter_voltage);
 
-            if ((relative_voltage < (context_.pwm_upper_limit - 0.5F)) &&
+            if ((relative_voltage < (context_.pwm_params.upper_limit - 0.5F)) &&
                 MotorParameters::getRsLimits().contains(result_.rs))
             {
                 context_.setPWM({

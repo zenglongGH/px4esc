@@ -98,22 +98,19 @@ void beginCalibration();
 bool isCalibrationInProgress();
 
 /**
- * Meaningful results guaranteed only after initialization.
- * @return PWM carrier period in seconds.
+ * Static PWM parameters; guaranteed to stay constant as long as the firmware is running.
  */
-float getPWMPeriod();
+struct PWMParameters
+{
+    float period = 0;       ///< Second
+    float dead_time = 0;    ///< Second
+    float upper_limit = 0;  ///< Unitless, (0, 1]
+};
 
 /**
  * Meaningful results guaranteed only after initialization.
- * @return PWM dead time in seconds.
  */
-float getPWMDeadTime();
-
-/**
- * Meaningful results guaranteed only after initialization.
- * @return Maximum PWM value that is guaranteed to not obscure the ADC sampling region; always within (0, 1].
- */
-float getPWMUpperLimit();
+PWMParameters getPWMParameters();
 
 /**
  * Returns the power stage voltage, aka VBAT, in volts.
