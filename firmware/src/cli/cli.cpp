@@ -599,6 +599,8 @@ class MotorIdentificationCommand : public os::shell::ICommandHandler
                 foc::stop();
                 aborted = true;
             }
+
+            foc::IRQDebugOutputBuffer::printIfNeeded();
         }
 
         // Handling the result
