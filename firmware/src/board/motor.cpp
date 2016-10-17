@@ -103,6 +103,8 @@ PWMParameters g_pwm_params;
 
 unsigned g_fast_irq_to_main_irq_period_ratio;
 
+math::Vector<2> g_phase_currents = math::Vector<2>::Zero();     ///< Most recent phase currents measurement
+
 /// Sometimes referred to as VBAT (ideally it should be volatile)
 float g_inverter_voltage;
 
@@ -622,6 +624,12 @@ PWMParameters getPWMParameters()
     return g_pwm_params;
 }
 
+math::Vector<2> getPhaseCurrentsAB()
+{
+    AbsoluteCriticalSectionLocker locker;
+    return g_phase_currents;
+}
+
 float getInverterVoltage()
 {
     return g_inverter_voltage;
@@ -739,7 +747,7 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
     const bool currents_valid = (PWMHandle::getTotalNumberOfActiveHandles() > 0) &&
                                 g_board_features->areCurrentSensorOutputsValid(phase_currents_adc_voltages);
 
-    const auto phase_currents = currents_valid ?
+    g_phase_currents = currents_valid ?
         g_board_features->convertADCVoltagesToPhaseCurrents(phase_currents_adc_voltages) :
         math::Vector<2>::Zero();
 
@@ -751,7 +759,7 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
     }
 
     handleFastIRQ(g_pwm_params.period,
-                  phase_currents,
+                  g_phase_currents,
                   g_inverter_voltage);
 
     /*
@@ -763,7 +771,7 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
     }
     else
     {
-        g_board_features->adjustCurrentGain(g_pwm_params.period, phase_currents);
+        g_board_features->adjustCurrentGain(g_pwm_params.period, g_phase_currents);
     }
 
     /*

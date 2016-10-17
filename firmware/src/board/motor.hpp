@@ -113,6 +113,12 @@ struct PWMParameters
 PWMParameters getPWMParameters();
 
 /**
+ * Returns the most recent phase currents sample.
+ * May return zeros if there's no active PWM handles.
+ */
+math::Vector<2> getPhaseCurrentsAB();
+
+/**
  * Returns the power stage voltage, aka VBAT, in volts.
  */
 float getInverterVoltage();
