@@ -110,7 +110,6 @@ private:
         Finished
     };
 
-    Const pwm_period_;
     Range inverter_voltage_range_;
     Range inverter_temperature_range_;
 
@@ -165,15 +164,12 @@ private:
     }
 
 public:
-    HardwareTester(Const pwm_period,
-                   const Range inverter_voltage_range,
+    HardwareTester(const Range inverter_voltage_range,
                    const Range inverter_temperature_range) :
-        pwm_period_(pwm_period),
         inverter_voltage_range_(inverter_voltage_range),
         inverter_temperature_range_(inverter_temperature_range),
         currents_filter_(Vector<2>::Zero())
     {
-        assert(pwm_period_ > 0);
         assert(inverter_temperature_range_.contains(math::convertCelsiusToKelvin(25.0F)));
     }
 
@@ -181,13 +177,14 @@ public:
      * Must be invoked on every PWM period with appropriate measurements.
      * Returns the desired PWM setpoints, possibly zero.
      */
-    Vector<3> onNextPWMPeriod(const Vector<2>& raw_phase_currents_ab,
-                              Const inverter_voltage,
-                              Const inverter_temperature,
-                              const bool inverter_overload,
-                              const bool inverter_fault)
+    Vector<3> update(Const period,
+                     const Vector<2>& raw_phase_currents_ab,
+                     Const inverter_voltage,
+                     Const inverter_temperature,
+                     const bool inverter_overload,
+                     const bool inverter_fault)
     {
-        time_ += pwm_period_;
+        time_ += period;
 
         Vector<3> pwm_vector = Vector<3>::Zero();
 

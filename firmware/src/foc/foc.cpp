@@ -912,6 +912,85 @@ void handleMainIRQ(Const period)
             g_motor_parameter_estimator = nullptr;
         }
     }
+
+    /*
+     * Hardware testing
+     */
+    {
+        static HardwareTester* hardware_tester = nullptr;
+
+        if (g_state == State::HardwareTesting)
+        {
+            AbsoluteCriticalSectionLocker locker;
+
+            alignas(16) static std::uint8_t hardware_tester_storage[sizeof(HardwareTester)];
+
+            if (hardware_tester == nullptr)
+            {
+                board::motor::beginCalibration();
+
+                const auto measurement_range = board::motor::getLimits().measurement_range;
+
+                hardware_tester = new (hardware_tester_storage) HardwareTester(measurement_range.inverter_voltage,
+                                                                               measurement_range.inverter_temperature);
+            }
+
+            const auto phase_currents_ab = board::motor::getPhaseCurrentsAB();
+            const auto inverter_voltage = board::motor::getInverterVoltage();
+
+            const auto hw_status = board::motor::getStatus();
+
+            if (board::motor::isCalibrationInProgress())
+            {
+                g_pwm_handle.release(); // Nothing to do, waiting for the calibration to end before continuing
+            }
+            else
+            {
+                const auto pwm_vector = hardware_tester->update(period,
+                                                                phase_currents_ab,
+                                                                inverter_voltage,
+                                                                hw_status.inverter_temperature,
+                                                                hw_status.overload,
+                                                                hw_status.fault);
+                g_pwm_handle.setPWM(pwm_vector);
+
+                if (hardware_tester->isFinished())
+                {
+                    g_pwm_handle.release();
+
+                    g_last_hardware_test_report = hardware_tester->getTestReport();
+
+                    if (g_last_hardware_test_report.isSuccessful())
+                    {
+                        g_state = State::Idle;
+                    }
+                    else
+                    {
+                        g_state = State::Fault;
+                    }
+                }
+            }
+
+            const auto filtered_currents = hardware_tester->getCurrentsFilter().getValue();
+
+            g_debug_tracer.set<0>(phase_currents_ab[0]);
+            g_debug_tracer.set<1>(phase_currents_ab[1]);
+            g_debug_tracer.set<2>(inverter_voltage);
+            g_debug_tracer.set<3>(filtered_currents[0]);
+            g_debug_tracer.set<4>(filtered_currents[1]);
+            g_debug_tracer.set<5>(math::convertKelvinToCelsius(hw_status.inverter_temperature));
+            g_debug_tracer.set<6>(hw_status.current_sensor_gain);
+        }
+        else
+        {
+            if (hardware_tester != nullptr)
+            {
+                AbsoluteCriticalSectionLocker locker;
+                hardware_tester->~HardwareTester();
+                hardware_tester = nullptr;
+            }
+        }
+    }
 }
 
 
@@ -979,80 +1058,6 @@ void handleFastIRQ(Const period,
             if (g_motor_parameter_estimator != nullptr)
             {
                 g_pwm_handle.setPWM(g_motor_parameter_estimator->onNextPWMPeriod(phase_currents_ab, inverter_voltage));
-            }
-        }
-    }
-
-    /*
-     * Hardware testing
-     */
-    {
-        static HardwareTester* hardware_tester = nullptr;
-
-        if (g_state == State::HardwareTesting)
-        {
-            alignas(16) static std::uint8_t hardware_tester_storage[sizeof(HardwareTester)];
-
-            if (hardware_tester == nullptr)
-            {
-                board::motor::beginCalibration();
-
-                const auto measurement_range = board::motor::getLimits().measurement_range;
-
-                hardware_tester = new (hardware_tester_storage) HardwareTester(period,
-                                                                               measurement_range.inverter_voltage,
-                                                                               measurement_range.inverter_temperature);
-            }
-
-            const auto hw_status = board::motor::getStatus();
-
-            if (board::motor::isCalibrationInProgress())
-            {
-                g_pwm_handle.release(); // Nothing to do, waiting for the calibration to end before continuing
-            }
-            else
-            {
-                const auto pwm_vector = hardware_tester->onNextPWMPeriod(phase_currents_ab,
-                                                                         inverter_voltage,
-                                                                         hw_status.inverter_temperature,
-                                                                         hw_status.overload,
-                                                                         hw_status.fault);
-
-                g_pwm_handle.setPWM(pwm_vector);
-
-                if (hardware_tester->isFinished())
-                {
-                    g_pwm_handle.release();
-
-                    g_last_hardware_test_report = hardware_tester->getTestReport();
-
-                    if (g_last_hardware_test_report.isSuccessful())
-                    {
-                        g_state = State::Idle;
-                    }
-                    else
-                    {
-                        g_state = State::Fault;
-                    }
-                }
-            }
-
-            const auto filtered_currents = hardware_tester->getCurrentsFilter().getValue();
-
-            g_debug_tracer.set<0>(phase_currents_ab[0]);
-            g_debug_tracer.set<1>(phase_currents_ab[1]);
-            g_debug_tracer.set<2>(inverter_voltage);
-            g_debug_tracer.set<3>(filtered_currents[0]);
-            g_debug_tracer.set<4>(filtered_currents[1]);
-            g_debug_tracer.set<5>(math::convertKelvinToCelsius(hw_status.inverter_temperature));
-            g_debug_tracer.set<6>(hw_status.current_sensor_gain);
-        }
-        else
-        {
-            if (hardware_tester != nullptr)
-            {
-                hardware_tester->~HardwareTester();
-                hardware_tester = nullptr;
             }
         }
     }
