@@ -77,6 +77,8 @@ HardwareTester::TestReport g_last_hardware_test_report;
 
 EventCounter g_fast_irq_cycle_counter;
 
+motor_id::Estimator* g_motor_parameter_estimator = nullptr;
+
 
 class DebugVariableTracer
 {
@@ -842,6 +844,79 @@ void handleMainIRQ(Const period)
             g_state = State::Idle;
         }
     }
+
+    /*
+     * Motor identification
+     */
+    if (g_state == State::MotorIdentification)
+    {
+        if (g_motor_parameter_estimator == nullptr)
+        {
+            AbsoluteCriticalSectionLocker locker;
+
+            board::motor::beginCalibration();
+
+            alignas(motor_id::Estimator)
+            static std::uint8_t estimator_storage[sizeof(motor_id::Estimator)];
+
+            g_motor_parameter_estimator = new (estimator_storage)
+                motor_id::Estimator(g_requested_motor_identification_mode,
+                                    g_motor_params,
+                                    g_controller_params.motor_id,
+                                    board::motor::getPWMPeriod(),
+                                    board::motor::getPWMDeadTime(),
+                                    board::motor::getPWMUpperLimit());
+        }
+
+        const auto hw_status = board::motor::getStatus();
+
+        if (!board::motor::isCalibrationInProgress())
+        {
+            AbsoluteCriticalSectionLocker::assertNotLocked();
+            g_motor_parameter_estimator->onMainIRQ(period);
+
+            AbsoluteCriticalSectionLocker locker;
+
+            // TODO: We can't check the general hardware status because FAULT tends to go up randomly.
+            //       There might be a hardware bug somewhere. Investigate it later.
+            //if (hw_status.isOkay())
+            if (hw_status.power_ok && !hw_status.overload)
+            {
+                if (g_motor_parameter_estimator->isFinished())
+                {
+                    g_motor_params = g_motor_parameter_estimator->getEstimatedMotorParameters();
+
+                    if (g_motor_params.isValid())
+                    {
+                        g_state = State::Idle;
+                    }
+                    else
+                    {
+                        g_state = State::Fault;
+                    }
+                }
+            }
+            else
+            {
+                g_state = State::Fault;
+                IRQDebugOutputBuffer::setVariableFromIRQ<0>(hw_status.power_ok);
+                IRQDebugOutputBuffer::setVariableFromIRQ<1>(hw_status.overload);
+                IRQDebugOutputBuffer::setVariableFromIRQ<2>(hw_status.fault);
+            }
+        }
+
+        g_debug_tracer.set(g_motor_parameter_estimator->getDebugValues());
+        g_debug_tracer.set<6>(hw_status.current_sensor_gain);
+    }
+    else
+    {
+        if (g_motor_parameter_estimator != nullptr)
+        {
+            AbsoluteCriticalSectionLocker locker;
+            g_motor_parameter_estimator->~Estimator();
+            g_motor_parameter_estimator = nullptr;
+        }
+    }
 }
 
 
@@ -898,82 +973,17 @@ void handleFastIRQ(Const period,
     /*
      * Motor identification
      */
+    if (g_state == State::MotorIdentification)
     {
-        static motor_id::Estimator* estimator = nullptr;
-
-        if (g_state == State::MotorIdentification)
+        if (board::motor::isCalibrationInProgress())
         {
-            alignas(16) static std::uint8_t estimator_storage[sizeof(motor_id::Estimator)];
-
-            if (estimator == nullptr)
-            {
-                board::motor::beginCalibration();
-
-                estimator = new (estimator_storage)
-                    motor_id::Estimator(g_requested_motor_identification_mode,
-                                        g_motor_params,
-                                        g_controller_params.motor_id,
-                                        period,
-                                        board::motor::getPWMDeadTime(),
-                                        board::motor::getPWMUpperLimit());
-            }
-
-            const auto hw_status = board::motor::getStatus();
-
-            if (board::motor::isCalibrationInProgress())
-            {
-                g_pwm_handle.release(); // Nothing to do, waiting for the calibration to end before continuing
-            }
-            else
-            {
-                // TODO: We can't check the general hardware status because FAULT tends to go up randomly.
-                //       There might be a hardware bug somewhere. Investigate it later.
-                //const bool hw_ok = hw_status.isOkay();
-                const bool hw_ok = hw_status.power_ok && !hw_status.overload;
-
-                if (hw_ok)
-                {
-                    const auto pwm_vector = estimator->onNextPWMPeriod(phase_currents_ab, inverter_voltage);
-
-                    g_pwm_handle.setPWM(pwm_vector);
-
-                    if (estimator->isFinished())
-                    {
-                        g_pwm_handle.release();
-
-                        g_motor_params = estimator->getEstimatedMotorParameters();
-
-                        if (g_motor_params.isValid())
-                        {
-                            g_state = State::Idle;
-                        }
-                        else
-                        {
-                            g_state = State::Fault;
-                        }
-                    }
-                }
-                else
-                {
-                    // Hardware error; aborting and switching into the fault state
-                    g_pwm_handle.release();
-                    g_state = State::Fault;
-
-                    IRQDebugOutputBuffer::setVariableFromIRQ<0>(hw_status.power_ok);
-                    IRQDebugOutputBuffer::setVariableFromIRQ<1>(hw_status.overload);
-                    IRQDebugOutputBuffer::setVariableFromIRQ<2>(hw_status.fault);
-                }
-            }
-
-            g_debug_tracer.set(estimator->getDebugValues());
-            g_debug_tracer.set<6>(hw_status.current_sensor_gain);
+            g_pwm_handle.release(); // Nothing to do, waiting for the calibration to end before continuing
         }
         else
         {
-            if (estimator != nullptr)
+            if (g_motor_parameter_estimator != nullptr)
             {
-                estimator->~Estimator();
-                estimator = nullptr;
+                g_pwm_handle.setPWM(g_motor_parameter_estimator->onNextPWMPeriod(phase_currents_ab, inverter_voltage));
             }
         }
     }

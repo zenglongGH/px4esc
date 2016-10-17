@@ -280,6 +280,11 @@ public:
             __enable_irq();
         }
     }
+
+    inline static void assertNotLocked()
+    {
+        assert(__get_PRIMASK() == 0);
+    }
 } volatile AbsoluteCriticalSectionLocker;
 
 }

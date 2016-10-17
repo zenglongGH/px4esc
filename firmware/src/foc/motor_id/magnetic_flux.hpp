@@ -95,6 +95,18 @@ public:
         }
     }
 
+    void onMainIRQ(Const period) override
+    {
+        (void) period;
+        context_.reportDebugVariables({
+            angular_velocity_,
+            Uq_,
+            I_,
+            U_,
+            phi_ * 1e3F
+        });
+    }
+
     void onNextPWMPeriod(const Vector<2>& phase_currents_ab,
                          Const inverter_voltage) override
     {
@@ -208,17 +220,6 @@ public:
                 status_ = Status::Failed;
             }
         }
-
-        /*
-         * Debug outputs
-         */
-        context_.reportDebugVariables({
-            angular_velocity_,
-            Uq_,
-            I_,
-            U_,
-            phi_ * 1e3F
-        });
     }
 
     Status getStatus() const override { return status_; }

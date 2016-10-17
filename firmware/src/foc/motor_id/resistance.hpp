@@ -126,6 +126,11 @@ public:
         }
     }
 
+    void onMainIRQ(Const period) override
+    {
+        (void) period;
+    }
+
     void onNextPWMPeriod(const Vector<2>& phase_currents_ab,
                          Const inverter_voltage) override
     {

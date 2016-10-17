@@ -69,6 +69,7 @@ class InductanceTask : public ITask
     std::array<math::CumulativeAverageComputer<>, 3> averagers_;
 
     Modulator modulator_;
+    Modulator::Output last_modulator_output_;
 
     Scalar angular_position_ = 0;
 
@@ -98,6 +99,19 @@ public:
        }
     }
 
+    void onMainIRQ(Const period) override
+    {
+        (void) period;
+        AbsoluteCriticalSectionLocker locker;
+        context_.reportDebugVariables({
+            last_modulator_output_.reference_Udq[0],
+            last_modulator_output_.reference_Udq[1],
+            last_modulator_output_.estimated_Idq[0],
+            last_modulator_output_.estimated_Idq[1],
+            Scalar(modulator_.getUdqNormalizationCounter().get())
+        });
+    }
+
     void onNextPWMPeriod(const Vector<2>& phase_currents_ab,
                          Const inverter_voltage) override
     {
@@ -120,31 +134,24 @@ public:
             modulator_setpoint.mode = Modulator::Setpoint::Mode::Iq;
             modulator_setpoint.value = estimation_current_;
 
-            const auto output = modulator_.onNextPWMPeriod(phase_currents_ab,
-                                                           inverter_voltage,
-                                                           angular_velocity_,
-                                                           angular_position_,
-                                                           modulator_setpoint);
-            angular_position_ = output.extrapolated_angular_position;
-            context_.setPWM(output.pwm_setpoint);
-
-            context_.reportDebugVariables({
-                output.reference_Udq[0],
-                output.reference_Udq[1],
-                output.estimated_Idq[0],
-                output.estimated_Idq[1],
-                Scalar(modulator_.getUdqNormalizationCounter().get())
-            });
+            last_modulator_output_ =
+                modulator_.onNextPWMPeriod(phase_currents_ab,
+                                           inverter_voltage,
+                                           angular_velocity_,
+                                           angular_position_,
+                                           modulator_setpoint);
+            angular_position_ = last_modulator_output_.extrapolated_angular_position;
+            context_.setPWM(last_modulator_output_.pwm_setpoint);
 
             // TODO: Compensation disabled, since it yields lower values than expected
             Const dead_time_compensation_mult = 1.0F;
             //Const dead_time_compensation_mult = 1.0F - pwm_dead_time_ / pwm_period_;
 
-            if (!output.Udq_was_limited)
+            if (!last_modulator_output_.Udq_was_limited)
             {
-                averagers_[0].addSample(output.reference_Udq[0] * dead_time_compensation_mult);
-                averagers_[1].addSample(output.reference_Udq[1] * dead_time_compensation_mult);
-                averagers_[2].addSample(output.estimated_Idq[1]);
+                averagers_[0].addSample(last_modulator_output_.reference_Udq[0] * dead_time_compensation_mult);
+                averagers_[1].addSample(last_modulator_output_.reference_Udq[1] * dead_time_compensation_mult);
+                averagers_[2].addSample(last_modulator_output_.estimated_Idq[1]);
             }
         }
         else

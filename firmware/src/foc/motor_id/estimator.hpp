@@ -42,7 +42,7 @@ class Estimator
 {
     struct ContextImplementation : public Context
     {
-        std::uint64_t pwm_period_counter = 0;
+        std::uint32_t pwm_period_counter = 0;
         Vector<3> pwm_output_vector = Vector<3>::Zero();
         std::array<Scalar, 7> debug_values_{};
 
@@ -58,24 +58,30 @@ class Estimator
 
         void setPWM(const Vector<3>& pwm) override
         {
+            AbsoluteCriticalSectionLocker locker;
             pwm_output_vector = pwm;
         }
 
         void reportDebugVariables(const std::initializer_list<Scalar>& variables) override
         {
+            AbsoluteCriticalSectionLocker locker;
             std::copy_n(variables.begin(),
                         std::min(variables.size(), debug_values_.size()),
                         debug_values_.begin());
         }
 
-        Scalar getTime() const override { return Scalar(pwm_period_counter) * pwm_period; }
+        Scalar getTime() const override
+        {
+            // Locking is not necessary because the read is atomic
+            return Scalar(pwm_period_counter) * pwm_period;
+        }
     } context_;
 
     MotorParameters result_;
     bool finished_ = false;
-    unsigned current_task_index_ = 0;
+    unsigned next_task_index_ = 0;
     ITask* current_task_ = nullptr;
-    void (Estimator::* const* const current_task_chain_)();
+    void (Estimator::* const* const task_chain_)();
 
     alignas(32) std::uint8_t vinnie_the_pool_[std::max({
         sizeof(ResistanceTask),
@@ -141,7 +147,7 @@ public:
                  pwm_dead_time,
                  pwm_upper_limit),
         result_(initial_parameters),
-        current_task_chain_(selectTaskChain(mode))
+        task_chain_(selectTaskChain(mode))
     {
         assert(config.isValid());
     }
@@ -152,50 +158,46 @@ public:
     }
 
     /**
-     * Must be invoked on every PWM period with appropriate measurements.
-     * Returns the desired PWM setpoints, possibly zero.
+     * Must be invoked every n-th PWM period.
+     * This method can be interrupted by @ref onNextPWMPeriod().
+     * @param period    Invocation period [seconds].
      */
-    Vector<3> onNextPWMPeriod(const Vector<2>& phase_currents_ab,
-                              Const inverter_voltage)
+    void onMainIRQ(Const period)
     {
-        context_.pwm_output_vector = Vector<3>::Zero(); // Default
-        context_.pwm_period_counter++;
-
-        if (finished_)
-        {
-            return context_.pwm_output_vector;
-        }
-
         if (current_task_ == nullptr)
         {
+            AbsoluteCriticalSectionLocker locker;
+
             // Making sure the parameters are sane
             if (!context_.params.isValid())
             {
                 finished_ = true;
                 result_ = MotorParameters();
-                return context_.pwm_output_vector;
             }
 
-            // Overwriting all variables in order to remove old values and indicate that the state has been switched
-            for (unsigned i = 0; i < IRQDebugOutputBuffer::NumVariables; i++)
+            // Switching to the next state
+            if (!finished_)
             {
-                IRQDebugOutputBuffer::setVariableFromIRQ(i, current_task_index_);
-            }
-
-            const auto constructor = current_task_chain_[current_task_index_];
-            if (constructor == nullptr)
-            {
-                finished_ = true;
-            }
-            else
-            {
-                current_task_index_++;
-                (this->*constructor)();
+                const auto constructor = task_chain_[next_task_index_];
+                if (constructor == nullptr)
+                {
+                    finished_ = true;
+                }
+                else
+                {
+                    next_task_index_++;
+                    (this->*constructor)();
+                }
             }
         }
         else
         {
-            current_task_->onNextPWMPeriod(phase_currents_ab, inverter_voltage);
+            // This is the only brief period of time where we aren't IRQ-safe.
+            AbsoluteCriticalSectionLocker::assertNotLocked();
+            current_task_->onMainIRQ(period);
+
+            // Immediately once the business logic processing is finished, lock again
+            AbsoluteCriticalSectionLocker locker;
 
             const auto status = current_task_->getStatus();
             if (status != ITask::Status::InProgress)
@@ -209,6 +211,36 @@ public:
                     finished_ = true;
                 }
             }
+        }
+    }
+
+    /**
+     * Must be invoked on every PWM period with appropriate measurements.
+     * Returns the desired PWM setpoints, possibly zero.
+     */
+    Vector<3> onNextPWMPeriod(const Vector<2>& phase_currents_ab,
+                              Const inverter_voltage)
+    {
+        AbsoluteCriticalSectionLocker::assertNotLocked();
+
+        if (context_.pwm_period_counter < std::numeric_limits<decltype(context_.pwm_period_counter)>::max())
+        {
+            context_.pwm_period_counter++;
+        }
+        else
+        {
+            // This can't happen.
+            assert(false);
+            finished_ = true;
+            result_ = MotorParameters();
+            return Vector<3>::Zero();
+        }
+
+        context_.pwm_output_vector.setZero();   // Default
+
+        if (current_task_ != nullptr)
+        {
+            current_task_->onNextPWMPeriod(phase_currents_ab, inverter_voltage);
         }
 
         return context_.pwm_output_vector;

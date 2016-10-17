@@ -145,11 +145,33 @@ public:
 
     virtual ~ITask() { }
 
+    /**
+     * This method is invoked every main IRQ, which happens every N-th period of PWM.
+     * @param period    Invocation period [seconds]
+     */
+    virtual void onMainIRQ(Const period) = 0;
+
+    /**
+     * This method is invoked at every PWM period, from the highest priority IRQ.
+     * It preempts the main IRQ method.
+     * This is the ONLY method that can be invoked from the PWM IRQ; all other methods can only be invoked
+     * from the main IRQ.
+     * @param phase_currents_ab
+     * @param inverter_voltage
+     */
     virtual void onNextPWMPeriod(const Vector<2>& phase_currents_ab,
                                  Const inverter_voltage) = 0;
 
+    /**
+     * This method is always invoked from the main IRQ with the absolute critical section locked,
+     * i.e. it cannot be interrupted by the PWM IRQ.
+     */
     virtual Status getStatus() const = 0;
 
+    /**
+     * This method is always invoked from the main IRQ with the absolute critical section locked,
+     * i.e. it cannot be interrupted by the PWM IRQ.
+     */
     virtual MotorParameters getEstimatedMotorParameters() const = 0;
 };
 
