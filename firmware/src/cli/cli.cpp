@@ -193,6 +193,8 @@ class StatusCommand : public os::shell::ICommandHandler
         std::puts("\nMotor control HW:");
         board::motor::printStatus();
 
+        std::printf("\nPhase Currents AB: %s\n", math::toString(board::motor::getPhaseCurrentsAB()).c_str());
+
         const auto pwm_params = board::motor::getPWMParameters();
 
         std::printf("\nPWM:\n"
