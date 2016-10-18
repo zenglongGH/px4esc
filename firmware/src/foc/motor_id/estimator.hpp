@@ -78,7 +78,7 @@ class Estimator
     MotorParameters result_;
     bool finished_ = false;
     unsigned next_task_index_ = 0;
-    ITask* current_task_ = nullptr;
+    IEstimatorTask* current_task_ = nullptr;
     void (Estimator::* const* const task_chain_)();
 
     alignas(32) std::uint8_t vinnie_the_pool_[std::max({
@@ -91,7 +91,7 @@ class Estimator
     {
         if (current_task_ != nullptr)
         {
-            current_task_->~ITask();
+            current_task_->~IEstimatorTask();
             current_task_ = nullptr;
         }
     }
@@ -196,13 +196,13 @@ public:
             AbsoluteCriticalSectionLocker locker;
 
             const auto status = current_task_->getStatus();
-            if (status != ITask::Status::InProgress)
+            if (status != IEstimatorTask::Status::InProgress)
             {
                 result_ = current_task_->getEstimatedMotorParameters();
 
                 destroyCurrentTask();
 
-                if (status == ITask::Status::Failed)
+                if (status == IEstimatorTask::Status::Failed)
                 {
                     finished_ = true;
                 }

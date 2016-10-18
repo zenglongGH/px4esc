@@ -32,7 +32,7 @@ namespace foc
 namespace motor_id
 {
 
-class MagneticFluxTask : public ITask
+class MagneticFluxTask : public IEstimatorTask
 {
     // Voltage reduction during the measurement phase shold be very slow in order to
     // reduce phase delay of the current filter.

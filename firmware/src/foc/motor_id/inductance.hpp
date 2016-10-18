@@ -48,7 +48,7 @@ namespace motor_id
  * Therefore, keep in mind that this operation is dependent on the Rs measurement procedure, and they
  * should be viewed holistically rather than as independent operations.
  */
-class InductanceTask : public ITask
+class InductanceTask : public IEstimatorTask
 {
     static constexpr Scalar MeasurementDuration         = 15.0F;
     static constexpr Scalar MinValidSampleRatio         = 0.99F;

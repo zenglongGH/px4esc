@@ -35,7 +35,7 @@ namespace motor_id
  * Phase resistance estimation task.
  * This one should be always executed first, since it doesn't depend on anything.
  */
-class ResistanceTask : public ITask
+class ResistanceTask : public IEstimatorTask
 {
     static constexpr Scalar RotorStabilizationDuration  =  1.0F;
     static constexpr Scalar PhaseMeasurementDuration    = 10.0F;

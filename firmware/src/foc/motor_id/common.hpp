@@ -129,7 +129,7 @@ using ContextReference = Context&;
 /**
  * Interface of a motor ID task, e.g. resistance measurement.
  */
-class ITask
+class IEstimatorTask
 {
 public:
     enum class Status
@@ -139,7 +139,7 @@ public:
         Failed
     };
 
-    virtual ~ITask() { }
+    virtual ~IEstimatorTask() { }
 
     /**
      * This method is invoked every main IRQ, which happens every N-th period of PWM.
