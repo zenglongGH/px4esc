@@ -27,6 +27,7 @@
 #include <math/math.hpp>
 #include <board/motor.hpp>
 #include <zubax_chibios/util/heapless.hpp>
+#include <cassert>
 
 
 namespace foc
@@ -41,6 +42,53 @@ using board::motor::AbsoluteCriticalSectionLocker;
 
 
 constexpr Scalar SquareRootOf3 = Scalar(1.7320508075688772);
+
+/**
+ * Constant parameters shared between tasks.
+ * This data is guaranteed to stay constant as long as a task is running,
+ * but it may be changed when tasks are switched (e.g. configuration parameters may be updated at run time).
+ */
+struct CompleteParameterSet
+{
+    ControllerParameters controller;
+    MotorParameters motor;
+    ObserverParameters observer;
+    board::motor::PWMParameters pwm;
+
+    bool isValid() const
+    {
+        return controller.isValid() &&
+               motor.isValid();
+    }
+};
+
+/**
+ * State specific task generalization.
+ */
+class ITask
+{
+public:
+    static constexpr unsigned NumDebugVariables = 7;
+
+    enum class Status
+    {
+        Running,
+        Finished,
+        Failed
+    };
+
+    virtual ~ITask() { }
+
+    virtual void onMainIRQ(Const period,
+                           const board::motor::Status& hw_status) = 0;
+
+    virtual std::pair<Vector<3>, bool> onNextPWMPeriod(const Vector<2>& phase_currents_ab,
+                                                       Const inverter_voltage) = 0;
+
+    virtual Status getStatus() const = 0;
+
+    virtual std::array<Scalar, NumDebugVariables> getDebugVariables() const = 0;
+};
 
 /**
  * Simple counter with limited access to the variable for extra paranoia.

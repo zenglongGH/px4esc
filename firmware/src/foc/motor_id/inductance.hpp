@@ -48,7 +48,7 @@ namespace motor_id
  * Therefore, keep in mind that this operation is dependent on the Rs measurement procedure, and they
  * should be viewed holistically rather than as independent operations.
  */
-class InductanceTask : public IEstimatorTask
+class InductanceTask : public ISubTask
 {
     static constexpr Scalar MeasurementDuration         = 15.0F;
     static constexpr Scalar MinValidSampleRatio         = 0.99F;
@@ -78,18 +78,18 @@ public:
                    const MotorParameters& initial_parameters) :
        context_(context),
        result_(initial_parameters),
-       estimation_current_(initial_parameters.max_current * context.params.fraction_of_max_current),
-       angular_velocity_(context_.params.current_injection_frequency * math::Pi2),
+       estimation_current_(initial_parameters.max_current * context.params.controller.motor_id.fraction_of_max_current),
+       angular_velocity_(context.params.controller.motor_id.current_injection_frequency * math::Pi2),
        modulator_(OneSizeFitsAllLq,
                   result_.rs,
                   result_.max_current,
-                  context.pwm_params,
+                  context.params.pwm,
                   Modulator::DeadTimeCompensationPolicy::Disabled,
                   Modulator::CrossCouplingCompensationPolicy::Disabled)
     {
        result_.lq = 0;
 
-       if (!context_.params.isValid() ||
+       if (!context_.params.controller.motor_id.isValid() ||
            !result_.getRsLimits().contains(result_.rs) ||
            !os::float_eq::positive(result_.max_current))
        {
@@ -155,7 +155,7 @@ public:
         else
         {
             const auto min_samples_needed =
-                unsigned((MeasurementDuration / context_.pwm_params.period) * MinValidSampleRatio);
+                unsigned((MeasurementDuration / context_.params.pwm.period) * MinValidSampleRatio);
             const auto num_samples_acquired = averagers_[0].getNumSamples();
 
             assert(std::all_of(averagers_.begin(), averagers_.begin() + 3, [=](math::CumulativeAverageComputer<>& x) {

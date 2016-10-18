@@ -25,9 +25,9 @@
 #pragma once
 
 #include "motor_parameters.hpp"
-#include "motor_id/estimator.hpp"
+#include "motor_id/task.hpp"
 #include "setpoint_controller.hpp"
-#include "hardware_tester.hpp"
+#include "hardware_testing_task.hpp"
 #include "observer.hpp"
 #include <math/math.hpp>
 #include <cstdint>
@@ -123,7 +123,7 @@ void beginHardwareTest();
 /**
  * See @ref beginHardwareTest().
  */
-HardwareTester::TestReport getLastHardwareTestReport();
+HardwareTestingTask::TestReport getLastHardwareTestReport();
 
 /**
  * State of the control logic.

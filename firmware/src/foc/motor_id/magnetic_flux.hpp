@@ -32,7 +32,7 @@ namespace foc
 namespace motor_id
 {
 
-class MagneticFluxTask : public IEstimatorTask
+class MagneticFluxTask : public ISubTask
 {
     // Voltage reduction during the measurement phase shold be very slow in order to
     // reduce phase delay of the current filter.
@@ -71,11 +71,12 @@ public:
                      const MotorParameters& initial_parameters) :
         context_(context),
         result_(initial_parameters),
-        initial_Uq_((initial_parameters.max_current * context.params.fraction_of_max_current) * result_.rs * 1.5F),
+        initial_Uq_((initial_parameters.max_current *
+                     context.params.controller.motor_id.fraction_of_max_current) * result_.rs * 1.5F),
         modulator_(result_.lq,
                    result_.rs,
                    result_.max_current,
-                   context.pwm_params,
+                   context.params.pwm,
                    Modulator::DeadTimeCompensationPolicy::Disabled,
                    Modulator::CrossCouplingCompensationPolicy::Disabled),
         currents_filter_(Vector<2>::Zero()),
@@ -84,7 +85,7 @@ public:
     {
         result_.phi = 0;
 
-        if (!context_.params.isValid() ||
+        if (!context_.params.controller.motor_id.isValid() ||
             !result_.getRsLimits().contains(result_.rs) ||
             !result_.getLqLimits().contains(result_.lq) ||
             !os::float_eq::positive(result_.max_current))
@@ -118,7 +119,7 @@ public:
             started_at_ = context_.getTime();
         }
 
-        Const low_pass_filter_innovation = context_.pwm_params.period * 10.0F;
+        Const low_pass_filter_innovation = context_.params.pwm.period * 10.0F;
 
         Const prev_I = I_;
 
@@ -158,12 +159,11 @@ public:
         /*
          * Acceleration/measurement
          */
-        if (angular_velocity_ < context_.params.phi_estimation_electrical_angular_velocity)
+        if (angular_velocity_ < context_.params.controller.motor_id.phi_estimation_electrical_angular_velocity)
         {
             // Acceleration
-            angular_velocity_ +=
-                (context_.params.phi_estimation_electrical_angular_velocity / (VoltageSlopeLengthSec / 2.0F)) *
-                context_.pwm_params.period;
+            angular_velocity_ += (context_.params.controller.motor_id.phi_estimation_electrical_angular_velocity /
+                                  (VoltageSlopeLengthSec / 2.0F)) * context_.params.pwm.period;
         }
         else
         {
@@ -194,7 +194,7 @@ public:
 
             if (result_.phi >= 0.0F)
             {
-                Const dIdt = (I_ - prev_I) / context_.pwm_params.period;
+                Const dIdt = (I_ - prev_I) / context_.params.pwm.period;
 
                 // TODO: we could automatically learn the worst case di/dt after the acceleration phase?
                 // 2 - triggers false positive
@@ -209,7 +209,7 @@ public:
                 else
                 {
                     // Minimum is not reached yet, continuing to reduce voltage
-                    Uq_ -= (initial_Uq_ / VoltageSlopeLengthSec) * context_.pwm_params.period;
+                    Uq_ -= (initial_Uq_ / VoltageSlopeLengthSec) * context_.params.pwm.period;
                 }
             }
             else

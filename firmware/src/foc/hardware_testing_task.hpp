@@ -25,9 +25,6 @@
 #pragma once
 
 #include "common.hpp"
-#include <math/math.hpp>
-#include <zubax_chibios/util/heapless.hpp>
-#include <cassert>
 
 
 namespace foc
@@ -35,12 +32,12 @@ namespace foc
 /**
  * This class ensures that the power stage hardware, sensors, and the connected motor are functioning correctly.
  */
-class HardwareTester
+class HardwareTestingTask : public ITask
 {
 public:
     class TestReport
     {
-        friend class HardwareTester;
+        friend class HardwareTestingTask;
 
         std::uint32_t mask_ = 0;
 
@@ -121,6 +118,10 @@ private:
 
     TestReport test_report_;
 
+    board::motor::Status hardware_status_;
+
+    Vector<3> pwm_output_ = Vector<3>::Zero();
+
 
     Scalar getTimeSinceStateSwitch() const
     {
@@ -164,7 +165,7 @@ private:
     }
 
 public:
-    HardwareTester(const Range inverter_voltage_range,
+    HardwareTestingTask(const Range inverter_voltage_range,
                    const Range inverter_temperature_range) :
         inverter_voltage_range_(inverter_voltage_range),
         inverter_temperature_range_(inverter_temperature_range),
@@ -173,38 +174,31 @@ public:
         assert(inverter_temperature_range_.contains(math::convertCelsiusToKelvin(25.0F)));
     }
 
-    /**
-     * Must be invoked on every PWM period with appropriate measurements.
-     * Returns the desired PWM setpoints, possibly zero.
-     */
-    Vector<3> update(Const period,
-                     const Vector<2>& raw_phase_currents_ab,
-                     Const inverter_voltage,
-                     Const inverter_temperature,
-                     const bool inverter_overload,
-                     const bool inverter_fault)
+    void onMainIRQ(Const period,
+                   const board::motor::Status& hw_status) override
     {
+        hardware_status_ = hw_status;
+
         time_ += period;
 
-        Vector<3> pwm_vector = Vector<3>::Zero();
+        pwm_output_.setZero();
 
-        currents_filter_.update(raw_phase_currents_ab);
         const auto currents = currents_filter_.getValue();
 
         // No dead time compensation here
-        Const relative_testing_voltage = TestingVoltage / inverter_voltage;
+        Const relative_testing_voltage = TestingVoltage / hw_status.inverter_voltage;
 
-        if (!inverter_voltage_range_.contains(inverter_voltage))
+        if (!inverter_voltage_range_.contains(hw_status.inverter_voltage))
         {
             registerError(TestReport::ErrorFlag::InverterVoltageSensorError);
         }
 
-        if (!inverter_temperature_range_.contains(inverter_temperature))
+        if (!inverter_temperature_range_.contains(hw_status.inverter_temperature))
         {
             registerError(TestReport::ErrorFlag::InverterTemperatureSensorError);
         }
 
-        if (inverter_overload)
+        if (hw_status.overload)
         {
             registerError(TestReport::ErrorFlag::InverterOverloadSignal);
         }
@@ -231,7 +225,7 @@ public:
 
         case State::PreTestA:
         {
-            pwm_vector[0] += relative_testing_voltage;
+            pwm_output_[0] += relative_testing_voltage;
             switchToNextStateIfStabilizationTimeExpired();
             break;
         }
@@ -250,7 +244,7 @@ public:
 
         case State::PreTestB:
         {
-            pwm_vector[1] += relative_testing_voltage;
+            pwm_output_[1] += relative_testing_voltage;
             switchToNextStateIfStabilizationTimeExpired();
             break;
         }
@@ -269,7 +263,7 @@ public:
 
         case State::PreTestC:
         {
-            pwm_vector[2] += relative_testing_voltage;
+            pwm_output_[2] += relative_testing_voltage;
             switchToNextStateIfStabilizationTimeExpired();
             break;
         }
@@ -292,7 +286,7 @@ public:
              * Normally we should be checking this in all states, but there's something wrong with the hardware
              * which causes intermittent FAULT reports sometimes, so we moved the check here temporarily.
              */
-            if (inverter_fault)
+            if (hw_status.fault)
             {
                 registerError(TestReport::ErrorFlag::InverterFaultSignal);
             }
@@ -305,18 +299,42 @@ public:
             break;
         }
         }
-
-        return pwm_vector;
     }
 
-    bool isFinished() const { return state_ == State::Finished; }
+    std::pair<Vector<3>, bool> onNextPWMPeriod(const Vector<2>& phase_currents_ab,
+                                               Const inverter_voltage) override
+    {
+        (void) inverter_voltage;
+        currents_filter_.update(phase_currents_ab);
+        return {pwm_output_, true};
+    }
+
+    Status getStatus() const override
+    {
+        if (state_ == State::Finished)
+        {
+            return test_report_.isSuccessful() ? Status::Finished : Status::Failed;
+        }
+        else
+        {
+            return Status::Running;
+        }
+    }
+
+    std::array<Scalar, NumDebugVariables> getDebugVariables() const override
+    {
+        const auto currents = currents_filter_.getValue();
+
+        return {
+            hardware_status_.inverter_voltage,
+            math::convertKelvinToCelsius(hardware_status_.inverter_temperature),
+            hardware_status_.current_sensor_gain,
+            currents[0],
+            currents[1]
+        };
+    }
 
     const TestReport& getTestReport() const { return test_report_; }
-
-    /**
-     * State accessors for debugging purposes.
-     */
-    const auto& getCurrentsFilter() const { return currents_filter_; }
 };
 
 }

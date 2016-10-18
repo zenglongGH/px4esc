@@ -38,20 +38,16 @@ namespace motor_id
  * Motor identification logic.
  * Refer to the Dmitry's doc for derivations and explanation of what's going on here.
  */
-class Estimator
+class MotorIdentificationTask : public ITask
 {
     struct ContextImplementation : public Context
     {
         std::uint32_t pwm_period_counter = 0;
         Vector<3> pwm_output_vector = Vector<3>::Zero();
-        std::array<Scalar, 7> debug_values_{};
+        std::array<Scalar, ITask::NumDebugVariables> debug_values_{};
 
-        ContextImplementation(const Parameters& config,
-                              const ObserverParameters& observer_params,
-                              const board::motor::PWMParameters& pwm_params) :
-            Context(config,
-                    observer_params,
-                    pwm_params)
+        ContextImplementation(const CompleteParameterSet& params) :
+            Context(params)
         { }
 
         void setPWM(const Vector<3>& pwm) override
@@ -71,15 +67,15 @@ class Estimator
         Scalar getTime() const override
         {
             // Locking is not necessary because the read is atomic
-            return Scalar(pwm_period_counter) * pwm_params.period;
+            return Scalar(pwm_period_counter) * params.pwm.period;
         }
     } context_;
 
     MotorParameters result_;
-    bool finished_ = false;
+    Status status_ = Status::Running;
     unsigned next_task_index_ = 0;
-    IEstimatorTask* current_task_ = nullptr;
-    void (Estimator::* const* const task_chain_)();
+    ISubTask* current_task_ = nullptr;
+    void (MotorIdentificationTask::* const* const task_chain_)();
 
     alignas(32) std::uint8_t vinnie_the_pool_[std::max({
         sizeof(ResistanceTask),
@@ -91,7 +87,7 @@ class Estimator
     {
         if (current_task_ != nullptr)
         {
-            current_task_->~IEstimatorTask();
+            current_task_->~ISubTask();
             current_task_ = nullptr;
         }
     }
@@ -105,25 +101,25 @@ class Estimator
         current_task_ = new (vinnie_the_pool_) Task(context_, result_);
     }
 
-    static void (Estimator::* const* selectTaskChain(Mode mode))()
+    static void (MotorIdentificationTask::* const* selectTaskChain(Mode mode))()
     {
         switch (mode)
         {
         case Mode::Static:
         {
-            static constexpr void (Estimator::* chain[])() = {
-                &Estimator::switchTask<ResistanceTask>,
-                &Estimator::switchTask<InductanceTask>,
+            static constexpr void (MotorIdentificationTask::* chain[])() = {
+                &MotorIdentificationTask::switchTask<ResistanceTask>,
+                &MotorIdentificationTask::switchTask<InductanceTask>,
                 nullptr
             };
             return chain;
         }
         case Mode::RotationWithoutMechanicalLoad:
         {
-            static constexpr void (Estimator::* chain[])() = {
-                &Estimator::switchTask<ResistanceTask>,
-                &Estimator::switchTask<InductanceTask>,
-                &Estimator::switchTask<MagneticFluxTask>,
+            static constexpr void (MotorIdentificationTask::* chain[])() = {
+                &MotorIdentificationTask::switchTask<ResistanceTask>,
+                &MotorIdentificationTask::switchTask<InductanceTask>,
+                &MotorIdentificationTask::switchTask<MagneticFluxTask>,
                 nullptr
             };
             return chain;
@@ -134,50 +130,43 @@ class Estimator
     }
 
 public:
-    Estimator(Mode mode,
-              const MotorParameters& initial_parameters,
-              const Parameters& config,
-              const ObserverParameters& observer_params,
-              const board::motor::PWMParameters& pwm_params) :
-        context_(config,
-                 observer_params,
-                 pwm_params),
-        result_(initial_parameters),
+    MotorIdentificationTask(const CompleteParameterSet& params,
+                            Mode mode) :
+        context_(params),
+        result_(params.motor),
         task_chain_(selectTaskChain(mode))
     {
-        assert(config.isValid());
+        assert(params.controller.motor_id.isValid());
     }
 
-    ~Estimator()
+    ~MotorIdentificationTask()
     {
         destroyCurrentTask();
     }
 
-    /**
-     * Must be invoked every n-th PWM period.
-     * This method can be interrupted by @ref onNextPWMPeriod().
-     * @param period    Invocation period [seconds].
-     */
-    void onMainIRQ(Const period)
+    void onMainIRQ(Const period,
+                   const board::motor::Status& hw_status) override
     {
+        (void) hw_status;       // TODO check the status, abort on faults
+
         if (current_task_ == nullptr)
         {
             AbsoluteCriticalSectionLocker locker;
 
             // Making sure the parameters are sane
-            if (!context_.params.isValid())
+            if (!context_.params.controller.motor_id.isValid())
             {
-                finished_ = true;
+                status_ = Status::Failed;
                 result_ = MotorParameters();
             }
 
             // Switching to the next state
-            if (!finished_)
+            if (status_ == Status::Running)
             {
                 const auto constructor = task_chain_[next_task_index_];
                 if (constructor == nullptr)
                 {
-                    finished_ = true;
+                    status_ = Status::Finished;
                 }
                 else
                 {
@@ -196,26 +185,22 @@ public:
             AbsoluteCriticalSectionLocker locker;
 
             const auto status = current_task_->getStatus();
-            if (status != IEstimatorTask::Status::InProgress)
+            if (status != ISubTask::Status::InProgress)
             {
                 result_ = current_task_->getEstimatedMotorParameters();
 
                 destroyCurrentTask();
 
-                if (status == IEstimatorTask::Status::Failed)
+                if (status == ISubTask::Status::Failed)
                 {
-                    finished_ = true;
+                    status_ = Status::Failed;
                 }
             }
         }
     }
 
-    /**
-     * Must be invoked on every PWM period with appropriate measurements.
-     * Returns the desired PWM setpoints, possibly zero.
-     */
-    Vector<3> onNextPWMPeriod(const Vector<2>& phase_currents_ab,
-                              Const inverter_voltage)
+    std::pair<Vector<3>, bool> onNextPWMPeriod(const Vector<2>& phase_currents_ab,
+                                               Const inverter_voltage) override
     {
         AbsoluteCriticalSectionLocker::assertNotLocked();
 
@@ -227,7 +212,7 @@ public:
         {
             // This can't happen.
             assert(false);
-            finished_ = true;
+            status_ = Status::Failed;
             result_ = MotorParameters();
             return Vector<3>::Zero();
         }
@@ -239,14 +224,14 @@ public:
             current_task_->onNextPWMPeriod(phase_currents_ab, inverter_voltage);
         }
 
-        return context_.pwm_output_vector;
+        return {context_.pwm_output_vector, true};
     }
 
-    bool isFinished() const { return finished_; }
+    Status getStatus() const override { return status_; }
+
+    std::array<Scalar, NumDebugVariables> getDebugVariables() const override { return context_.debug_values_; }
 
     const MotorParameters& getEstimatedMotorParameters() const { return result_; }
-
-    auto getDebugValues() const { return context_.debug_values_; }
 };
 
 }

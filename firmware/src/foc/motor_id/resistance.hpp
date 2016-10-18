@@ -35,7 +35,7 @@ namespace motor_id
  * Phase resistance estimation task.
  * This one should be always executed first, since it doesn't depend on anything.
  */
-class ResistanceTask : public IEstimatorTask
+class ResistanceTask : public ISubTask
 {
     static constexpr Scalar RotorStabilizationDuration  =  1.0F;
     static constexpr Scalar PhaseMeasurementDuration    = 10.0F;
@@ -84,7 +84,7 @@ class ResistanceTask : public IEstimatorTask
         assert(inverter_voltage > 0);
 
         Const voltage_drop_due_to_dead_time =
-            (context_.pwm_params.dead_time / context_.pwm_params.period) * inverter_voltage;
+            (context_.params.pwm.dead_time / context_.params.pwm.period) * inverter_voltage;
 
         return (desired_voltage + voltage_drop_due_to_dead_time) / inverter_voltage;
     }
@@ -115,12 +115,13 @@ public:
                    const MotorParameters& initial_parameters) :
         context_(context),
         result_(initial_parameters),
-        estimation_current_(initial_parameters.max_current * context.params.fraction_of_max_current),
+        estimation_current_(initial_parameters.max_current *
+                            context.params.controller.motor_id.fraction_of_max_current),
         currents_filter_(Vector<2>::Zero())
     {
         result_.rs = 0;
 
-        if (!context_.params.isValid() ||
+        if (!context_.params.controller.motor_id.isValid() ||
             !os::float_eq::positive(result_.max_current))
         {
             state_ = State::Failed;
@@ -152,7 +153,7 @@ public:
             {
                 // Very coarse initial estimation
                 result_.rs = std::max(MotorParameters::getRsLimits().min,
-                                      result_.rs + OhmPerSec * context_.pwm_params.period);
+                                      result_.rs + OhmPerSec * context_.params.pwm.period);
             }
             else
             {
@@ -163,7 +164,7 @@ public:
             Const voltage = computeLineVoltageForResistanceMeasurement(estimation_current_, result_.rs);
             Const relative_voltage = computeRelativePhaseVoltage(voltage, inverter_voltage);
 
-            if ((relative_voltage < (context_.pwm_params.upper_limit - 0.5F)) &&
+            if ((relative_voltage < (context_.params.pwm.upper_limit - 0.5F)) &&
                 MotorParameters::getRsLimits().contains(result_.rs))
             {
                 context_.setPWM({

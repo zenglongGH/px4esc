@@ -100,16 +100,10 @@ struct Parameters
  */
 struct Context
 {
-    const Parameters params;
-    const ObserverParameters observer_params;
-    const board::motor::PWMParameters pwm_params;
+    const CompleteParameterSet params;
 
-    Context(const Parameters& config,
-            const ObserverParameters& observer_params,
-            const board::motor::PWMParameters& pwm_params) :
-        params(config),
-        observer_params(observer_params),
-        pwm_params(pwm_params)
+    Context(const CompleteParameterSet& params) :
+        params(params)
     { }
 
     virtual ~Context() { }
@@ -129,7 +123,7 @@ using ContextReference = Context&;
 /**
  * Interface of a motor ID task, e.g. resistance measurement.
  */
-class IEstimatorTask
+class ISubTask
 {
 public:
     enum class Status
@@ -139,7 +133,7 @@ public:
         Failed
     };
 
-    virtual ~IEstimatorTask() { }
+    virtual ~ISubTask() { }
 
     /**
      * This method is invoked every main IRQ, which happens every N-th period of PWM.

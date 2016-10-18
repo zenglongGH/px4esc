@@ -136,6 +136,23 @@ struct MotorParameters
         }
     }
 
+    Scalar computeMinVoltage() const
+    {
+        Const min_mrpm =
+            convertRotationRateElectricalToMechanical(convertAngularVelocityToRPM(min_electrical_ang_vel), num_poles);
+        Const kv = convertFluxLinkageToKV(phi, num_poles);
+        Const min_voltage = min_mrpm / kv;
+
+        if (math::Range<>(0.01F, 10.0F).contains(min_voltage))
+        {
+            return min_voltage;
+        }
+        else
+        {
+            return 0;
+        }
+    }
+
     bool isValid() const
     {
         static const auto is_positive = [](Const x) { return (x > 0) && std::isfinite(x); };
