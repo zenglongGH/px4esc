@@ -91,13 +91,16 @@ namespace observer
 
 using Default = foc::ObserverParameters;
 
-Real g_Q_11_22 ("obs.q_11_22",  Default().Q.diagonal()[0],  1e-6F,  1e+6F);
+Real g_Q_11    ("obs.q_11",     Default().Q.diagonal()[0],  1e-6F,  1e+6F);
+Real g_Q_22    ("obs.q_22",     Default().Q.diagonal()[1],  1e-6F,  1e+6F);
 Real g_Q_33    ("obs.q_33",     Default().Q.diagonal()[2],  1e-6F,  1e+6F);
 Real g_Q_44    ("obs.q_44",     Default().Q.diagonal()[3],  1e-6F,  1e+6F);
 
-Real g_R_11_22 ("obs.r_11_22",  Default().R.diagonal()[0],  1e-6F,  1e+6F);
+Real g_R_11    ("obs.r_11",     Default().R.diagonal()[0],  1e-6F,  1e+6F);
+Real g_R_22    ("obs.r_22",     Default().R.diagonal()[1],  1e-6F,  1e+6F);
 
-Real g_P0_11_22("obs.p0_11_22", Default().P0.diagonal()[0], 1e-6F,  1e+6F);
+Real g_P0_11   ("obs.p0_11",    Default().P0.diagonal()[0], 1e-6F,  1e+6F);
+Real g_P0_22   ("obs.p0_22",    Default().P0.diagonal()[1], 1e-6F,  1e+6F);
 Real g_P0_33   ("obs.p0_33",    Default().P0.diagonal()[2], 1e-6F,  1e+6F);
 Real g_P0_44   ("obs.p0_44",    Default().P0.diagonal()[3], 1e-6F,  1e+6F);
 
@@ -212,16 +215,16 @@ foc::ObserverParameters readObserverParameters()
 
     using namespace observer;
 
-    out.Q = math::makeDiagonalMatrix(g_Q_11_22.get(),
-                                     g_Q_11_22.get(),
+    out.Q = math::makeDiagonalMatrix(g_Q_11.get(),
+                                     g_Q_22.get(),
                                      g_Q_33.get(),
                                      g_Q_44.get());
 
-    out.R = math::makeDiagonalMatrix(g_R_11_22.get(),
-                                     g_R_11_22.get());
+    out.R = math::makeDiagonalMatrix(g_R_11.get(),
+                                     g_R_22.get());
 
-    out.P0 = math::makeDiagonalMatrix(g_P0_11_22.get(),
-                                      g_P0_11_22.get(),
+    out.P0 = math::makeDiagonalMatrix(g_P0_11.get(),
+                                      g_P0_22.get(),
                                       g_P0_33.get(),
                                       g_P0_44.get());
 
@@ -248,16 +251,16 @@ void writeObserverParameters(const foc::ObserverParameters& obj)
         }
     };
 
-    unpacker(obj.Q, {&g_Q_11_22,
-                     nullptr,
+    unpacker(obj.Q, {&g_Q_11,
+                     &g_Q_22,
                      &g_Q_33,
                      &g_Q_44});
 
-    unpacker(obj.R, {&g_R_11_22,
-                     nullptr});
+    unpacker(obj.R, {&g_R_11,
+                     &g_R_22});
 
-    unpacker(obj.P0, {&g_P0_11_22,
-                      nullptr,
+    unpacker(obj.P0, {&g_P0_11,
+                      &g_P0_22,
                       &g_P0_33,
                       &g_P0_44});
 
