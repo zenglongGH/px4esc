@@ -28,6 +28,7 @@
 #include <foc/common.hpp>
 #include <foc/voltage_modulator.hpp>
 #include <foc/irq_debug_output.hpp>
+#include <foc/observer.hpp>
 #include <math/math.hpp>
 #include <cstdint>
 #include <functional>
