@@ -38,9 +38,9 @@ namespace foc
  */
 struct ObserverParameters
 {
-    DiagonalMatrix<4> Q  = math::makeDiagonalMatrix(0.5F,
-                                                    0.05F,
-                                                    500.0F,
+    DiagonalMatrix<4> Q  = math::makeDiagonalMatrix(100.0F,
+                                                    100.0F,
+                                                    5000.0F,
                                                     1.0F);
 
     DiagonalMatrix<2> R  = math::makeDiagonalMatrix(2.0F,
