@@ -40,6 +40,7 @@ class CurrentPIController
     Const full_scale_current_;
     Const kp_;
     Const ki_;
+    Const voltage_limit_mult_;
 
     Scalar ui_ = 0;
 
@@ -49,8 +50,9 @@ public:
                         Const max_current,
                         Const dt) :
         full_scale_current_(max_current * 3.0F),
-        kp_((math::Pi * 2.0F * Lq) / (20.0F * dt)),
-        ki_(dt * Rs / Lq)
+        kp_((math::Pi2 * Lq) / (20.0F * dt)),
+        ki_(dt * Rs / Lq),
+        voltage_limit_mult_((SquareRootOf3 / 2.0F) / kp_)
     {
         assert(Lq > 0);
         assert(Rs > 0);
@@ -62,7 +64,7 @@ public:
                           Const real_current,
                           Const inverter_voltage)
     {
-        Const voltage_limit = inverter_voltage * (SquareRootOf3 / 2.0F);
+        Const voltage_limit = inverter_voltage * voltage_limit_mult_;
         const math::Range<> voltage_limits(-voltage_limit, voltage_limit);
 
         static constexpr math::Range<> UnityLimits(-1.0F, 1.0F);
