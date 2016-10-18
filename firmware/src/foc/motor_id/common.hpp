@@ -100,12 +100,14 @@ struct Parameters
 struct Context
 {
     const Parameters params;
-
+    const ObserverParameters observer_params;
     const board::motor::PWMParameters pwm_params;
 
     Context(const Parameters& config,
+            const ObserverParameters& observer_params,
             const board::motor::PWMParameters& pwm_params) :
         params(config),
+        observer_params(observer_params),
         pwm_params(pwm_params)
     { }
 

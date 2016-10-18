@@ -47,8 +47,10 @@ class Estimator
         std::array<Scalar, 7> debug_values_{};
 
         ContextImplementation(const Parameters& config,
+                              const ObserverParameters& observer_params,
                               const board::motor::PWMParameters& pwm_params) :
             Context(config,
+                    observer_params,
                     pwm_params)
         { }
 
@@ -135,8 +137,10 @@ public:
     Estimator(Mode mode,
               const MotorParameters& initial_parameters,
               const Parameters& config,
+              const ObserverParameters& observer_params,
               const board::motor::PWMParameters& pwm_params) :
         context_(config,
+                 observer_params,
                  pwm_params),
         result_(initial_parameters),
         task_chain_(selectTaskChain(mode))

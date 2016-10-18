@@ -860,6 +860,7 @@ void handleMainIRQ(Const period)
                 motor_id::Estimator(g_requested_motor_identification_mode,
                                     g_motor_params,
                                     g_controller_params.motor_id,
+                                    g_observer_params,
                                     board::motor::getPWMParameters());
         }
 
