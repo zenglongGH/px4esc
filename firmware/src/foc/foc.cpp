@@ -65,6 +65,20 @@ TaskHandler<const CompleteParameterSet&,
             MotorIdentificationTask
 > g_task_handler(g_params);
 
+
+void onTaskFinished()
+{
+    if (auto task = g_task_handler.as<HardwareTestingTask>())
+    {
+        g_last_hardware_test_report = task->getTestReport();
+    }
+
+    if (auto task = g_task_handler.as<MotorIdentificationTask>())
+    {
+        g_params.motor = task->getEstimatedMotorParameters();
+    }
+}
+
 } // namespace
 
 
@@ -315,16 +329,7 @@ void handleMainIRQ(Const period)
 
     case ITask::Status::Finished:
     {
-        if (auto task = g_task_handler.as<HardwareTestingTask>())
-        {
-            g_last_hardware_test_report = task->getTestReport();
-        }
-
-        if (auto task = g_task_handler.as<MotorIdentificationTask>())
-        {
-            g_params.motor = task->getEstimatedMotorParameters();
-        }
-
+        onTaskFinished();
         g_task_handler.select<IdleTask>();
         break;
     }

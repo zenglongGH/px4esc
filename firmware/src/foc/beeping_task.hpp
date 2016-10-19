@@ -63,7 +63,7 @@ public:
     {
         (void) period;
 
-        if (!hw_status.isOkay())
+        if (!hw_status.power_ok)
         {
             status_ = Status::Failed;
         }

@@ -255,6 +255,9 @@ os::watchdog::Timer init()
 
     board::motor::printStatus();
 
+    // Clearing faults
+    foc::stop();
+
     /*
      * Interfaces
      */
