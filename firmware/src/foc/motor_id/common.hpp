@@ -24,75 +24,18 @@
 
 #pragma once
 
-#include <foc/motor_parameters.hpp>
+#include <foc/parameters.hpp>
 #include <foc/common.hpp>
 #include <foc/voltage_modulator.hpp>
 #include <foc/irq_debug_output.hpp>
 #include <foc/observer.hpp>
-#include <math/math.hpp>
 #include <cstdint>
-#include <functional>
 
 
 namespace foc
 {
 namespace motor_id
 {
-/**
- * Greater modes (listed later) allow to identify more parameters,
- * but impose more restrictions on the connected load.
- * Read the comments for details.
- */
-enum class Mode
-{
-    /**
-     * In this mode, the motor will not rotate, therefore it doesn't matter what load it is connected to.
-     * Estimated parameters: Rs, L.
-     */
-    Static,
-
-    /**
-     * In this mode, the motor WILL SPIN.
-     * In order to achieve correct results, the motor MUST NOT BE CONNECTED TO ANY MECHANICAL LOAD.
-     * Estimated parameters: Rs, L, Phi.
-     */
-    RotationWithoutMechanicalLoad
-};
-
-/**
- * Parameters used by the motor parameters estimator logic.
- * Provided defaults should be valid for most, if not all, use cases.
- */
-struct Parameters
-{
-    /// Fraction of the maximum motor current used for identification
-    Scalar fraction_of_max_current = 0.3F;
-
-    /// Current frequency used for inductance identification, Hertz
-    Scalar current_injection_frequency = 1000.0F;
-
-    /// Electrical angular velocity used for magnetic flux linkage identification, radian/second
-    Scalar phi_estimation_electrical_angular_velocity = 150.0F;
-
-
-    bool isValid() const
-    {
-        return math::Range<>(0.01F, 1.0F).contains(fraction_of_max_current) &&
-               math::Range<>(10.0F, 100000.0F).contains(current_injection_frequency) &&
-               math::Range<>(10.0F, 10000.0F).contains(phi_estimation_electrical_angular_velocity);
-    }
-
-    auto toString() const
-    {
-        return os::heapless::format("FracI: %.0f %%\n"
-                                    "Finj : %.1f Hz\n"
-                                    "Wphi : %.1f rad/s",
-                                    double(fraction_of_max_current * 100.0F),
-                                    double(current_injection_frequency),
-                                    double(phi_estimation_electrical_angular_velocity));
-    }
-};
-
 /**
  * Context of the whole identification process.
  * An object of this type is passed from task to task until the procedure is complete.

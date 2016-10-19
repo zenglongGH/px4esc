@@ -25,6 +25,7 @@
 #pragma once
 
 #include "common.hpp"
+#include "parameters.hpp"
 
 
 namespace foc
@@ -75,7 +76,7 @@ public:
             time_to_next_excitation_ -= params_.pwm.period;
             if (time_to_next_excitation_ <= 0)
             {
-                time_to_next_excitation_ = excitation_period_;
+                time_to_next_excitation_ += excitation_period_;
                 Vector<3> output = Vector<3>::Zero();
                 output[next_phase_index_++ % 3] = 1.0F;
                 return {output, true};

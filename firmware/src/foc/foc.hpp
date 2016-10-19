@@ -24,11 +24,11 @@
 
 #pragma once
 
-#include "motor_parameters.hpp"
+#include "common.hpp"
+#include "parameters.hpp"
 #include "motor_id/task.hpp"
-#include "setpoint_controller.hpp"
+#include "running_task.hpp"
 #include "hardware_testing_task.hpp"
-#include "observer.hpp"
 #include <math/math.hpp>
 #include <cstdint>
 #include <utility>
@@ -38,39 +38,7 @@ namespace foc
 {
 
 using MotorIdentificationMode = motor_id::Mode;
-
-/**
- * General parameters not pertaining to the observer or the motor.
- */
-struct ControllerParameters
-{
-    /// Preferred duration of spinup, real duration may slightly differ, seconds
-    Scalar nominal_spinup_duration = 1.5F;
-
-    /// If the rotor stalled this many times in a row, latch into FAULT state
-    std::uint32_t num_stalls_to_latch = 100;
-
-    /// Refer to the definition for details
-    motor_id::Parameters motor_id;
-
-
-    bool isValid() const
-    {
-        return math::Range<>(0.1F, 60.0F).contains(nominal_spinup_duration) &&
-               num_stalls_to_latch > 0 &&
-               motor_id.isValid();
-    }
-
-    auto toString() const
-    {
-        return os::heapless::format("Tspinup: %.1f sec\n"
-                                    "Nslatch: %u\n"
-                                    "Motor ID parameters:\n%s",
-                                    double(nominal_spinup_duration),
-                                    unsigned(num_stalls_to_latch),
-                                    motor_id.toString().c_str());
-    }
-};
+using HardwareTestReport = HardwareTestingTask::TestReport;
 
 /**
  * Must be invoked in the first order, exactly once.
@@ -110,7 +78,7 @@ ObserverParameters getObserverParameters();
  * Completion of the process can be detected by means of monitoring the current state of the controller, see @ref State.
  * The identified parameters can be read via @ref getMotorParameters().
  */
-void beginMotorIdentification(motor_id::Mode mode);
+void beginMotorIdentification(MotorIdentificationMode mode);
 
 /**
  * Begins the asynchronous process of hardware testing.
@@ -123,7 +91,7 @@ void beginHardwareTest();
 /**
  * See @ref beginHardwareTest().
  */
-HardwareTestingTask::TestReport getLastHardwareTestReport();
+HardwareTestReport getLastHardwareTestReport();
 
 /**
  * State of the control logic.

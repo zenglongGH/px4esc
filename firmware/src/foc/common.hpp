@@ -44,25 +44,6 @@ using board::motor::AbsoluteCriticalSectionLocker;
 constexpr Scalar SquareRootOf3 = Scalar(1.7320508075688772);
 
 /**
- * Constant parameters shared between tasks.
- * This data is guaranteed to stay constant as long as a task is running,
- * but it may be changed when tasks are switched (e.g. configuration parameters may be updated at run time).
- */
-struct CompleteParameterSet
-{
-    ControllerParameters controller;
-    MotorParameters motor;
-    ObserverParameters observer;
-    board::motor::PWMParameters pwm;
-
-    bool isValid() const
-    {
-        return controller.isValid() &&
-               motor.isValid();
-    }
-};
-
-/**
  * State specific task generalization.
  */
 class ITask

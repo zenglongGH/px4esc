@@ -41,10 +41,6 @@ namespace foc
 
 namespace
 {
-/*
- * State variables
- */
-volatile State g_state = State::Idle;
 
 CompleteParameterSet g_params;
 
@@ -57,20 +53,14 @@ class DebugVariableTracer
 {
     static constexpr unsigned NumVariables = 7;
 
-#if DEBUG_BUILD
     Scalar vars_[NumVariables] = {};
-#endif
 
 public:
     template <unsigned Index, typename Value>
     void set(const Value x)
     {
         static_assert(Index < NumVariables, "Debug variable index out of range");
-#if DEBUG_BUILD
         vars_[Index] = Scalar(x);
-#else
-        (void) x;
-#endif
     }
 
     template <typename Container>
@@ -81,18 +71,11 @@ public:
 
     void print() const
     {
-#if DEBUG_BUILD
         std::uint64_t pwm_cycles = 0;
         Scalar vars_copy[NumVariables] = {};
 
-        {
-            AbsoluteCriticalSectionLocker locker;
-            pwm_cycles = g_fast_irq_cycle_counter.get();
-            std::copy(std::begin(vars_), std::end(vars_), std::begin(vars_copy));
-        }
-
         std::printf("$%.4f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
-                    double(pwm_cycles) * double(board::motor::getPWMParameters().period),
+                    double(ST2US(chVTGetSystemTimeX())) * 1e-6,     // TODO: Avoid wraparound!
                     double(vars_copy[0]),
                     double(vars_copy[1]),
                     double(vars_copy[2]),
@@ -100,33 +83,15 @@ public:
                     double(vars_copy[4]),
                     double(vars_copy[5]),
                     double(vars_copy[6]));
-#endif
     }
 } g_debug_tracer;
-
-
-void doStop()
-{
-    AbsoluteCriticalSectionLocker locker;
-
-    g_state = State::Idle;
-    g_setpoint = 0;
-    g_setpoint_remaining_ttl = 0;
-
-    if (g_c != nullptr)
-    {
-        g_c->~Context();
-        g_c = nullptr;
-    }
-}
 
 
 bool isStatusOk()
 {
     return g_last_hardware_test_report.isSuccessful() &&
-           g_motor_params.isValid() &&
-           board::motor::getStatus().isOkay() &&
-           (g_num_successive_rotor_stalls < g_controller_params.num_stalls_to_latch);
+           g_params.isValid() &&
+           board::motor::getStatus().isOkay();
 }
 
 } // namespace
@@ -134,15 +99,6 @@ bool isStatusOk()
 
 void init()
 {
-    {
-        AbsoluteCriticalSectionLocker locker;
-
-        g_state = State::Idle;
-        g_setpoint = 0;
-        g_setpoint_remaining_ttl = 0;
-        g_c = nullptr;
-    }
-
     board::motor::beginCalibration();
 }
 
@@ -150,62 +106,49 @@ void init()
 void setControllerParameters(const ControllerParameters& params)
 {
     AbsoluteCriticalSectionLocker locker;
-    g_controller_params = params;
+    g_params.controller = params;
 }
 
 ControllerParameters getControllerParameters()
 {
     AbsoluteCriticalSectionLocker locker;
-    return g_controller_params;
+    return g_params.controller;
 }
 
 void setMotorParameters(const MotorParameters& params)
 {
     AbsoluteCriticalSectionLocker locker;
-    g_motor_params = params;
+    g_params.motor = params;
 }
 
 MotorParameters getMotorParameters()
 {
     AbsoluteCriticalSectionLocker locker;
-    return g_motor_params;
+    return g_params.motor;
 }
 
 void setObserverParameters(const ObserverParameters& params)
 {
     AbsoluteCriticalSectionLocker locker;
-    g_observer_params = params;
+    g_params.observer = params;
 }
 
 ObserverParameters getObserverParameters()
 {
     AbsoluteCriticalSectionLocker locker;
-    return g_observer_params;
+    return g_params.observer;
 }
 
 
 void beginMotorIdentification(motor_id::Mode mode)
 {
     AbsoluteCriticalSectionLocker locker;
-
-    if (g_state == State::Idle ||
-        g_state == State::Fault)
-    {
-        g_state = State::MotorIdentification;
-        g_requested_motor_identification_mode = mode;
-    }
 }
 
 
 void beginHardwareTest()
 {
     AbsoluteCriticalSectionLocker locker;
-
-    if (g_state == State::Idle ||
-        g_state == State::Fault)
-    {
-        g_state = State::HardwareTesting;
-    }
 }
 
 
@@ -218,7 +161,7 @@ HardwareTestingTask::TestReport getLastHardwareTestReport()
 
 State getState()
 {
-    return g_state;             // Atomic read, no locking
+    return 0;
 }
 
 
@@ -233,11 +176,6 @@ void setSetpoint(ControlMode control_mode,
 void stop()
 {
     AbsoluteCriticalSectionLocker locker;
-
-    if (g_state == State::MotorIdentification)
-    {
-        g_state = State::Fault;     // Will switch back to Idle later from IRQ
-    }
 }
 
 
@@ -306,12 +244,6 @@ void beep(Const frequency,
     if ((frequency > 0) &&
         (duration > 0))
     {
-        static BeepCommand beep_command;
-
-        beep_command.frequency = frequency;
-        beep_command.duration  = duration;
-
-        g_beep_command = &beep_command;
     }
 }
 
@@ -646,12 +578,6 @@ void handleFastIRQ(Const period,
     if (board::motor::isCalibrationInProgress())
     {
         g_pwm_handle.release();
-
-        if (g_state == State::Running ||
-            g_state == State::Spinup)
-        {
-            g_state = State::Idle;
-        }
     }
     else
     {

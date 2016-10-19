@@ -25,6 +25,7 @@
 #pragma once
 
 #include "common.hpp"
+#include "parameters.hpp"
 
 
 namespace foc
