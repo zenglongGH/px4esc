@@ -198,7 +198,7 @@ class RunningTask : public ITask
 
     ControlMode requested_control_mode_ = ControlMode(0);
     Scalar raw_setpoint_ = 0;
-    Scalar setpoint_remaining_ttl_ = 0;         ///< Seconds left before the setpoint will be zeroed, unless updated
+    Scalar remaining_setpoint_timeout_ = 0;
 
     struct LowPassFilteredValues
     {
@@ -214,8 +214,7 @@ class RunningTask : public ITask
     } low_pass_filtered_values_;
 
 
-    MotorRunner::Setpoint computeSetpoint(Const period,
-                                          const board::motor::Status& hw_status) const
+    MotorRunner::Setpoint computeSetpoint(Const period, const board::motor::Status& hw_status) const
     {
         MotorRunner::Setpoint new_sp;
 
@@ -256,7 +255,10 @@ class RunningTask : public ITask
     }
 
 public:
-    RunningTask(const CompleteParameterSet& params) :
+    RunningTask(const CompleteParameterSet& params,
+                ControlMode control_mode,
+                Const initial_setpoint,
+                Const initial_setpoint_ttl) :
         params_(params),
         setpoint_controller_(params.motor.max_current,
                              params.motor.min_current,
@@ -265,6 +267,8 @@ public:
                              params.motor.voltage_ramp_volt_per_s)
     {
         assert(params_.isValid());
+
+        setSetpoint(control_mode, initial_setpoint, initial_setpoint_ttl);
     }
 
     void setSetpoint(ControlMode control_mode,
@@ -272,18 +276,9 @@ public:
                      Const request_ttl)
     {
         AbsoluteCriticalSectionLocker locker;
-
-        const bool zero_setpoint = os::float_eq::closeToZero(value);
-        const bool sign_flip = ((raw_setpoint_ > 0) && (value < 0)) ||
-                               ((raw_setpoint_ < 0) && (value > 0));
-        if (zero_setpoint || sign_flip)
-        {
-            num_successive_stalls_ = 0;
-        }
-
-        requested_control_mode_ = control_mode;
-        raw_setpoint_           = value;
-        setpoint_remaining_ttl_ = request_ttl;
+        requested_control_mode_     = control_mode;
+        raw_setpoint_               = value;
+        remaining_setpoint_timeout_ = request_ttl;
     }
 
     void onMainIRQ(Const period,
@@ -291,14 +286,16 @@ public:
     {
         if (status_ != Status::Running)
         {
+            AbsoluteCriticalSectionLocker locker;
+            runner_.destroy();
             return;
         }
 
         if (!runner_.isConstructed())
         {
             AbsoluteCriticalSectionLocker locker;
-            const auto dir = (raw_setpoint_ > 0) ? MotorRunner::Direction::Forward : MotorRunner::Direction::Reverse;
-            runner_.construct(params_, dir);
+            runner_.construct(params_,
+                              (raw_setpoint_ > 0) ? MotorRunner::Direction::Forward : MotorRunner::Direction::Reverse);
         }
 
         AbsoluteCriticalSectionLocker::assertNotLocked();
@@ -306,6 +303,13 @@ public:
 
         {
             AbsoluteCriticalSectionLocker locker;
+
+            remaining_setpoint_timeout_ -= period;
+            if (remaining_setpoint_timeout_ < 0)
+            {
+                remaining_setpoint_timeout_ = 0;
+                raw_setpoint_ = 0;
+            }
 
             switch (runner_->getState())
             {
@@ -343,6 +347,14 @@ public:
                 if (num_successive_stalls_ > params_.controller.num_stalls_to_latch)
                 {
                     status_ = Status::Failed;
+                }
+                else if (os::float_eq::closeToZero(raw_setpoint_))
+                {
+                    status_ = Status::Finished;
+                }
+                else
+                {
+                    ;   // No change, keep running
                 }
                 break;
             }
@@ -394,6 +406,41 @@ public:
 
         // TODO: Return Dmitry's formula back
         return out;
+    }
+
+    bool isSpinupInProgress() const
+    {
+        AbsoluteCriticalSectionLocker locker;
+        return runner_.isConstructed() ? (runner_->getState() == MotorRunner::State::Spinup) : false;
+    }
+
+    std::uint32_t getNumSuccessiveStalls() const
+    {
+        return num_successive_stalls_;  // Atomic read, no locking
+    }
+
+    Vector<2> getUdq() const
+    {
+        AbsoluteCriticalSectionLocker locker;
+        return runner_.isConstructed() ? runner_->getUdq() : Vector<2>::Zero();
+    }
+
+    Vector<2> getIdq() const
+    {
+        AbsoluteCriticalSectionLocker locker;
+        return runner_.isConstructed() ? runner_->getIdq() : Vector<2>::Zero();
+    }
+
+    Scalar getElectricalAngularVelocity() const
+    {
+        AbsoluteCriticalSectionLocker locker;
+        return runner_.isConstructed() ? runner_->getElectricalAngularVelocity() : 0.0F;
+    }
+
+    LowPassFilteredValues getLowPassFilteredValues() const
+    {
+        AbsoluteCriticalSectionLocker locker;
+        return low_pass_filtered_values_;
     }
 };
 

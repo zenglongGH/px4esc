@@ -33,18 +33,30 @@ namespace foc
 /**
  * Do-nothing task.
  */
-class IdleTask : public ITask
+class BeepingTask : public ITask
 {
+    static constexpr math::Range<> DurationLimits{0, 3.0F};
+    static constexpr math::Range<> FrequencyLimits{100.0F, 15000.0F};
+
     Status status_ = Status::Running;
 
+    const CompleteParameterSet params_;
+
+    Const excitation_period_ = 0;
+
+    Scalar remaining_duration_ = 0;
+    Scalar time_to_next_excitation_ = 0;
+    unsigned next_phase_index_ = 0;
+
 public:
-    IdleTask(const CompleteParameterSet& params)
-    {
-        if (!params.isValid())
-        {
-            status_ = Status::Failed;
-        }
-    }
+    BeepingTask(const CompleteParameterSet& params,
+                Const frequency,
+                Const duration) :
+        params_(params),
+        excitation_period_(1.0F / FrequencyLimits.constrain(frequency)),
+        remaining_duration_(DurationLimits.constrain(duration)),
+        time_to_next_excitation_(excitation_period_)
+    { }
 
     void onMainIRQ(Const period,
                    const board::motor::Status& hw_status) override
@@ -62,6 +74,24 @@ public:
     {
         (void) phase_currents_ab;
         (void) inverter_voltage;
+
+        // Beeping
+        if (remaining_duration_ > 0)
+        {
+            remaining_duration_ -= params_.pwm.period;
+            time_to_next_excitation_ -= params_.pwm.period;
+            if (time_to_next_excitation_ <= 0)
+            {
+                time_to_next_excitation_ += excitation_period_;
+                Vector<3> output = Vector<3>::Zero();
+                output[next_phase_index_++ % 3] = 1.0F;
+                return {output, true};
+            }
+        }
+        else
+        {
+            status_ = Status::Finished;
+        }
 
         return {Vector<3>::Zero(), false};
     }

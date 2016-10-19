@@ -108,8 +108,7 @@ private:
         Finished
     };
 
-    Range inverter_voltage_range_;
-    Range inverter_temperature_range_;
+    const CompleteParameterSet params_;
 
     State state_ = State::Initialization;
     Scalar time_ = 0;
@@ -166,13 +165,13 @@ private:
     }
 
 public:
-    HardwareTestingTask(const Range inverter_voltage_range,
-                   const Range inverter_temperature_range) :
-        inverter_voltage_range_(inverter_voltage_range),
-        inverter_temperature_range_(inverter_temperature_range),
+    HardwareTestingTask(const CompleteParameterSet& params) :
+        params_(params),
         currents_filter_(Vector<2>::Zero())
     {
-        assert(inverter_temperature_range_.contains(math::convertCelsiusToKelvin(25.0F)));
+        assert(
+            params_.board_limits.measurement_range.inverter_temperature.contains(
+                math::convertCelsiusToKelvin(25.0F)));
     }
 
     void onMainIRQ(Const period,
@@ -189,12 +188,12 @@ public:
         // No dead time compensation here
         Const relative_testing_voltage = TestingVoltage / hw_status.inverter_voltage;
 
-        if (!inverter_voltage_range_.contains(hw_status.inverter_voltage))
+        if (!params_.board_limits.measurement_range.inverter_voltage.contains(hw_status.inverter_voltage))
         {
             registerError(TestReport::ErrorFlag::InverterVoltageSensorError);
         }
 
-        if (!inverter_temperature_range_.contains(hw_status.inverter_temperature))
+        if (!params_.board_limits.measurement_range.inverter_temperature.contains(hw_status.inverter_temperature))
         {
             registerError(TestReport::ErrorFlag::InverterTemperatureSensorError);
         }

@@ -96,6 +96,9 @@ HardwareTestReport getLastHardwareTestReport();
 /**
  * State of the control logic.
  * Some of the functions may be unavailable in certain states.
+ * TODO: At the moment, the control logic does not use this state representation.
+ *       There is a wrapper that converts real states into this representation.
+ *       Probably this should be simplified.
  */
 enum class State
 {
@@ -174,16 +177,13 @@ void setSetpoint(ControlMode control_mode,
                  Const request_ttl);
 
 /**
- * See @ref ControlMode.
- * The control mode is selected via @ref setSetpoint().
- */
-ControlMode getControlMode();
-
-/**
  * Stops the motor normally if it is running.
  * Clears the fault state if the motor is not running.
  */
-void stop();
+inline void stop()
+{
+    setSetpoint(ControlMode(0), 0.0F, 0.0F);
+}
 
 /**
  * Returns the instant motor current in Amperes.

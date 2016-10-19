@@ -263,6 +263,7 @@ struct CompleteParameterSet
     MotorParameters motor;
     ObserverParameters observer;
     board::motor::PWMParameters pwm;
+    board::motor::Limits board_limits;
 
     bool isValid() const
     {

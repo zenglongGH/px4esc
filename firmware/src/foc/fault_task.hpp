@@ -32,6 +32,8 @@ namespace foc
 {
 /**
  * Do-nothing task at fault state.
+ * Note that this task is automatically selected when any other task reports Failure; therefore, this task itself
+ * must NEVER report Failure (shoudln't be hard to ensure since it doesn't do anything anyway).
  */
 class FaultTask : public ITask
 {

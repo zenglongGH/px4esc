@@ -288,6 +288,11 @@ public:
     {
         assert(__get_PRIMASK() == 0);
     }
+
+    inline static void assertLocked()
+    {
+        assert(__get_PRIMASK() != 0);
+    }
 } volatile AbsoluteCriticalSectionLocker;
 
 }

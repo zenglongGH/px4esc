@@ -26,10 +26,15 @@
 #include "pid.hpp"
 #include "transforms.hpp"
 #include "voltage_modulator.hpp"
-#include "irq_debug_output.hpp"
-#include "common.hpp"
+#include "irq_debug.hpp"
 
-#include <zubax_chibios/config/config.hpp>
+// Tasks:
+#include "idle_task.hpp"
+#include "fault_task.hpp"
+#include "beeping_task.hpp"
+#include "running_task.hpp"
+#include "hardware_testing_task.hpp"
+#include "motor_id/task.hpp"
 
 
 /*
@@ -38,7 +43,6 @@
  */
 namespace foc
 {
-
 namespace
 {
 
@@ -48,60 +52,33 @@ board::motor::PWMHandle g_pwm_handle;
 
 HardwareTestingTask::TestReport g_last_hardware_test_report;
 
+IRQDebugPlotter g_debug_plotter;
 
-class DebugVariableTracer
-{
-    static constexpr unsigned NumVariables = 7;
+using motor_id::MotorIdentificationTask;
 
-    Scalar vars_[NumVariables] = {};
-
-public:
-    template <unsigned Index, typename Value>
-    void set(const Value x)
-    {
-        static_assert(Index < NumVariables, "Debug variable index out of range");
-        vars_[Index] = Scalar(x);
-    }
-
-    template <typename Container>
-    void set(const Container cont)
-    {
-        std::copy_n(std::begin(cont), std::min(cont.size(), NumVariables), std::begin(vars_));
-    }
-
-    void print() const
-    {
-        std::uint64_t pwm_cycles = 0;
-        Scalar vars_copy[NumVariables] = {};
-
-        std::printf("$%.4f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
-                    double(ST2US(chVTGetSystemTimeX())) * 1e-6,     // TODO: Avoid wraparound!
-                    double(vars_copy[0]),
-                    double(vars_copy[1]),
-                    double(vars_copy[2]),
-                    double(vars_copy[3]),
-                    double(vars_copy[4]),
-                    double(vars_copy[5]),
-                    double(vars_copy[6]));
-    }
-} g_debug_tracer;
-
-
-bool isStatusOk()
-{
-    return g_last_hardware_test_report.isSuccessful() &&
-           g_params.isValid() &&
-           board::motor::getStatus().isOkay();
-}
+TaskHandler<const CompleteParameterSet&,
+            IdleTask,
+            FaultTask,
+            BeepingTask,
+            RunningTask,
+            HardwareTestingTask,
+            MotorIdentificationTask
+> g_task_handler(g_params);
 
 } // namespace
 
 
 void init()
 {
-    board::motor::beginCalibration();
-}
+    AbsoluteCriticalSectionLocker locker;
 
+    board::motor::beginCalibration();
+
+    g_params.pwm = board::motor::getPWMParameters();
+    g_params.board_limits = board::motor::getLimits();
+
+    g_task_handler.select<IdleTask>();
+}
 
 void setControllerParameters(const ControllerParameters& params)
 {
@@ -139,18 +116,15 @@ ObserverParameters getObserverParameters()
     return g_params.observer;
 }
 
-
-void beginMotorIdentification(motor_id::Mode mode)
+void beginMotorIdentification(MotorIdentificationMode mode)
 {
-    AbsoluteCriticalSectionLocker locker;
+    g_task_handler.from<IdleTask, BeepingTask>().to<MotorIdentificationTask>(mode);
 }
-
 
 void beginHardwareTest()
 {
-    AbsoluteCriticalSectionLocker locker;
+    g_task_handler.from<IdleTask, BeepingTask, FaultTask>().to<HardwareTestingTask>();
 }
-
 
 HardwareTestingTask::TestReport getLastHardwareTestReport()
 {
@@ -158,51 +132,82 @@ HardwareTestingTask::TestReport getLastHardwareTestReport()
     return g_last_hardware_test_report;
 }
 
-
 State getState()
 {
-    return 0;
-}
+    AbsoluteCriticalSectionLocker locker;
 
+    if (g_task_handler.either<IdleTask, BeepingTask>())
+    {
+        return State::Idle;
+    }
+
+    if (g_task_handler.is<FaultTask>())
+    {
+        return State::Fault;
+    }
+
+    if (auto task = g_task_handler.as<RunningTask>())
+    {
+        return task->isSpinupInProgress() ? State::Spinup : State::Running;
+    }
+
+    if (g_task_handler.is<HardwareTestingTask>())
+    {
+        return State::HardwareTesting;
+    }
+
+    if (g_task_handler.is<MotorIdentificationTask>())
+    {
+        return State::MotorIdentification;
+    }
+
+    assert(false);
+    return State::Fault;
+}
 
 void setSetpoint(ControlMode control_mode,
                  Const value,
                  Const request_ttl)
 {
     AbsoluteCriticalSectionLocker locker;
-
+    if (auto task = g_task_handler.as<RunningTask>())
+    {
+        task->setSetpoint(control_mode, value, request_ttl);
+    }
+    else
+    {
+        if (os::float_eq::closeToZero(value))
+        {
+            g_task_handler.from<FaultTask>().to<IdleTask>();
+        }
+        else
+        {
+            g_task_handler.from<IdleTask, BeepingTask>().to<RunningTask>(control_mode, value, request_ttl);
+        }
+    }
 }
-
-void stop()
-{
-    AbsoluteCriticalSectionLocker locker;
-}
-
 
 Scalar getInstantCurrentFiltered()
 {
     Const voltage = board::motor::getInverterVoltage();
-
     if (os::float_eq::positive(voltage))
     {
         AbsoluteCriticalSectionLocker locker;
-        if (g_c != nullptr)
+        if (auto task = g_task_handler.as<RunningTask>())
         {
-            return g_c->low_pass_filtered_values.inverter_power / voltage;
+            return task->getLowPassFilteredValues().inverter_power / voltage;
         }
     }
-
     return 0;
 }
 
 Scalar getInstantDemandFactorFiltered()
 {
     AbsoluteCriticalSectionLocker locker;
-    if (g_c != nullptr)
+    if (auto task = g_task_handler.as<RunningTask>())
     {
-        return g_c->low_pass_filtered_values.demand_factor;
+        return task->getLowPassFilteredValues().demand_factor;
     }
-
     return 0;
 }
 
@@ -212,13 +217,13 @@ Scalar getInstantMechanicalRPM()
 
     {
         AbsoluteCriticalSectionLocker locker;
-        if (g_c != nullptr)
+        if (auto task = g_task_handler.as<RunningTask>())
         {
-            electrical_rad_sec = g_c->angular_velocity;
+            electrical_rad_sec = task->getElectricalAngularVelocity();
         }
     }
 
-    const auto num_poles = g_motor_params.num_poles;
+    const auto num_poles = g_params.motor.num_poles;
 
     if ((num_poles >= 2) &&
         (num_poles % 2 == 0))
@@ -232,108 +237,28 @@ Scalar getInstantMechanicalRPM()
 
 std::uint32_t getErrorCount()
 {
-    return g_num_successive_rotor_stalls;
-}
-
-
-void beep(Const frequency,
-          Const duration)
-{
     AbsoluteCriticalSectionLocker locker;
-
-    if ((frequency > 0) &&
-        (duration > 0))
+    if (auto task = g_task_handler.as<RunningTask>())
     {
+        return task->getNumSuccessiveStalls();
     }
+    return 0;
 }
 
+void beep(Const frequency, Const duration)
+{
+    g_task_handler.from<IdleTask>().to<BeepingTask>(frequency, duration);
+}
 
 void printStatusInfo()
 {
-    State state = State();
-    ControlMode control_mode = ControlMode();
-    Scalar setpoint = 0;
-    std::uint32_t num_successive_rotor_stalls = 0;
-
-    EventCounter Udq_normalizations;
-
-    Scalar angular_velocity = 0;
-    Vector<2> estimated_Idq = Vector<2>::Zero();
-    Vector<2> reference_Udq = Vector<2>::Zero();
-    Scalar setpoint_Iq = 0;
-    Scalar setpoint_Uq = 0;
-    Scalar inverter_power = 0;
-    Scalar demand_factor = 0;
-
-    {
-        AbsoluteCriticalSectionLocker locker;
-
-        state           = g_state;
-        control_mode    = g_requested_control_mode;
-        setpoint        = g_setpoint;
-
-        num_successive_rotor_stalls = g_num_successive_rotor_stalls;
-
-        if (g_c != nullptr)
-        {
-            Udq_normalizations = g_c->modulator.getUdqNormalizationCounter();
-
-            angular_velocity    = g_c->angular_velocity;
-            estimated_Idq       = g_c->estimated_Idq;
-            reference_Udq       = g_c->reference_Udq;
-            setpoint_Iq         = g_c->setpoint_Iq;
-            setpoint_Uq         = g_c->setpoint_Uq;
-            inverter_power      = g_c->low_pass_filtered_values.inverter_power;
-            demand_factor       = g_c->low_pass_filtered_values.demand_factor;
-        }
-    }
-
-    std::printf("State        : %s [%d]\n"
-                "Control Mode : %d\n"
-                "Setpoint     : %.3f\n"
-                "Succ. Stalls : %u\n",
-                stateToString(state), int(state),
-                int(control_mode),
-                double(setpoint),
-                unsigned(num_successive_rotor_stalls));
-
-    std::printf("Udq Norm. Cnt: %s\n",
-                Udq_normalizations.toString().c_str());
-
-    Scalar mrpm = 0;
-
-    if ((g_motor_params.num_poles >= 2) &&
-        (g_motor_params.num_poles % 2 == 0))
-    {
-        mrpm = convertRotationRateElectricalToMechanical(convertAngularVelocityToRPM(angular_velocity),
-                                                         g_motor_params.num_poles);
-    }
-
-    std::printf("Elect. AngVel: %.1f rad/s\n"
-                "Mech. RPM    : %.1f MRPM\n"
-                "Estimated Idq: %s A\n"
-                "Reference Udq: %s A\n"
-                "Setpoint  Iq : %.1f A\n"
-                "Setpoint  Uq : %.1f A\n"
-                "Inverter Pwr : %.1f W\n"
-                "Demand Factor: %.0f %%\n",
-                double(angular_velocity),
-                double(mrpm),
-                math::toString(estimated_Idq).c_str(),
-                math::toString(reference_Udq).c_str(),
-                double(setpoint_Iq),
-                double(setpoint_Uq),
-                double(inverter_power),
-                double(demand_factor) * 100.0);
 }
-
 
 void plotRealTimeValues()
 {
-    g_debug_tracer.print();
+    g_debug_plotter.print();
     IRQDebugOutputBuffer::printIfNeeded();
 }
-
 
 std::array<DebugKeyValueType, NumDebugKeyValuePairs> getDebugKeyValuePairs()
 {
@@ -342,10 +267,10 @@ std::array<DebugKeyValueType, NumDebugKeyValuePairs> getDebugKeyValuePairs()
 
     {
         AbsoluteCriticalSectionLocker locker;
-        if (g_c != nullptr)
+        if (auto task = g_task_handler.as<RunningTask>())
         {
-            Idq = g_c->estimated_Idq;
-            Udq = g_c->reference_Udq;
+            Idq = task->getIdq();
+            Udq = task->getUdq();
         }
     }
 
@@ -370,203 +295,45 @@ using namespace foc;
 
 void handleMainIRQ(Const period)
 {
-    /*
-     * It is guaranteed by the driver that the main IRQ is always invoked immediately after the fast IRQ
-     * of the same period. This guarantees that the context struct contains the most recent data.
-     * The Spinup/Running case must be processed first, because synchronization with the fast IRQ is important,
-     * and because we care about latency.
-     */
-    if (g_state == State::Running ||
-        g_state == State::Spinup)
-    {
-        /*
-         * Updating setpoint and handling termination condition.
-         */
-        g_setpoint_remaining_ttl -= period;
+    const auto hw_status = board::motor::getStatus();
 
-        if (os::float_eq::closeToZero(g_setpoint) ||
-            (g_setpoint_remaining_ttl <= 0.0F))
-        {
-            doStop();
-            return;
-        }
+    if (!board::motor::isCalibrationInProgress())
+    {
+        auto& task = g_task_handler.get();
+        task.onMainIRQ(period, hw_status);
+        g_debug_plotter.set(task.getDebugVariables());
     }
 
-    if (g_state == State::Idle)
-    {
-        // Retaining the Fault state if there's something wrong
-        if (!isStatusOk())
-        {
-            g_setpoint = 0;             // No way
-            g_state = State::Fault;
-        }
+    AbsoluteCriticalSectionLocker locker;
 
-        if (!os::float_eq::closeToZero(g_setpoint))
-        {
-            initializeContext();
-            g_c->setpoint_Iq = 0;
-            g_c->use_voltage_setpoint = true;
-            g_state = State::Spinup;
-        }
+    switch (g_task_handler.get().getStatus())
+    {
+    case ITask::Status::Running:
+    {
+        break;  // Nothing to do
     }
 
-    if (g_state == State::Fault)
+    case ITask::Status::Finished:
     {
-        if (isStatusOk())
+        if (auto task = g_task_handler.as<HardwareTestingTask>())
         {
-            g_state = State::Idle;
+            g_last_hardware_test_report = task->getTestReport();
         }
+
+        if (auto task = g_task_handler.as<MotorIdentificationTask>())
+        {
+            g_params.motor = task->getEstimatedMotorParameters();
+        }
+
+        g_task_handler.select<IdleTask>();
+        break;
     }
 
-    /*
-     * Motor identification
-     */
-    if (g_state == State::MotorIdentification)
+    case ITask::Status::Failed:
     {
-        if (g_motor_parameter_estimator == nullptr)
-        {
-            AbsoluteCriticalSectionLocker locker;
-
-            board::motor::beginCalibration();
-
-            alignas(motor_id::MotorIdentificationTask)
-            static std::uint8_t estimator_storage[sizeof(motor_id::MotorIdentificationTask)];
-
-            g_motor_parameter_estimator = new (estimator_storage)
-                motor_id::MotorIdentificationTask(g_requested_motor_identification_mode,
-                                    g_motor_params,
-                                    g_controller_params.motor_id,
-                                    g_observer_params,
-                                    board::motor::getPWMParameters());
-        }
-
-        const auto hw_status = board::motor::getStatus();
-
-        if (!board::motor::isCalibrationInProgress())
-        {
-            AbsoluteCriticalSectionLocker::assertNotLocked();
-            g_motor_parameter_estimator->onMainIRQ(period);
-
-            AbsoluteCriticalSectionLocker locker;
-
-            // TODO: We can't check the general hardware status because FAULT tends to go up randomly.
-            //       There might be a hardware bug somewhere. Investigate it later.
-            //if (hw_status.isOkay())
-            if (hw_status.power_ok && !hw_status.overload)
-            {
-                if (g_motor_parameter_estimator->isFinished())
-                {
-                    g_motor_params = g_motor_parameter_estimator->getEstimatedMotorParameters();
-
-                    if (g_motor_params.isValid())
-                    {
-                        g_state = State::Idle;
-                    }
-                    else
-                    {
-                        g_state = State::Fault;
-                    }
-                }
-            }
-            else
-            {
-                g_state = State::Fault;
-                IRQDebugOutputBuffer::setVariableFromIRQ<0>(hw_status.power_ok);
-                IRQDebugOutputBuffer::setVariableFromIRQ<1>(hw_status.overload);
-                IRQDebugOutputBuffer::setVariableFromIRQ<2>(hw_status.fault);
-            }
-        }
-
-        g_debug_tracer.set(g_motor_parameter_estimator->getDebugValues());
-        g_debug_tracer.set<6>(hw_status.current_sensor_gain);
+        g_task_handler.select<FaultTask>();
+        break;
     }
-    else
-    {
-        if (g_motor_parameter_estimator != nullptr)
-        {
-            AbsoluteCriticalSectionLocker locker;
-            g_motor_parameter_estimator->~MotorIdentificationTask();
-            g_motor_parameter_estimator = nullptr;
-        }
-    }
-
-    /*
-     * Hardware testing
-     */
-    {
-        static HardwareTestingTask* hardware_tester = nullptr;
-
-        if (g_state == State::HardwareTesting)
-        {
-            AbsoluteCriticalSectionLocker locker;
-
-            alignas(16) static std::uint8_t hardware_tester_storage[sizeof(HardwareTestingTask)];
-
-            if (hardware_tester == nullptr)
-            {
-                board::motor::beginCalibration();
-
-                const auto measurement_range = board::motor::getLimits().measurement_range;
-
-                hardware_tester = new (hardware_tester_storage) HardwareTestingTask(measurement_range.inverter_voltage,
-                                                                               measurement_range.inverter_temperature);
-            }
-
-            const auto phase_currents_ab = board::motor::getPhaseCurrentsAB();
-            const auto inverter_voltage = board::motor::getInverterVoltage();
-
-            const auto hw_status = board::motor::getStatus();
-
-            if (board::motor::isCalibrationInProgress())
-            {
-                g_pwm_handle.release(); // Nothing to do, waiting for the calibration to end before continuing
-            }
-            else
-            {
-                const auto pwm_vector = hardware_tester->update(period,
-                                                                phase_currents_ab,
-                                                                inverter_voltage,
-                                                                hw_status.inverter_temperature,
-                                                                hw_status.overload,
-                                                                hw_status.fault);
-                g_pwm_handle.setPWM(pwm_vector);
-
-                if (hardware_tester->isFinished())
-                {
-                    g_pwm_handle.release();
-
-                    g_last_hardware_test_report = hardware_tester->getTestReport();
-
-                    if (g_last_hardware_test_report.isSuccessful())
-                    {
-                        g_state = State::Idle;
-                    }
-                    else
-                    {
-                        g_state = State::Fault;
-                    }
-                }
-            }
-
-            const auto filtered_currents = hardware_tester->getCurrentsFilter().getValue();
-
-            g_debug_tracer.set<0>(phase_currents_ab[0]);
-            g_debug_tracer.set<1>(phase_currents_ab[1]);
-            g_debug_tracer.set<2>(inverter_voltage);
-            g_debug_tracer.set<3>(filtered_currents[0]);
-            g_debug_tracer.set<4>(filtered_currents[1]);
-            g_debug_tracer.set<5>(math::convertKelvinToCelsius(hw_status.inverter_temperature));
-            g_debug_tracer.set<6>(hw_status.current_sensor_gain);
-        }
-        else
-        {
-            if (hardware_tester != nullptr)
-            {
-                AbsoluteCriticalSectionLocker locker;
-                hardware_tester->~HardwareTestingTask();
-                hardware_tester = nullptr;
-            }
-        }
     }
 }
 
@@ -575,13 +342,23 @@ void handleFastIRQ(Const period,
                    const Vector<2>& phase_currents_ab,
                    Const inverter_voltage)
 {
+    (void) period;
+
     if (board::motor::isCalibrationInProgress())
     {
         g_pwm_handle.release();
     }
     else
     {
-
+        const auto out = g_task_handler.get().onNextPWMPeriod(phase_currents_ab, inverter_voltage);
+        if (out.second)
+        {
+            g_pwm_handle.setPWM(out.first);
+        }
+        else
+        {
+            g_pwm_handle.release();
+        }
     }
 }
 

@@ -30,7 +30,9 @@
 
 namespace foc
 {
-
+/**
+ * Stores arbitrary values from IRQ to print them later into stdout.
+ */
 class IRQDebugOutputBuffer
 {
 public:
@@ -97,6 +99,52 @@ public:
             }
             std::puts("");
         }
+    }
+};
+
+/**
+ * Stores quickly changing IRQ values and prints them into stdout.
+ */
+class IRQDebugPlotter
+{
+public:
+    static constexpr unsigned NumVariables = 7;
+
+private:
+    std::array<Scalar, NumVariables> vars_ = {};
+
+public:
+    template <unsigned Index, typename Value>
+    void set(const Value x)
+    {
+        static_assert(Index < NumVariables, "Debug variable index out of range");
+        vars_[Index] = Scalar(x);
+    }
+
+    template <typename Container>
+    void set(const Container cont)
+    {
+        std::copy_n(std::begin(cont), std::min(cont.size(), NumVariables), std::begin(vars_));
+    }
+
+    void print() const
+    {
+        std::array<Scalar, NumVariables> vars_copy;
+
+        {
+            AbsoluteCriticalSectionLocker locker;
+            vars_copy = vars_;
+        }
+
+        std::printf("$%.4f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
+                    double(ST2US(chVTGetSystemTimeX())) * 1e-6,     // TODO: Avoid wraparound!
+                    double(vars_copy[0]),
+                    double(vars_copy[1]),
+                    double(vars_copy[2]),
+                    double(vars_copy[3]),
+                    double(vars_copy[4]),
+                    double(vars_copy[5]),
+                    double(vars_copy[6]));
     }
 };
 

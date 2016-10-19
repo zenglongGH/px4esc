@@ -35,7 +35,7 @@
 
 #include <foc/foc.hpp>
 #include <foc/transforms.hpp>
-#include <foc/irq_debug_output.hpp>
+#include <foc/irq_debug.hpp>
 #include <motor_database/motor_database.hpp>
 #include <params.hpp>
 

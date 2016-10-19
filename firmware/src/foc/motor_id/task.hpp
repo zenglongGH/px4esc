@@ -147,7 +147,14 @@ public:
     void onMainIRQ(Const period,
                    const board::motor::Status& hw_status) override
     {
-        (void) hw_status;       // TODO check the status, abort on faults
+        // TODO: We can't check the general hardware status because FAULT tends to go up randomly.
+        //       There might be a hardware bug somewhere. Investigate it later.
+        //if (hw_status.isOkay())
+        if (hw_status.power_ok && !hw_status.overload)
+        {
+            status_ = Status::Failed;
+            result_ = MotorParameters();
+        }
 
         if (current_task_ == nullptr)
         {
@@ -214,7 +221,7 @@ public:
             assert(false);
             status_ = Status::Failed;
             result_ = MotorParameters();
-            return Vector<3>::Zero();
+            return { Vector<3>::Zero(), false };
         }
 
         context_.pwm_output_vector.setZero();   // Default
