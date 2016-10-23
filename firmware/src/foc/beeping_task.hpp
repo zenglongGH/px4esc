@@ -86,13 +86,16 @@ public:
                 output[next_phase_index_++ % 3] = 1.0F;
                 return {output, true};
             }
+            else
+            {
+                return {Vector<3>::Zero(), true};
+            }
         }
         else
         {
             status_ = Status::Finished;
+            return {Vector<3>::Zero(), false};
         }
-
-        return {Vector<3>::Zero(), false};
     }
 
     Status getStatus() const override { return status_; }

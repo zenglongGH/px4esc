@@ -473,6 +473,7 @@ int main()
      */
     chibios_rt::BaseThread::setPriority(LOWPRIO);
 
+    ::usleep(10000);
     foc::beep(5000.0F, 0.1F);
     ::usleep(100000);
     foc::beep(6000.0F, 0.1F);
