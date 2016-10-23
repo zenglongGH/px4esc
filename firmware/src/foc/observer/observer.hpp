@@ -24,19 +24,21 @@
 
 #pragma once
 
-#include <cassert>
+#include <foc/common.hpp>
 #include <zubax_chibios/util/heapless.hpp>
-#include "common.hpp"
+#include <cassert>
 
 
 namespace foc
+{
+namespace observer
 {
 /**
  * Observer constants that are invariant to the motor model.
  * Model of the motor is defined separately.
  * All parameters here are set to reasonable default values.
  */
-struct ObserverParameters
+struct Parameters
 {
     DiagonalMatrix<4> Q  = math::makeDiagonalMatrix(100.0F,
                                                     100.0F,
@@ -67,21 +69,22 @@ struct ObserverParameters
 };
 
 /**
+ * Restriction on the direction of rotation applied to the model.
+ */
+enum class DirectionConstraint
+{
+    None,   //!< None
+    Forward,//!< Forward
+    Reverse //!< Reverse
+};
+
+/**
  * Dmitry's ingenious observer.
  * Refer to the Simulink model for derivations.
  * All units are SI units (Weber, Henry, Ohm, Volt, Second, Radian).
  */
 class Observer
 {
-public:
-    enum class DirectionConstraint
-    {
-        None,
-        Forward,
-        Reverse
-    };
-
-private:
     Const phi_;
     Const ld_;
     Const lq_;
@@ -104,7 +107,7 @@ private:
     Matrix<4, 4> P_;
 
 public:
-    Observer(const ObserverParameters& parameters,
+    Observer(const Parameters& parameters,
              Const field_flux,
              Const stator_phase_inductance_direct,
              Const stator_phase_inductance_quadrature,
@@ -123,4 +126,5 @@ public:
     Scalar getAngularPosition() const { return x_[StateIndexAngularPosition]; }
 };
 
+}
 }

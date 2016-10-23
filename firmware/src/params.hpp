@@ -36,7 +36,7 @@ void writeControllerParameters(const foc::ControllerParameters& obj);
 foc::MotorParameters readMotorParameters();
 void writeMotorParameters(const foc::MotorParameters& obj);
 
-foc::ObserverParameters readObserverParameters();
-void writeObserverParameters(const foc::ObserverParameters& obj);
+foc::observer::Parameters readObserverParameters();
+void writeObserverParameters(const foc::observer::Parameters& obj);
 
 }

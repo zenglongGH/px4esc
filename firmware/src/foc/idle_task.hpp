@@ -24,8 +24,7 @@
 
 #pragma once
 
-#include "common.hpp"
-#include "parameters.hpp"
+#include "task.hpp"
 
 
 namespace foc
@@ -38,9 +37,10 @@ class IdleTask : public ITask
     Status status_ = Status::Running;
 
 public:
-    IdleTask(const CompleteParameterSet& params)
+    IdleTask(const TaskContext& context)
     {
-        if (!params.isValid())
+        if (!context.params.isValid() ||
+            !context.last_hw_test_report.isSuccessful())
         {
             status_ = Status::Failed;
         }
@@ -67,8 +67,6 @@ public:
     }
 
     Status getStatus() const override { return status_; }
-
-    std::array<Scalar, NumDebugVariables> getDebugVariables() const override { return {}; }
 };
 
 }

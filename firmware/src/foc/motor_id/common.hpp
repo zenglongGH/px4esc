@@ -24,11 +24,9 @@
 
 #pragma once
 
-#include <foc/parameters.hpp>
-#include <foc/common.hpp>
+#include <foc/task.hpp>
 #include <foc/voltage_modulator.hpp>
 #include <foc/irq_debug.hpp>
-#include <foc/observer.hpp>
 #include <cstdint>
 
 
@@ -41,15 +39,9 @@ namespace motor_id
  * An object of this type is passed from task to task until the procedure is complete.
  * The virtual methods should be devirtualized by the optimizer.
  */
-struct Context
+struct SubTaskContext : public TaskContext
 {
-    const CompleteParameterSet params;
-
-    Context(const CompleteParameterSet& params) :
-        params(params)
-    { }
-
-    virtual ~Context() { }
+    virtual ~SubTaskContext() { }
 
     virtual void setPWM(const Vector<3>& pwm) = 0;
 
@@ -61,7 +53,7 @@ struct Context
     virtual Scalar getTime() const = 0;
 };
 
-using ContextReference = Context&;
+using SubTaskContextReference = SubTaskContext&;
 
 /**
  * Interface of a motor ID task, e.g. resistance measurement.

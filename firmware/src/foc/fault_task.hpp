@@ -24,8 +24,7 @@
 
 #pragma once
 
-#include "common.hpp"
-#include "parameters.hpp"
+#include "task.hpp"
 
 
 namespace foc
@@ -38,7 +37,7 @@ namespace foc
 class FaultTask : public ITask
 {
 public:
-    FaultTask(const CompleteParameterSet&) { }
+    FaultTask(const TaskContext&) { }
 
     void onMainIRQ(Const period,
                    const board::motor::Status& hw_status) override
@@ -60,8 +59,6 @@ public:
     {
         return Status::Running;     // Never ends
     }
-
-    std::array<Scalar, NumDebugVariables> getDebugVariables() const override { return {}; }
 };
 
 }

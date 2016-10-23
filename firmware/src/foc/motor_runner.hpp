@@ -26,6 +26,7 @@
 
 #include "common.hpp"
 #include "parameters.hpp"
+#include "voltage_modulator.hpp"
 
 
 namespace foc
@@ -67,7 +68,7 @@ private:
 
     State state_ = State::Spinup;
 
-    Observer observer_;
+    observer::Observer observer_;
 
     Setpoint regular_setpoint_;
     Setpoint spinup_setpoint_;
@@ -146,7 +147,7 @@ public:
 
         if (state_ != State::Spinup)
         {
-            observer_.setDirectionConstraint(Observer::DirectionConstraint::None);
+            observer_.setDirectionConstraint(observer::DirectionConstraint::None);
 
             // Rotor stall detection
             if (remaining_time_before_stall_detection_enabled_ > 0)
@@ -177,8 +178,8 @@ public:
         else
         {
             observer_.setDirectionConstraint(isReversed() ?
-                                             Observer::DirectionConstraint::Reverse :
-                                             Observer::DirectionConstraint::Forward);
+                                             observer::DirectionConstraint::Reverse :
+                                             observer::DirectionConstraint::Forward);
 
             spinup_time_ += period;
 

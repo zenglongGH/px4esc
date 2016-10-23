@@ -89,7 +89,7 @@ Real g_voltage_ramp       ("m.volt_per_sec",    D().voltage_ramp_volt_per_s, 0.0
 namespace observer
 {
 
-using Default = foc::ObserverParameters;
+using Default = foc::observer::Parameters;
 
 Real g_Q_11    ("obs.q_11",     Default().Q.diagonal()[0],  1e-6F,  1e+6F);
 Real g_Q_22    ("obs.q_22",     Default().Q.diagonal()[1],  1e-6F,  1e+6F);
@@ -207,11 +207,11 @@ void writeMotorParameters(const foc::MotorParameters& obj)
 }
 
 
-foc::ObserverParameters readObserverParameters()
+foc::observer::Parameters readObserverParameters()
 {
     os::MutexLocker locker(g_mutex);
 
-    foc::ObserverParameters out;
+    foc::observer::Parameters out;
 
     using namespace observer;
 
@@ -233,7 +233,7 @@ foc::ObserverParameters readObserverParameters()
     return out;
 }
 
-void writeObserverParameters(const foc::ObserverParameters& obj)
+void writeObserverParameters(const foc::observer::Parameters& obj)
 {
     os::MutexLocker locker(g_mutex);
 

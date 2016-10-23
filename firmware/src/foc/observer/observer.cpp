@@ -23,23 +23,19 @@
  */
 
 #include "observer.hpp"
-#include "common.hpp"
-#include <zubax_chibios/config/config.hpp>
 
 
 namespace foc
 {
-namespace
+namespace observer
 {
-
-} // namespace
 
 using math::makeMatrix;
 using math::makeDiagonalMatrix;
 using math::makeRow;
 
 
-Observer::Observer(const ObserverParameters& parameters,
+Observer::Observer(const Parameters& parameters,
                    Const field_flux,
                    Const stator_phase_inductance_direct,
                    Const stator_phase_inductance_quadrature,
@@ -137,4 +133,5 @@ void Observer::update(Const dt,
     }
 }
 
+}
 }

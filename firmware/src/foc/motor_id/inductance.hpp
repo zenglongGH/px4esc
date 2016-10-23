@@ -57,7 +57,7 @@ class InductanceTask : public ISubTask
 
     using Modulator = ThreePhaseVoltageModulator<IdqMovingAverageLength>;
 
-    ContextReference context_;
+    SubTaskContextReference context_;
     MotorParameters result_;
 
     Const estimation_current_;
@@ -74,7 +74,7 @@ class InductanceTask : public ISubTask
     Scalar angular_position_ = 0;
 
 public:
-    InductanceTask(ContextReference context,
+    InductanceTask(SubTaskContextReference context,
                    const MotorParameters& initial_parameters) :
        context_(context),
        result_(initial_parameters),

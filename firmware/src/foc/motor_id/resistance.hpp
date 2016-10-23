@@ -56,7 +56,7 @@ class ResistanceTask : public ISubTask
 
     Scalar state_switched_at_ = 0;
 
-    ContextReference context_;
+    SubTaskContextReference context_;
     MotorParameters result_;
 
     Const estimation_current_;
@@ -111,7 +111,7 @@ class ResistanceTask : public ISubTask
     }
 
 public:
-    ResistanceTask(ContextReference context,
+    ResistanceTask(SubTaskContextReference context,
                    const MotorParameters& initial_parameters) :
         context_(context),
         result_(initial_parameters),

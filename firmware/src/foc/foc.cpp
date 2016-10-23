@@ -23,7 +23,6 @@
  */
 
 #include "foc.hpp"
-#include "pid.hpp"
 #include "transforms.hpp"
 #include "voltage_modulator.hpp"
 #include "irq_debug.hpp"
@@ -33,7 +32,7 @@
 #include "fault_task.hpp"
 #include "beeping_task.hpp"
 #include "running_task.hpp"
-#include "hardware_testing_task.hpp"
+#include "hw_test/task.hpp"
 #include "motor_id/task.hpp"
 
 
@@ -46,38 +45,23 @@ namespace foc
 namespace
 {
 
-CompleteParameterSet g_params;
+TaskContext g_context;
 
 board::motor::PWMHandle g_pwm_handle;
-
-HardwareTestingTask::TestReport g_last_hardware_test_report;
 
 IRQDebugPlotter g_debug_plotter;
 
 using motor_id::MotorIdentificationTask;
+using hw_test::HardwareTestingTask;
 
-TaskHandler<const CompleteParameterSet&,
-            IdleTask,
-            FaultTask,
-            BeepingTask,
-            RunningTask,
-            HardwareTestingTask,
-            MotorIdentificationTask
-> g_task_handler(g_params);
-
-
-void onTaskFinished()
-{
-    if (auto task = g_task_handler.as<HardwareTestingTask>())
-    {
-        g_last_hardware_test_report = task->getTestReport();
-    }
-
-    if (auto task = g_task_handler.as<MotorIdentificationTask>())
-    {
-        g_params.motor = task->getEstimatedMotorParameters();
-    }
-}
+TaskHandler
+< IdleTask
+, FaultTask
+, BeepingTask
+, RunningTask
+, HardwareTestingTask
+, MotorIdentificationTask
+> g_task_handler([]() { return g_context; });
 
 } // namespace
 
@@ -88,8 +72,8 @@ void init()
 
     board::motor::beginCalibration();
 
-    g_params.pwm = board::motor::getPWMParameters();
-    g_params.board_limits = board::motor::getLimits();
+    g_context.params.pwm = board::motor::getPWMParameters();
+    g_context.params.board_limits = board::motor::getLimits();
 
     g_task_handler.select<IdleTask>();
 }
@@ -97,37 +81,37 @@ void init()
 void setControllerParameters(const ControllerParameters& params)
 {
     AbsoluteCriticalSectionLocker locker;
-    g_params.controller = params;
+    g_context.params.controller = params;
 }
 
 ControllerParameters getControllerParameters()
 {
     AbsoluteCriticalSectionLocker locker;
-    return g_params.controller;
+    return g_context.params.controller;
 }
 
 void setMotorParameters(const MotorParameters& params)
 {
     AbsoluteCriticalSectionLocker locker;
-    g_params.motor = params;
+    g_context.params.motor = params;
 }
 
 MotorParameters getMotorParameters()
 {
     AbsoluteCriticalSectionLocker locker;
-    return g_params.motor;
+    return g_context.params.motor;
 }
 
-void setObserverParameters(const ObserverParameters& params)
+void setObserverParameters(const observer::Parameters& params)
 {
     AbsoluteCriticalSectionLocker locker;
-    g_params.observer = params;
+    g_context.params.observer = params;
 }
 
-ObserverParameters getObserverParameters()
+observer::Parameters getObserverParameters()
 {
     AbsoluteCriticalSectionLocker locker;
-    return g_params.observer;
+    return g_context.params.observer;
 }
 
 void beginMotorIdentification(MotorIdentificationMode mode)
@@ -140,10 +124,10 @@ void beginHardwareTest()
     g_task_handler.from<IdleTask, BeepingTask, FaultTask>().to<HardwareTestingTask>();
 }
 
-HardwareTestingTask::TestReport getLastHardwareTestReport()
+HardwareTestReport getLastHardwareTestReport()
 {
     AbsoluteCriticalSectionLocker locker;
-    return g_last_hardware_test_report;
+    return g_context.last_hw_test_report;
 }
 
 State getState()
@@ -237,7 +221,7 @@ Scalar getInstantMechanicalRPM()
         }
     }
 
-    const auto num_poles = g_params.motor.num_poles;
+    const auto num_poles = g_context.params.motor.num_poles;
 
     if ((num_poles >= 2) &&
         (num_poles % 2 == 0))
@@ -326,16 +310,16 @@ void handleMainIRQ(Const period)
     {
         break;  // Nothing to do
     }
-
     case ITask::Status::Finished:
     {
-        onTaskFinished();
+        assert(!g_task_handler.is<IdleTask>());         // Idle task shouldn't finish
+        g_task_handler.get().applyResultToGlobalContext(g_context);
         g_task_handler.select<IdleTask>();
         break;
     }
-
     case ITask::Status::Failed:
     {
+        assert(!g_task_handler.is<FaultTask>());        // Fault task shouldn't fail
         g_task_handler.select<FaultTask>();
         break;
     }

@@ -40,15 +40,16 @@ namespace motor_id
  */
 class MotorIdentificationTask : public ITask
 {
-    struct ContextImplementation : public Context
+    struct ContextImplementation : public SubTaskContext
     {
         std::uint32_t pwm_period_counter = 0;
         Vector<3> pwm_output_vector = Vector<3>::Zero();
         std::array<Scalar, ITask::NumDebugVariables> debug_values_{};
 
-        ContextImplementation(const CompleteParameterSet& params) :
-            Context(params)
-        { }
+        ContextImplementation(const TaskContext& cont)
+        {
+            static_cast<TaskContext&>(*this) = cont;
+        }
 
         void setPWM(const Vector<3>& pwm) override
         {
@@ -130,13 +131,13 @@ class MotorIdentificationTask : public ITask
     }
 
 public:
-    MotorIdentificationTask(const CompleteParameterSet& params,
+    MotorIdentificationTask(const TaskContext& context,
                             Mode mode) :
-        context_(params),
-        result_(params.motor),
+        context_(context),
+        result_(context.params.motor),
         task_chain_(selectTaskChain(mode))
     {
-        assert(params.controller.motor_id.isValid());
+        assert(context.params.controller.motor_id.isValid());
     }
 
     ~MotorIdentificationTask()
@@ -236,9 +237,12 @@ public:
 
     Status getStatus() const override { return status_; }
 
-    std::array<Scalar, NumDebugVariables> getDebugVariables() const override { return context_.debug_values_; }
+    void applyResultToGlobalContext(TaskContext& inout_context) const override
+    {
+        inout_context.params.motor = result_;
+    }
 
-    const MotorParameters& getEstimatedMotorParameters() const { return result_; }
+    std::array<Scalar, NumDebugVariables> getDebugVariables() const override { return context_.debug_values_; }
 };
 
 }

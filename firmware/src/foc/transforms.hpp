@@ -239,4 +239,77 @@ ListLinePlot[{Iinv\[Transpose][[1]], Iinv\[Transpose][[2]]}, PlotLegends -> Auto
 
  */
 
+/**
+ * @param flux_linkage  Positive, in Weber.
+ * @param num_poles     Positive, even.
+ * @return              KV if inputs are valid; zero and assertion failure if not.
+ */
+inline Scalar convertFluxLinkageToKV(Const flux_linkage,
+                                     const unsigned num_poles)
+{
+    if ((flux_linkage > 0) &&
+        (num_poles >= 2) &&
+        (num_poles % 2 == 0))
+    {
+        return (20.0F * SquareRootOf3) / (math::Pi * flux_linkage * Scalar(num_poles));
+    }
+    else
+    {
+        assert(false);
+        return 0;
+    }
+}
+
+/**
+ * @param kv            Positive, in MRPM/V; MRPM is mechanical RPM.
+ * @param num_poles     Positive, even.
+ * @return              Field flux linkage if inputs are valid; zero and assertion failure if not.
+ */
+inline Scalar convertKVToFluxLinkage(Const kv,
+                                     const unsigned num_poles)
+{
+    if ((kv > 0) &&
+        (num_poles >= 2) &&
+        (num_poles % 2 == 0))
+    {
+        return (20.0F * SquareRootOf3) / (math::Pi * kv * Scalar(num_poles));
+    }
+    else
+    {
+        assert(false);
+        return 0;
+    }
+}
+
+/**
+ * Obviously, this function is equally applicable both to electrical and mechanical angular velocity.
+ * @param radian_per_sec        Angular velocity in Rad/sec
+ * @return                      Revolutions per minute
+ */
+constexpr inline Scalar convertAngularVelocityToRPM(Const radian_per_sec)
+{
+    return (radian_per_sec * 60.0F) / (math::Pi * 2.0F);
+}
+
+/**
+ * This function is applicable to any quantity that measures the rotation rate.
+ * @param rate          Rotation rate in any unit, e.g. Radian/sec, RPM, Hertz, etc.
+ * @param num_poles     Number of magnetic poles in the rotor; positive, even.
+ * @return              Scaled rotation rate in the same units.
+ */
+inline Scalar convertRotationRateElectricalToMechanical(Const rate,
+                                                        const unsigned num_poles)
+{
+    if ((num_poles >= 2) &&
+        (num_poles % 2 == 0))
+    {
+        return rate / Scalar(num_poles / 2U);
+    }
+    else
+    {
+        assert(false);
+        return 0;
+    }
+}
+
 }

@@ -26,9 +26,9 @@
 
 #include "common.hpp"
 #include "parameters.hpp"
-#include "motor_id/task.hpp"
 #include "running_task.hpp"
-#include "hardware_testing_task.hpp"
+#include "hw_test/report.hpp"
+#include "motor_id/task.hpp"
 #include <math/math.hpp>
 #include <cstdint>
 #include <utility>
@@ -38,7 +38,7 @@ namespace foc
 {
 
 using MotorIdentificationMode = motor_id::Mode;
-using HardwareTestReport = HardwareTestingTask::TestReport;
+using HardwareTestReport = hw_test::Report;
 
 /**
  * Must be invoked in the first order, exactly once.
@@ -68,9 +68,9 @@ MotorParameters getMotorParameters();
  * Observer parameters can be set after initialization. They are initialized to reasonable values by default.
  * New parameters will take effect when the motor is restarted.
  */
-void setObserverParameters(const ObserverParameters& params);
+void setObserverParameters(const observer::Parameters& params);
 
-ObserverParameters getObserverParameters();
+observer::Parameters getObserverParameters();
 
 /**
  * Begins the asynchronous process of motor identification.

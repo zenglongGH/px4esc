@@ -42,7 +42,7 @@ class MagneticFluxTask : public ISubTask
 
     using Modulator = ThreePhaseVoltageModulator<IdqMovingAverageLength>;
 
-    ContextReference context_;
+    SubTaskContextReference context_;
     MotorParameters result_;
 
     Const initial_Uq_;
@@ -67,7 +67,7 @@ class MagneticFluxTask : public ISubTask
     Scalar phi_ = 0;
 
 public:
-    MagneticFluxTask(ContextReference context,
+    MagneticFluxTask(SubTaskContextReference context,
                      const MotorParameters& initial_parameters) :
         context_(context),
         result_(initial_parameters),

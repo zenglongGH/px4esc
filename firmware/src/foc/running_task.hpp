@@ -24,7 +24,7 @@
 
 #pragma once
 
-#include "common.hpp"
+#include "task.hpp"
 #include "motor_runner.hpp"
 #include <zubax_chibios/util/helpers.hpp>
 
@@ -187,7 +187,7 @@ public:
  */
 class RunningTask : public ITask
 {
-    const CompleteParameterSet params_;
+    const TaskContext context_;
 
     Status status_ = Status::Running;
 
@@ -243,7 +243,7 @@ class RunningTask : public ITask
             }
         }
 
-        const auto max_voltage = computeLineVoltageLimit(hw_status.inverter_voltage, params_.pwm.upper_limit);
+        const auto max_voltage = computeLineVoltageLimit(hw_status.inverter_voltage, context_.params.pwm.upper_limit);
 
         new_sp.value = setpoint_controller_.update(period,
                                                    raw_setpoint_,
@@ -255,18 +255,18 @@ class RunningTask : public ITask
     }
 
 public:
-    RunningTask(const CompleteParameterSet& params,
+    RunningTask(const TaskContext& context,
                 ControlMode control_mode,
                 Const initial_setpoint,
                 Const initial_setpoint_ttl) :
-        params_(params),
-        setpoint_controller_(params.motor.max_current,
-                             params.motor.min_current,
-                             params.motor.computeMinVoltage(),
-                             params.motor.current_ramp_amp_per_s,
-                             params.motor.voltage_ramp_volt_per_s)
+        context_(context),
+        setpoint_controller_(context_.params.motor.max_current,
+                             context_.params.motor.min_current,
+                             context_.params.motor.computeMinVoltage(),
+                             context_.params.motor.current_ramp_amp_per_s,
+                             context_.params.motor.voltage_ramp_volt_per_s)
     {
-        assert(params_.isValid());
+        assert(context_.params.isValid());
 
         setSetpoint(control_mode, initial_setpoint, initial_setpoint_ttl);
     }
@@ -294,7 +294,7 @@ public:
         if (!runner_.isConstructed())
         {
             AbsoluteCriticalSectionLocker locker;
-            runner_.construct(params_,
+            runner_.construct(context_.params,
                               (raw_setpoint_ > 0) ? MotorRunner::Direction::Forward : MotorRunner::Direction::Reverse);
         }
 
@@ -344,7 +344,7 @@ public:
             {
                 runner_.destroy();
                 num_successive_stalls_++;
-                if (num_successive_stalls_ > params_.controller.num_stalls_to_latch)
+                if (num_successive_stalls_ > context_.params.controller.num_stalls_to_latch)
                 {
                     status_ = Status::Failed;
                 }
@@ -369,7 +369,7 @@ public:
                                           runner_->computeInverterPower());
 
             LowPassFilteredValues::update(low_pass_filtered_values_.demand_factor,
-                                          std::abs(runner_->getIdq()[1]) / params_.motor.max_current);
+                                          std::abs(runner_->getIdq()[1]) / context_.params.motor.max_current);
         }
     }
 

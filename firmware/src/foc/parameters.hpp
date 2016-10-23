@@ -25,7 +25,8 @@
 #pragma once
 
 #include "common.hpp"
-#include "observer.hpp"
+#include "transforms.hpp"
+#include "observer/observer.hpp"
 #include "motor_id/parameters.hpp"
 #include <zubax_chibios/util/heapless.hpp>
 #include <math/math.hpp>
@@ -261,7 +262,7 @@ struct CompleteParameterSet
 {
     ControllerParameters controller;
     MotorParameters motor;
-    ObserverParameters observer;
+    observer::Parameters observer;
     board::motor::PWMParameters pwm;
     board::motor::Limits board_limits;
 

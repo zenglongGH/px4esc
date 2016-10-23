@@ -24,8 +24,7 @@
 
 #pragma once
 
-#include "common.hpp"
-#include "parameters.hpp"
+#include "task.hpp"
 
 
 namespace foc
@@ -40,7 +39,7 @@ class BeepingTask : public ITask
 
     Status status_ = Status::Running;
 
-    const CompleteParameterSet params_;
+    const TaskContext context_;
 
     Const excitation_period_ = 0;
 
@@ -49,10 +48,10 @@ class BeepingTask : public ITask
     unsigned next_phase_index_ = 0;
 
 public:
-    BeepingTask(const CompleteParameterSet& params,
+    BeepingTask(const TaskContext& context,
                 Const frequency,
                 Const duration) :
-        params_(params),
+        context_(context),
         excitation_period_(1.0F / FrequencyLimits.constrain(frequency)),
         remaining_duration_(DurationLimits.constrain(duration)),
         time_to_next_excitation_(excitation_period_)
@@ -78,8 +77,8 @@ public:
         // Beeping
         if (remaining_duration_ > 0)
         {
-            remaining_duration_ -= params_.pwm.period;
-            time_to_next_excitation_ -= params_.pwm.period;
+            remaining_duration_ -= context_.params.pwm.period;
+            time_to_next_excitation_ -= context_.params.pwm.period;
             if (time_to_next_excitation_ <= 0)
             {
                 time_to_next_excitation_ += excitation_period_;
@@ -97,8 +96,6 @@ public:
     }
 
     Status getStatus() const override { return status_; }
-
-    std::array<Scalar, NumDebugVariables> getDebugVariables() const override { return {}; }
 };
 
 }
