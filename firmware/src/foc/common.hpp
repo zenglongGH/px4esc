@@ -28,6 +28,7 @@
 #include <board/motor.hpp>
 #include <zubax_chibios/util/heapless.hpp>
 #include <cassert>
+#include <array>
 
 
 namespace foc

@@ -30,6 +30,7 @@
 #include <cassert>
 #include <type_traits>
 #include <cmath>
+#include <cstdint>
 #include <zubax_chibios/util/heapless.hpp>
 
 
