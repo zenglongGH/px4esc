@@ -40,7 +40,7 @@ public:
     IdleTask(const TaskContext& context)
     {
         if (!context.params.isValid() ||
-            !context.last_hw_test_report.isSuccessful())
+            !context.hw_test_report.isSuccessful())
         {
             status_ = Status::Failed;
         }

@@ -30,13 +30,12 @@
 namespace params
 {
 
-foc::ControllerParameters readControllerParameters();
-void writeControllerParameters(const foc::ControllerParameters& obj);
+foc::Parameters readFOCParameters();
+void writeFOCParameters(const foc::Parameters& obj);
 
-foc::MotorParameters readMotorParameters();
+/**
+ * A subset of @ref writeFOCParameters().
+ */
 void writeMotorParameters(const foc::MotorParameters& obj);
-
-foc::observer::Parameters readObserverParameters();
-void writeObserverParameters(const foc::observer::Parameters& obj);
 
 }

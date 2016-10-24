@@ -63,7 +63,9 @@ public:
     using DebugVariables = std::array<Scalar, 6>;
 
 private:
-    const CompleteParameterSet params_;
+    const ControllerParameters controller_params_;
+    const MotorParameters motor_params_;
+
     const Direction direction_;
 
     State state_ = State::Spinup;
@@ -88,21 +90,25 @@ private:
     bool isReversed() const { return direction_ == Direction::Reverse; }
 
 public:
-    MotorRunner(const CompleteParameterSet& params,
+    MotorRunner(const ControllerParameters& controller_params,
+                const MotorParameters& motor_params,
+                const observer::Parameters& observer_params,
+                const board::motor::PWMParameters& pwm_params,
                 const Direction dir) :
-        params_(params),
+        controller_params_(controller_params),
+        motor_params_(motor_params),
         direction_(dir),
 
-        observer_(params.observer,
-                  params.motor.phi,
-                  params.motor.lq,      // TODO: MOVE THE ASSUMPTION THAT Lq = Ld INTO THE OBSERVER
-                  params.motor.lq,
-                  params.motor.rs),
+        observer_(observer_params,
+                  motor_params.phi,
+                  motor_params.lq,      // TODO: MOVE THE ASSUMPTION THAT Lq = Ld INTO THE OBSERVER
+                  motor_params.lq,
+                  motor_params.rs),
 
-        modulator_(params.motor.lq,
-                   params.motor.rs,
-                   params.motor.max_current,
-                   params.pwm,
+        modulator_(motor_params.lq,
+                   motor_params.rs,
+                   motor_params.max_current,
+                   pwm_params,
                    modulator_.DeadTimeCompensationPolicy::Disabled,
                    modulator_.CrossCouplingCompensationPolicy::Disabled)
     { }
@@ -158,7 +164,7 @@ public:
             else
             {
                 // Stopping if the angular velocity is too low
-                if (std::abs(angular_velocity_) < params_.motor.min_electrical_ang_vel)
+                if (std::abs(angular_velocity_) < motor_params_.min_electrical_ang_vel)
                 {
                     const bool reverse = isReversed();
                     const bool forward = !reverse;
@@ -183,18 +189,18 @@ public:
 
             spinup_time_ += period;
 
-            Const spinup_fraction = spinup_time_ / params_.controller.nominal_spinup_duration;
+            Const spinup_fraction = spinup_time_ / controller_params_.nominal_spinup_duration;
 
             // TODO: Try voltage setpoint?
             spinup_setpoint_.mode = Setpoint::Mode::Iq;
-            spinup_setpoint_.value = (isReversed() ? -1.0F : 1.0F) * params_.motor.spinup_current *
+            spinup_setpoint_.value = (isReversed() ? -1.0F : 1.0F) * motor_params_.spinup_current *
                                      math::Range<>(0.0F, 1.0F).constrain(spinup_fraction);
 
             regular_setpoint_ = spinup_setpoint_;
 
-            if (std::abs(spinup_setpoint_.value) > params_.motor.min_current)
+            if (std::abs(spinup_setpoint_.value) > motor_params_.min_current)
             {
-                Const ang_vel_threshold = params_.motor.min_electrical_ang_vel * SpinupAngularVelocityHysteresis;
+                Const ang_vel_threshold = motor_params_.min_electrical_ang_vel * SpinupAngularVelocityHysteresis;
                 if (std::abs(angular_velocity_) > ang_vel_threshold)
                 {
                     // Running fast enough, switching to normal mode

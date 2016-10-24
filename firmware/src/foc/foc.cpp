@@ -66,34 +66,30 @@ TaskHandler
 } // namespace
 
 
-void init()
+void init(const Parameters& params)
 {
     AbsoluteCriticalSectionLocker locker;
 
     board::motor::beginCalibration();
 
-    g_context.params.pwm = board::motor::getPWMParameters();
-    g_context.params.board_limits = board::motor::getLimits();
+    g_context.params = params;
+
+    g_context.board.pwm     = board::motor::getPWMParameters();
+    g_context.board.limits  = board::motor::getLimits();
 
     g_task_handler.select<IdleTask>();
 }
 
-void setControllerParameters(const ControllerParameters& params)
+void setParameters(const Parameters& params)
 {
     AbsoluteCriticalSectionLocker locker;
-    g_context.params.controller = params;
+    g_context.params = params;
 }
 
-ControllerParameters getControllerParameters()
+Parameters getParameters()
 {
     AbsoluteCriticalSectionLocker locker;
-    return g_context.params.controller;
-}
-
-void setMotorParameters(const MotorParameters& params)
-{
-    AbsoluteCriticalSectionLocker locker;
-    g_context.params.motor = params;
+    return g_context.params;
 }
 
 MotorParameters getMotorParameters()
@@ -102,19 +98,13 @@ MotorParameters getMotorParameters()
     return g_context.params.motor;
 }
 
-void setObserverParameters(const observer::Parameters& params)
+hw_test::Report getHardwareTestReport()
 {
     AbsoluteCriticalSectionLocker locker;
-    g_context.params.observer = params;
+    return g_context.hw_test_report;
 }
 
-observer::Parameters getObserverParameters()
-{
-    AbsoluteCriticalSectionLocker locker;
-    return g_context.params.observer;
-}
-
-void beginMotorIdentification(MotorIdentificationMode mode)
+void beginMotorIdentification(motor_id::Mode mode)
 {
     g_task_handler.from<IdleTask, BeepingTask>().to<MotorIdentificationTask>(mode);
 }
@@ -122,12 +112,6 @@ void beginMotorIdentification(MotorIdentificationMode mode)
 void beginHardwareTest()
 {
     g_task_handler.from<IdleTask, BeepingTask, FaultTask>().to<HardwareTestingTask>();
-}
-
-HardwareTestReport getLastHardwareTestReport()
-{
-    AbsoluteCriticalSectionLocker locker;
-    return g_context.last_hw_test_report;
 }
 
 State getState()

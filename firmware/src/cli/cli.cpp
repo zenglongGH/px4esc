@@ -184,11 +184,8 @@ class StatusCommand : public os::shell::ICommandHandler
     {
         foc::printStatusInfo();
 
-        std::printf("\nController:\n%s\n", foc::getControllerParameters().toString().c_str());
-
-        std::printf("\nMotor:\n%s\n", foc::getMotorParameters().toString().c_str());
-
-        std::printf("\nObserver:\n%s\n", foc::getObserverParameters().toString().c_str());
+        std::puts("\nFOC Parameters:");
+        std::puts(foc::getParameters().toString().c_str());
 
         std::puts("\nMotor control HW:");
         board::motor::printStatus();
@@ -553,14 +550,14 @@ class MotorIdentificationCommand : public os::shell::ICommandHandler
 
         // Parsing mode
         const os::heapless::String<> mode_string(argv[1]);
-        foc::MotorIdentificationMode mode{};
+        foc::motor_id::Mode mode{};
         if (mode_string == "static")
         {
-            mode = foc::MotorIdentificationMode::Static;
+            mode = foc::motor_id::Mode::Static;
         }
         else if (mode_string == "rotating")
         {
-            mode = foc::MotorIdentificationMode::RotationWithoutMechanicalLoad;
+            mode = foc::motor_id::Mode::RotationWithoutMechanicalLoad;
         }
         else
         {
@@ -722,7 +719,7 @@ class HardwareTestCommand : public os::shell::ICommandHandler
             ios.print(" Done.\n");
         }
 
-        ios.print("%s\n", foc::getLastHardwareTestReport().toString().c_str());
+        ios.print("%s\n", foc::getHardwareTestReport().toString().c_str());
     }
 } static cmd_hardware_test;
 
@@ -789,7 +786,6 @@ class MotorDatabaseCommand : public os::shell::ICommandHandler
                     if (command == "use")
                     {
                         params::writeMotorParameters(entry.parameters);
-                        foc::setMotorParameters(entry.parameters);
                         ios.puts("Motor parameters updated.");
                     }
                 }

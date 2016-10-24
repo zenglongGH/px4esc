@@ -84,7 +84,7 @@ class ResistanceTask : public ISubTask
         assert(inverter_voltage > 0);
 
         Const voltage_drop_due_to_dead_time =
-            (context_.params.pwm.dead_time / context_.params.pwm.period) * inverter_voltage;
+            (context_.board.pwm.dead_time / context_.board.pwm.period) * inverter_voltage;
 
         return (desired_voltage + voltage_drop_due_to_dead_time) / inverter_voltage;
     }
@@ -116,12 +116,12 @@ public:
         context_(context),
         result_(initial_parameters),
         estimation_current_(initial_parameters.max_current *
-                            context.params.controller.motor_id.fraction_of_max_current),
+                            context.params.motor_id.fraction_of_max_current),
         currents_filter_(Vector<2>::Zero())
     {
         result_.rs = 0;
 
-        if (!context_.params.controller.motor_id.isValid() ||
+        if (!context_.params.motor_id.isValid() ||
             !os::float_eq::positive(result_.max_current))
         {
             state_ = State::Failed;
@@ -153,7 +153,7 @@ public:
             {
                 // Very coarse initial estimation
                 result_.rs = std::max(MotorParameters::getRsLimits().min,
-                                      result_.rs + OhmPerSec * context_.params.pwm.period);
+                                      result_.rs + OhmPerSec * context_.board.pwm.period);
             }
             else
             {
@@ -164,7 +164,7 @@ public:
             Const voltage = computeLineVoltageForResistanceMeasurement(estimation_current_, result_.rs);
             Const relative_voltage = computeRelativePhaseVoltage(voltage, inverter_voltage);
 
-            if ((relative_voltage < (context_.params.pwm.upper_limit - 0.5F)) &&
+            if ((relative_voltage < (context_.board.pwm.upper_limit - 0.5F)) &&
                 MotorParameters::getRsLimits().contains(result_.rs))
             {
                 context_.setPWM({

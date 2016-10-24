@@ -122,7 +122,7 @@ public:
         context_(context),
         currents_filter_(Vector<2>::Zero())
     {
-        assert(context_.params.board_limits.measurement_range.inverter_temperature.contains(
+        assert(context_.board.limits.measurement_range.inverter_temperature.contains(
             math::convertCelsiusToKelvin(25.0F)));
     }
 
@@ -140,13 +140,12 @@ public:
         // No dead time compensation here
         Const relative_testing_voltage = TestingVoltage / hw_status.inverter_voltage;
 
-        if (!context_.params.board_limits.measurement_range.inverter_voltage.contains(hw_status.inverter_voltage))
+        if (!context_.board.limits.measurement_range.inverter_voltage.contains(hw_status.inverter_voltage))
         {
             registerError(Report::ErrorFlag::InverterVoltageSensorError);
         }
 
-        if (!context_.params.board_limits.measurement_range.inverter_temperature.contains(
-            hw_status.inverter_temperature))
+        if (!context_.board.limits.measurement_range.inverter_temperature.contains(hw_status.inverter_temperature))
         {
             registerError(Report::ErrorFlag::InverterTemperatureSensorError);
         }
@@ -289,7 +288,7 @@ public:
 
     void applyResultToGlobalContext(TaskContext& inout_context) const override
     {
-        inout_context.last_hw_test_report = test_report_;
+        inout_context.hw_test_report = test_report_;
     }
 };
 

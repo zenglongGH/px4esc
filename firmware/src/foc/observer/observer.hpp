@@ -55,6 +55,28 @@ struct Parameters
 
     Scalar cross_coupling_compensation = 0.8F;
 
+
+    bool isValid() const
+    {
+        static const auto check_positive = [](const auto& mat)
+        {
+            for (int i = 0; i < std::min(mat.rows(), mat.cols()); i++)
+            {
+                if (!os::float_eq::positive(mat.diagonal()[i]) ||
+                    !std::isfinite(mat.diagonal()[i]))
+                {
+                    return false;
+                }
+            }
+            return true;
+        };
+
+        return check_positive(Q)        &&
+               check_positive(R)        &&
+               check_positive(P0)       &&
+               math::Range<>(0.0F, 1.0F).contains(cross_coupling_compensation);
+    }
+
     auto toString() const
     {
         return os::heapless::format("Q diag : %s\n"

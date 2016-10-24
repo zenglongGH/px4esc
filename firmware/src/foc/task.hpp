@@ -37,8 +37,15 @@ namespace foc
  */
 struct TaskContext
 {
-    CompleteParameterSet params;
-    hw_test::Report last_hw_test_report;
+    Parameters params;
+
+    hw_test::Report hw_test_report;
+
+    struct Board
+    {
+        board::motor::PWMParameters pwm;
+        board::motor::Limits limits;
+    } board;
 };
 
 /**
@@ -49,7 +56,7 @@ class ITask
     ITask(const volatile ITask&) = delete;
     ITask(const volatile ITask&&) = delete;
     ITask& operator=(const volatile ITask&) = delete;
-    ITask& operator=(const volatile ITask&&) = delete;
+    ITask& operator=(const volatile ITask&&)= delete;
 
 protected:
     ITask() { }

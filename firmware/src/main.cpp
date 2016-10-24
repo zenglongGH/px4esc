@@ -193,17 +193,6 @@ auto onFirmwareUpdateRequestedFromUAVCAN(
 }
 
 /**
- * Some of configuration parameters can be loaded and applied without reboot.
- * This is done here.
- */
-void reloadConfigurationParameters()
-{
-    foc::setControllerParameters(params::readControllerParameters());
-    foc::setMotorParameters(params::readMotorParameters());
-    foc::setObserverParameters(params::readObserverParameters());
-}
-
-/**
  * This is invoked once immediately after boot.
  */
 os::watchdog::Timer init()
@@ -235,9 +224,7 @@ os::watchdog::Timer init()
      * Motor initialization
      */
     board::motor::init();
-    foc::init();
-
-    g_logger.println("Board limits:\n%s", board::motor::getLimits().toString().c_str());
+    foc::init(params::readFOCParameters());
 
     // Power on self test
     g_logger.puts("Testing hardware...");
@@ -249,9 +236,7 @@ os::watchdog::Timer init()
         ::sleep(1);
     }
 
-    g_logger.puts(foc::getLastHardwareTestReport().toString().c_str());
-
-    reloadConfigurationParameters();
+    g_logger.puts(foc::getHardwareTestReport().toString().c_str());
 
     board::motor::printStatus();
 
@@ -311,6 +296,12 @@ class BackgroundConfigManager
         return false;
     }
 
+    static void doReload()
+    {
+        foc::setParameters(params::readFOCParameters());
+        // TODO: Reload some other parameters, e.g. UAVCAN
+    }
+
 public:
     void poll()
     {
@@ -331,7 +322,8 @@ public:
                 pending_reload_ = false;
                 just_reloaded_ = true;
                 logger.println("Reloading [modcnt=%u]", modification_counter_);
-                reloadConfigurationParameters();
+
+                doReload();
             }
         }
 

@@ -220,9 +220,6 @@ struct MotorParameters
     }
 };
 
-/**
- * General parameters not pertaining to the observer or the motor.
- */
 struct ControllerParameters
 {
     /// Preferred duration of spinup, real duration may slightly differ, seconds
@@ -231,25 +228,19 @@ struct ControllerParameters
     /// If the rotor stalled this many times in a row, latch into FAULT state
     std::uint32_t num_stalls_to_latch = 100;
 
-    /// Refer to the definition for details
-    motor_id::Parameters motor_id;
-
 
     bool isValid() const
     {
         return math::Range<>(0.1F, 60.0F).contains(nominal_spinup_duration) &&
-               num_stalls_to_latch > 0 &&
-               motor_id.isValid();
+               num_stalls_to_latch > 0;
     }
 
     auto toString() const
     {
         return os::heapless::format("Tspinup: %.1f sec\n"
-                                    "Nslatch: %u\n"
-                                    "Motor ID parameters:\n%s",
+                                    "Nslatch: %u",
                                     double(nominal_spinup_duration),
-                                    unsigned(num_stalls_to_latch),
-                                    motor_id.toString().c_str());
+                                    unsigned(num_stalls_to_latch));
     }
 };
 
@@ -258,18 +249,39 @@ struct ControllerParameters
  * This data is guaranteed to stay constant as long as a task is running,
  * but it may be changed when tasks are switched (e.g. configuration parameters may be updated at run time).
  */
-struct CompleteParameterSet
+struct Parameters
 {
     ControllerParameters controller;
     MotorParameters motor;
+    motor_id::Parameters motor_id;
     observer::Parameters observer;
-    board::motor::PWMParameters pwm;
-    board::motor::Limits board_limits;
+
 
     bool isValid() const
     {
         return controller.isValid() &&
-               motor.isValid();
+               motor.isValid()      &&
+               motor_id.isValid()   &&
+               observer.isValid();
+    }
+
+    auto toString() const
+    {
+        static const auto append = [](auto& s, const char* name, const auto& src)
+        {
+            s.concatenate(name, ":\n", src.toString(), "\n--\n");
+        };
+
+        os::heapless::String<400> s;
+
+        append(s, "Controller", controller);
+        append(s, "Motor",      motor);
+        append(s, "Motor ID",   motor_id);
+        append(s, "Observer",   observer);
+
+        s.concatenate("Valid: ", isValid() ? "YES" : "NO");
+
+        return s;
     }
 };
 

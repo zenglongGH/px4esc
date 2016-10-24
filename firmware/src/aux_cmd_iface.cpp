@@ -86,12 +86,12 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
         {
             waitFor(0.01F);
         }
-        const auto report = foc::getLastHardwareTestReport();
+        const auto report = foc::getHardwareTestReport();
         log(report.isSuccessful() ? uavcan_node::LogLevel::INFO : uavcan_node::LogLevel::WARNING,
             "HW test result: %s", report.toString().c_str());
     }
 
-    void doMotorID(foc::MotorIdentificationMode mode) const
+    void doMotorID(foc::motor_id::Mode mode) const
     {
         static const auto is_inactive = []()
         {
@@ -110,7 +110,7 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
         // Hardware testing
         doHardwareTest();
 
-        if (!foc::getLastHardwareTestReport().isSuccessful() ||
+        if (!foc::getHardwareTestReport().isSuccessful() ||
             !is_inactive())
         {
             g_logger.puts("Bad state or HW test failure");
@@ -164,11 +164,11 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
         }
         else if (cmd == CmdMotorIDStatic)
         {
-            doMotorID(foc::MotorIdentificationMode::Static);
+            doMotorID(foc::motor_id::Mode::Static);
         }
         else if (cmd == CmdMotorIDRotating)
         {
-            doMotorID(foc::MotorIdentificationMode::RotationWithoutMechanicalLoad);
+            doMotorID(foc::motor_id::Mode::RotationWithoutMechanicalLoad);
         }
         else
         {

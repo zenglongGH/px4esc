@@ -68,7 +68,7 @@ class MotorIdentificationTask : public ITask
         Scalar getTime() const override
         {
             // Locking is not necessary because the read is atomic
-            return Scalar(pwm_period_counter) * params.pwm.period;
+            return Scalar(pwm_period_counter) * board.pwm.period;
         }
     } context_;
 
@@ -137,7 +137,7 @@ public:
         result_(context.params.motor),
         task_chain_(selectTaskChain(mode))
     {
-        assert(context.params.controller.motor_id.isValid());
+        assert(context.params.motor_id.isValid());
     }
 
     ~MotorIdentificationTask()
@@ -162,7 +162,7 @@ public:
             AbsoluteCriticalSectionLocker locker;
 
             // Making sure the parameters are sane
-            if (!context_.params.controller.motor_id.isValid())
+            if (!context_.params.motor_id.isValid())
             {
                 status_ = Status::Failed;
                 result_ = MotorParameters();

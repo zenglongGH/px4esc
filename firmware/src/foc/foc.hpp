@@ -36,41 +36,29 @@
 
 namespace foc
 {
-
-using MotorIdentificationMode = motor_id::Mode;
-using HardwareTestReport = hw_test::Report;
-
 /**
  * Must be invoked in the first order, exactly once.
  * This function may block for a few seconds.
  * All other API functions are non-blocking, except stated otherwise.
  */
-void init();
+void init(const Parameters& params);
 
 /**
- * Controller parameters have sensible values initialized by default.
- * They can be overwritten after initialization.
- * The new values should take effect immediately.
+ * Allows to change configuration parameters at runtime.
+ * The new parameters will take effect on next state switch (e.g. motor start/stop, identification, etc).
  */
-void setControllerParameters(const ControllerParameters& params);
-
-ControllerParameters getControllerParameters();
+void setParameters(const Parameters& params);
+Parameters getParameters();
 
 /**
- * Motor parameters must be set after initialization before the motor can be started.
- * New parameters will take effect when the motor is restarted.
+ * Subset of @ref getParameters().
  */
-void setMotorParameters(const MotorParameters& params);
-
 MotorParameters getMotorParameters();
 
 /**
- * Observer parameters can be set after initialization. They are initialized to reasonable values by default.
- * New parameters will take effect when the motor is restarted.
+ * See @ref beginHardwareTest().
  */
-void setObserverParameters(const observer::Parameters& params);
-
-observer::Parameters getObserverParameters();
+hw_test::Report getHardwareTestReport();
 
 /**
  * Begins the asynchronous process of motor identification.
@@ -78,7 +66,7 @@ observer::Parameters getObserverParameters();
  * Completion of the process can be detected by means of monitoring the current state of the controller, see @ref State.
  * The identified parameters can be read via @ref getMotorParameters().
  */
-void beginMotorIdentification(MotorIdentificationMode mode);
+void beginMotorIdentification(motor_id::Mode mode);
 
 /**
  * Begins the asynchronous process of hardware testing.
@@ -87,11 +75,6 @@ void beginMotorIdentification(MotorIdentificationMode mode);
  * A side effect of the test is that the HW driver will be recalibrated.
  */
 void beginHardwareTest();
-
-/**
- * See @ref beginHardwareTest().
- */
-HardwareTestReport getLastHardwareTestReport();
 
 /**
  * State of the control logic.
@@ -230,9 +213,9 @@ void plotRealTimeValues();
 /**
  * Named debug values.
  * This is suitable for e.g. reporting via UAVCAN.
+ * Key length is guaranteed to never exceed 3 ASCII characters (3 bytes).
  */
-using DebugKeyType = os::heapless::String<3>;
-using DebugKeyValueType = std::pair<DebugKeyType, Scalar>;
+using DebugKeyValueType = std::pair<os::heapless::String<3>, Scalar>;
 constexpr unsigned NumDebugKeyValuePairs = 4;
 
 std::array<DebugKeyValueType, NumDebugKeyValuePairs> getDebugKeyValuePairs();

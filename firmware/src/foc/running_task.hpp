@@ -243,7 +243,7 @@ class RunningTask : public ITask
             }
         }
 
-        const auto max_voltage = computeLineVoltageLimit(hw_status.inverter_voltage, context_.params.pwm.upper_limit);
+        const auto max_voltage = computeLineVoltageLimit(hw_status.inverter_voltage, context_.board.pwm.upper_limit);
 
         new_sp.value = setpoint_controller_.update(period,
                                                    raw_setpoint_,
@@ -294,7 +294,10 @@ public:
         if (!runner_.isConstructed())
         {
             AbsoluteCriticalSectionLocker locker;
-            runner_.construct(context_.params,
+            runner_.construct(context_.params.controller,
+                              context_.params.motor,
+                              context_.params.observer,
+                              context_.board.pwm,
                               (raw_setpoint_ > 0) ? MotorRunner::Direction::Forward : MotorRunner::Direction::Reverse);
         }
 

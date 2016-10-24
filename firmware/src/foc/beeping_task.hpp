@@ -77,8 +77,8 @@ public:
         // Beeping
         if (remaining_duration_ > 0)
         {
-            remaining_duration_ -= context_.params.pwm.period;
-            time_to_next_excitation_ -= context_.params.pwm.period;
+            remaining_duration_ -= context_.board.pwm.period;
+            time_to_next_excitation_ -= context_.board.pwm.period;
             if (time_to_next_excitation_ <= 0)
             {
                 time_to_next_excitation_ += excitation_period_;
