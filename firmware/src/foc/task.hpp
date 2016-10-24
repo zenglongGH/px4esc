@@ -176,7 +176,6 @@ class TaskHandler
         void onMainIRQ(Const, const board::motor::Status&) override { }
         std::pair<Vector<3>, bool> onNextPWMPeriod(const Vector<2>&, Const) override { return {}; }
         Status getStatus() const override { return {}; }
-        std::array<Scalar, NumDebugVariables> getDebugVariables() const override { return {}; }
     public:
         NullPlaceholderTask(const TaskContext&) { }
     };
