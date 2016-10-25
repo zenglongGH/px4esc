@@ -481,9 +481,7 @@ class SetpointCommand : public os::shell::ICommandHandler
             {
                 foc::plotRealTimeValues();
 
-                const auto state = foc::getState();
-                if (state != foc::State::Running &&
-                    state != foc::State::Spinup)
+                if (!foc::isRunning())
                 {
                     break;
                 }
@@ -566,8 +564,7 @@ class MotorIdentificationCommand : public os::shell::ICommandHandler
         }
 
         // Running
-        if (foc::getState() != foc::State::Idle &&
-            foc::getState() != foc::State::Fault)
+        if (!foc::isInactive())
         {
             ios.puts("ERROR: Invalid state");
             return;
@@ -584,7 +581,7 @@ class MotorIdentificationCommand : public os::shell::ICommandHandler
 
         bool aborted = false;
 
-        while (foc::getState() == foc::State::MotorIdentification)
+        while (foc::isMotorIdentificationInProgress())
         {
             if (do_plot)
             {
@@ -692,8 +689,7 @@ class HardwareTestCommand : public os::shell::ICommandHandler
         }
 
         // Running
-        if (foc::getState() != foc::State::Idle &&
-            foc::getState() != foc::State::Fault)
+        if (!foc::isInactive())
         {
             ios.print("ERROR: Invalid state\n");
             return;
@@ -703,7 +699,7 @@ class HardwareTestCommand : public os::shell::ICommandHandler
 
         if (do_plot)
         {
-            while (foc::getState() == foc::State::HardwareTesting)
+            while (foc::isHardwareTestInProgress())
             {
                 foc::plotRealTimeValues();
             }
@@ -711,7 +707,7 @@ class HardwareTestCommand : public os::shell::ICommandHandler
         }
         else
         {
-            while (foc::getState() == foc::State::HardwareTesting)
+            while (foc::isHardwareTestInProgress())
             {
                 ios.putChar('.');
                 ::sleep(1);
@@ -896,8 +892,7 @@ class CLIThread : public chibios_rt::BaseStaticThread<2048>
 
     static auto renderPrompt()
     {
-        return os::heapless::concatenate<decltype(shell_)::Prompt::Capacity>(
-            foc::stateToString(foc::getState()), "> ");
+        return os::heapless::concatenate<decltype(shell_)::Prompt::Capacity>(foc::getCurrentTaskName(), "> ");
     }
 
 public:

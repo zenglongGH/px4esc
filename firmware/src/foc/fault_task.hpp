@@ -39,6 +39,8 @@ class FaultTask : public ITask
 public:
     FaultTask(const TaskContext&) { }
 
+    const char* getName() const override { return "fault"; }
+
     void onMainIRQ(Const period,
                    const board::motor::Status& hw_status) override
     {

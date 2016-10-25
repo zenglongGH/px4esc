@@ -77,74 +77,63 @@ void beginMotorIdentification(motor_id::Mode mode);
 void beginHardwareTest();
 
 /**
- * State of the control logic.
- * Some of the functions may be unavailable in certain states.
- * TODO: At the moment, the control logic does not use this state representation.
- *       There is a wrapper that converts real states into this representation.
- *       Probably this should be simplified.
+ * @ref isMotorIdentificationInProgress().
  */
-enum class State
+struct MotorIdentificationStateInfo
 {
-    /**
-     * The control logic is doing nothing and is ready to accept commands.
-     * If the motor stalled or another error occurred, an error code will be set.
-     */
-    Idle,
-
-    /**
-     * Motor identification is in progress, commands cannot be accepted.
-     * @ref beginMotorIdentification().
-     */
-    MotorIdentification,
-
-    /**
-     * Hardware testing is underway.
-     * Possible outcomes:
-     *  - Test passed                                   -> Idle
-     *  - Test failed (hardware problems detected)      -> Fault
-     * @ref beginHardwareTest().
-     */
-    HardwareTesting,
-
-    /**
-     * The motor is starting, or some pre-start procedures are underway. This is a transient state.
-     * Possible outcomes:
-     *  - Started successfully  -> Running
-     *  - Failed to start       -> Idle or Fault
-     */
-    Spinup,
-
-    /**
-     * The motor is running. Next state is normally Idle.
-     */
-    Running,
-
-    /**
-     * The controller has encountered a serious error and will not start the motor until the error is reset.
-     * In order to reset the error, call @ref stop(), or set a zero setpoint (which is equivalent to calling stop()).
-     */
-    Fault
+    Scalar progress                 = 0;    ///< Grows from 0 to 1
+    Scalar inverter_power_filtered  = 0;
+    Scalar mechanical_rpm           = 0;
 };
 
-inline const char* stateToString(const State s)
-{
-    switch (s)
-    {
-    case State::Idle:                return "Idle";
-    case State::MotorIdentification: return "MotorID";
-    case State::HardwareTesting:     return "HWTest";
-    case State::Spinup:              return "Spinup";
-    case State::Running:             return "Running";
-    case State::Fault:               return "Fault";
-    }
-
-    return "BADSTATE";
-}
+/**
+ * Returns true and optionally fills the state structure if identification is in progress.
+ */
+bool isMotorIdentificationInProgress(MotorIdentificationStateInfo* out_info = nullptr);
 
 /**
- * @ref State.
+ * Returns true if hardware test is in progress.
  */
-State getState();
+bool isHardwareTestInProgress();
+
+/**
+ * @ref isRunning().
+ */
+struct RunningStateInfo
+{
+    std::uint32_t stall_count       = 0;
+    Scalar inverter_power_filtered  = 0;
+    Scalar demand_factor_filtered   = 0;
+    Scalar mechanical_rpm           = 0;
+};
+
+/**
+ * Returns true and optionally fills the output arguments if the controller is in the running state.
+ */
+bool isRunning(RunningStateInfo* out_info = nullptr,
+               bool* out_spinup_in_progress = nullptr);
+
+/**
+ * @ref isInactive().
+ * If the fault code is nonzero, the controller is in the fault state which needs to be reset
+ * by the application by calling @ref stop().
+ */
+struct InactiveStateInfo
+{
+    static constexpr std::uint8_t FaultCodeNone = 0;
+
+    std::uint8_t fault_code = FaultCodeNone;    ///< Exact codes are not explicitly specified.
+};
+
+/**
+ * Returns true and optionally fills the state structure if the controller is not performing any important tasks.
+ */
+bool isInactive(InactiveStateInfo* out_info = nullptr);
+
+/**
+ * Returns a human-readable name of the currently active task.
+ */
+const char* getCurrentTaskName();
 
 /**
  * Assigns new setpoint; the units depend on the selected control mode.
@@ -160,6 +149,7 @@ void setSetpoint(ControlMode control_mode,
                  Const request_ttl);
 
 /**
+ * Shortcut for setSetpoint(0, 0, 0).
  * Stops the motor normally if it is running.
  * Clears the fault state if the motor is not running.
  */
@@ -169,29 +159,8 @@ inline void stop()
 }
 
 /**
- * Returns the instant motor current in Amperes.
- */
-Scalar getInstantCurrentFiltered();
-
-/**
- * Returns the instant relative power in percent of the maximum.
- */
-Scalar getInstantDemandFactorFiltered();
-
-/**
- * Returns the current mechanical angular velocity of the rotor in RPM.
- */
-Scalar getInstantMechanicalRPM();
-
-/**
- * Returns the number of all outstanding errors at the moment.
- * The exact semantics is yet to be defined; refer to the code to learn more.
- */
-std::uint32_t getErrorCount();
-
-/**
  * Generate sound using the motor windings.
- * The request MAY be ignored if the controller is in not in the Idle state.
+ * The request will be ignored if the controller is in not in the inactive state.
  * Units are SI (Hertz, seconds).
  */
 void beep(Const frequency,
@@ -217,7 +186,6 @@ void plotRealTimeValues();
  */
 using DebugKeyValueType = std::pair<os::heapless::String<3>, Scalar>;
 constexpr unsigned NumDebugKeyValuePairs = 4;
-
 std::array<DebugKeyValueType, NumDebugKeyValuePairs> getDebugKeyValuePairs();
 
 }

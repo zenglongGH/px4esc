@@ -63,6 +63,13 @@ TaskHandler
 , MotorIdentificationTask
 > g_task_handler([]() { return g_context; });
 
+
+inline Scalar convertElectricalAngularVelocityToMechanicalRPM(Const eangvel)
+{
+    return convertRotationRateElectricalToMechanical(convertAngularVelocityToRPM(eangvel),
+                                                     g_context.params.motor.num_poles);
+}
+
 } // namespace
 
 
@@ -114,37 +121,78 @@ void beginHardwareTest()
     g_task_handler.from<IdleTask, BeepingTask, FaultTask>().to<HardwareTestingTask>();
 }
 
-State getState()
+bool isMotorIdentificationInProgress(MotorIdentificationStateInfo* out_info)
+{
+    if (out_info != nullptr)
+    {
+        AbsoluteCriticalSectionLocker locker;
+        if (auto task = g_task_handler.as<MotorIdentificationTask>())
+        {
+            (void) task;                // TODO: Fill the state info
+            out_info->progress = 0;
+            out_info->inverter_power_filtered = 0;
+            out_info->mechanical_rpm = 0;
+            return true;
+        }
+        return false;
+    }
+    else
+    {
+        return g_task_handler.is<MotorIdentificationTask>();
+    }
+}
+
+bool isHardwareTestInProgress()
+{
+    return g_task_handler.is<HardwareTestingTask>();
+}
+
+bool isRunning(RunningStateInfo* out_info,
+               bool* out_spinup_in_progress)
 {
     AbsoluteCriticalSectionLocker locker;
-
-    if (g_task_handler.either<IdleTask, BeepingTask>())
-    {
-        return State::Idle;
-    }
-
-    if (g_task_handler.is<FaultTask>())
-    {
-        return State::Fault;
-    }
-
     if (auto task = g_task_handler.as<RunningTask>())
     {
-        return task->isSpinupInProgress() ? State::Spinup : State::Running;
-    }
+        if (out_info != nullptr)
+        {
+            out_info->stall_count = task->getNumSuccessiveStalls();
 
-    if (g_task_handler.is<HardwareTestingTask>())
+            const auto filt = task->getLowPassFilteredValues();
+            out_info->inverter_power_filtered = filt.inverter_power;
+            out_info->demand_factor_filtered = filt.demand_factor;
+
+            out_info->mechanical_rpm =
+                convertElectricalAngularVelocityToMechanicalRPM(task->getElectricalAngularVelocity());
+        }
+
+        if (out_spinup_in_progress != nullptr)
+        {
+            *out_spinup_in_progress = task->isSpinupInProgress();
+        }
+        return true;
+    }
+    return false;
+}
+
+bool isInactive(InactiveStateInfo* out_info)
+{
+    AbsoluteCriticalSectionLocker locker;
+    if (g_task_handler.either<IdleTask, BeepingTask, FaultTask>())
     {
-        return State::HardwareTesting;
+        if (out_info != nullptr)
+        {
+            // Meaningful fault codes are not implemented yet
+            out_info->fault_code = g_task_handler.is<FaultTask>() ? 1 : 0;
+        }
+        return true;
     }
+    return false;
+}
 
-    if (g_task_handler.is<MotorIdentificationTask>())
-    {
-        return State::MotorIdentification;
-    }
-
-    assert(false);
-    return State::Fault;
+const char* getCurrentTaskName()
+{
+    AbsoluteCriticalSectionLocker locker;
+    return g_task_handler.get().getName();
 }
 
 void setSetpoint(ControlMode control_mode,
@@ -167,64 +215,6 @@ void setSetpoint(ControlMode control_mode,
             g_task_handler.from<IdleTask, BeepingTask>().to<RunningTask>(control_mode, value, request_ttl);
         }
     }
-}
-
-Scalar getInstantCurrentFiltered()
-{
-    Const voltage = board::motor::getInverterVoltage();
-    if (os::float_eq::positive(voltage))
-    {
-        AbsoluteCriticalSectionLocker locker;
-        if (auto task = g_task_handler.as<RunningTask>())
-        {
-            return task->getLowPassFilteredValues().inverter_power / voltage;
-        }
-    }
-    return 0;
-}
-
-Scalar getInstantDemandFactorFiltered()
-{
-    AbsoluteCriticalSectionLocker locker;
-    if (auto task = g_task_handler.as<RunningTask>())
-    {
-        return task->getLowPassFilteredValues().demand_factor;
-    }
-    return 0;
-}
-
-Scalar getInstantMechanicalRPM()
-{
-    Scalar electrical_rad_sec = 0;
-
-    {
-        AbsoluteCriticalSectionLocker locker;
-        if (auto task = g_task_handler.as<RunningTask>())
-        {
-            electrical_rad_sec = task->getElectricalAngularVelocity();
-        }
-    }
-
-    const auto num_poles = g_context.params.motor.num_poles;
-
-    if ((num_poles >= 2) &&
-        (num_poles % 2 == 0))
-    {
-        return convertRotationRateElectricalToMechanical(convertAngularVelocityToRPM(electrical_rad_sec),
-                                                         num_poles);
-    }
-
-    return 0;
-}
-
-std::uint32_t getErrorCount()
-{
-    AbsoluteCriticalSectionLocker locker;
-    if (auto task = g_task_handler.as<RunningTask>())
-    {
-        return task->getNumSuccessiveStalls();
-    }
-    return 0;
 }
 
 void beep(Const frequency, Const duration)

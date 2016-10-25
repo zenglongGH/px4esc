@@ -84,8 +84,6 @@ void cbRPMCommand(const uavcan::ReceivedDataStructure<uavcan::equipment::esc::RP
 
 void cbTimer(const uavcan::TimerEvent& event)
 {
-    const auto state = foc::getState();
-
     /*
      * Scheduling the next timer event depending on the current state
      */
@@ -93,11 +91,8 @@ void cbTimer(const uavcan::TimerEvent& event)
         static const float interval_normal  = g_param_esc_status_interval.get();
         static const float interval_passive = g_param_esc_status_interval_passive.get();
 
-        const bool is_passive = state == foc::State::Idle ||
-                                state == foc::State::Fault;
-
         const auto current_interval = uavcan::MonotonicDuration::fromUSec(
-            std::uint64_t((is_passive ? interval_passive : interval_normal) * 1e6F));
+            std::uint64_t((foc::isInactive() ? interval_passive : interval_normal) * 1e6F));
 
         g_timer->startOneShotWithDeadline(event.scheduled_time + current_interval);
     }
@@ -110,13 +105,30 @@ void cbTimer(const uavcan::TimerEvent& event)
         const auto hw_status = board::motor::getStatus();
 
         status.esc_index   = g_self_index;
-        status.error_count = foc::getErrorCount();
         status.voltage     = hw_status.inverter_voltage;
         status.temperature = hw_status.inverter_temperature;
-        status.current     = foc::getInstantCurrentFiltered();
-        status.rpm         = static_cast<std::int32_t>(std::round(foc::getInstantMechanicalRPM()));
-        status.power_rating_pct =
-            std::uint8_t(std::min(foc::getInstantDemandFactorFiltered() * 100.0F + 0.5F, 126.0F));
+
+        foc::RunningStateInfo running_info;
+        foc::MotorIdentificationStateInfo motor_id_info;
+
+        if (foc::isRunning(&running_info))
+        {
+            status.error_count = running_info.stall_count;
+            status.current     = running_info.inverter_power_filtered / hw_status.inverter_voltage;
+            status.rpm         = static_cast<std::int32_t>(std::round(running_info.mechanical_rpm));
+
+            status.power_rating_pct =
+                std::uint8_t(std::min(running_info.demand_factor_filtered * 100.0F + 0.5F, 126.0F));
+        }
+        else if (foc::isMotorIdentificationInProgress(&motor_id_info))
+        {
+            status.current = motor_id_info.inverter_power_filtered / hw_status.inverter_voltage;
+            status.rpm     = static_cast<std::int32_t>(std::round(motor_id_info.mechanical_rpm));
+        }
+        else
+        {
+            ; // Nothing to do
+        }
 
         (void) g_pub_status->broadcast(status);
     }

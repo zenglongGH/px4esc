@@ -288,7 +288,7 @@ inline Scalar convertKVToFluxLinkage(Const kv,
  */
 constexpr inline Scalar convertAngularVelocityToRPM(Const radian_per_sec)
 {
-    return (radian_per_sec * 60.0F) / (math::Pi * 2.0F);
+    return radian_per_sec * (60.0F / math::Pi2);
 }
 
 /**

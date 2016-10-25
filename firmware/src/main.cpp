@@ -113,10 +113,7 @@ public:
 
     static bool canModifyStorageNow()
     {
-        const auto state = foc::getState();
-
-        return (state == foc::State::Idle ||
-                state == foc::State::Fault) &&
+        return foc::isInactive() &&
                (board::motor::PWMHandle::getTotalNumberOfActiveHandles() == 0) &&
                !board::motor::isCalibrationInProgress();
     }
@@ -231,7 +228,7 @@ os::watchdog::Timer init()
 
     foc::beginHardwareTest();
 
-    while (foc::getState() == foc::State::HardwareTesting)
+    while (foc::isHardwareTestInProgress())
     {
         ::sleep(1);
     }
@@ -356,40 +353,44 @@ public:
 
 
 void updateUAVCANNodeStatus(const bool board_ok,
-                            const std::uint16_t vendor_specific_status_code)
+                            const std::uint8_t upper_byte_of_vendor_specific_status_code)
 {
-    using foc::State;
-    using uavcan_node::NodeHealth;
-    using uavcan_node::NodeMode;
-    using uavcan_node::setNodeHealth;
-    using uavcan_node::setNodeMode;
+    uavcan_node::setNodeHealth(board_ok ? uavcan_node::NodeHealth::OK : uavcan_node::NodeHealth::Warning);
 
-    switch (foc::getState())
+    std::uint8_t lower_byte_vssc = 0;
+
+    /*
+     * Note that the access is non-atomic - the state may change while we're walking through the checks.
+     * This is why we fall back to the inactive state by default as a last resort.
+     */
+    if (foc::isRunning())
     {
-    case State::Idle:
-    case State::Spinup:
-    case State::Running:
-    {
-        setNodeMode(NodeMode::Operational);
-        setNodeHealth(board_ok ? NodeHealth::OK : NodeHealth::Warning);
-        break;
+        uavcan_node::setNodeMode(uavcan_node::NodeMode::Operational);
     }
-    case State::MotorIdentification:
-    case State::HardwareTesting:
+    else if (foc::isMotorIdentificationInProgress() ||
+             foc::isHardwareTestInProgress())
     {
-        setNodeMode(NodeMode::Maintenance);
-        setNodeHealth(board_ok ? NodeHealth::OK : NodeHealth::Warning);
-        break;
+        uavcan_node::setNodeMode(uavcan_node::NodeMode::Maintenance);
     }
-    case State::Fault:
+    else
     {
-        // Keeping the mode unchanged for better diagnostics
-        setNodeHealth(NodeHealth::Critical);
-        break;
-    }
+        foc::InactiveStateInfo inactive_info;
+        (void) foc::isInactive(&inactive_info);
+        if (inactive_info.fault_code == inactive_info.FaultCodeNone)
+        {
+            uavcan_node::setNodeMode(uavcan_node::NodeMode::Operational);
+        }
+        else
+        {
+            // Fault! Keeping the mode unchanged for better diagnostics
+            uavcan_node::setNodeHealth(uavcan_node::NodeHealth::Critical);
+            lower_byte_vssc = inactive_info.fault_code;
+        }
     }
 
-    uavcan_node::setVendorSpecificNodeStatusCode(vendor_specific_status_code);
+    uavcan_node::setVendorSpecificNodeStatusCode(
+        std::uint16_t((std::uint16_t(upper_byte_of_vendor_specific_status_code) << 8) |
+                      lower_byte_vssc));
 }
 
 led_indicator::Pattern makeLEDPattern(const bool board_ok)
@@ -401,25 +402,40 @@ led_indicator::Pattern makeLEDPattern(const bool board_ok)
 
     constexpr float Dim = 0.05F;
 
-    using foc::State;
     using Behavior = led_indicator::Pattern::Behavior;
 
     const auto base = board_ok ? Green : Yellow;
+    bool spinup_in_progress = false;
 
-    switch (foc::getState())
+    /*
+     * Note that the access is non-atomic - the state may change while we're walking through the checks.
+     * This is why we fall back to the inactive state by default as a last resort.
+     */
+    if (foc::isRunning(nullptr, &spinup_in_progress))
     {
-    case State::Idle:                   return {base * Dim, Behavior::Solid};
-    case State::Spinup:                 return {base,       Behavior::Blinking};
-    case State::Running:                return {base,       Behavior::Solid};
-
-    case State::MotorIdentification:    return {Blue,       Behavior::Solid};
-    case State::HardwareTesting:        return {Blue,       Behavior::Blinking};
-
-    case State::Fault:                  return {Red,        Behavior::Blinking};
+        return {base, spinup_in_progress ? Behavior::Blinking : Behavior::Solid};
     }
-
-    assert(false);
-    return {};
+    else if (foc::isMotorIdentificationInProgress())
+    {
+        return {Blue, Behavior::Solid};
+    }
+    else if (foc::isHardwareTestInProgress())
+    {
+        return {Blue, Behavior::Blinking};
+    }
+    else
+    {
+        foc::InactiveStateInfo inactive_info;
+        (void) foc::isInactive(&inactive_info);
+        if (inactive_info.fault_code == inactive_info.FaultCodeNone)
+        {
+            return {base * Dim, Behavior::Solid};
+        }
+        else
+        {
+            return {Red, Behavior::Blinking};
+        }
+    }
 }
 
 std::pair<bool, std::uint8_t> analyzeBoardHealth()
@@ -427,18 +443,14 @@ std::pair<bool, std::uint8_t> analyzeBoardHealth()
     const auto s = board::motor::getStatus();
     const auto lim = board::motor::getLimits().safe_operating_area;
 
-    const auto code =
-        (unsigned(s.power_ok) << 0) |
-        (unsigned(s.overload) << 1) |
-        (unsigned(s.fault) << 2) |
-        (unsigned(board::motor::isCalibrationInProgress()) << 3);
-
-    return {
-        lim.inverter_temperature.contains(s.inverter_temperature) &&
-        lim.inverter_voltage.contains(s.inverter_voltage) &&
-        s.isOkay(),
-        std::uint8_t(code)
-    };
+    const bool ok = lim.inverter_temperature.contains(s.inverter_temperature) &&
+                    lim.inverter_voltage.contains(s.inverter_voltage) &&
+                    s.isOkay();
+    const auto code = (unsigned(s.power_ok) << 0) |
+                      (unsigned(s.overload) << 1) |
+                      (unsigned(s.fault) << 2) |
+                      (unsigned(board::motor::isCalibrationInProgress()) << 3);
+    return {ok, std::uint8_t(code)};
 }
 
 }

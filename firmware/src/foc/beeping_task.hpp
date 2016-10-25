@@ -57,6 +57,8 @@ public:
         time_to_next_excitation_(excitation_period_)
     { }
 
+    const char* getName() const override { return "beep"; }
+
     void onMainIRQ(Const period,
                    const board::motor::Status& hw_status) override
     {

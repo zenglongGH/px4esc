@@ -82,7 +82,7 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
     void doHardwareTest() const
     {
         foc::beginHardwareTest();
-        while (foc::getState() == foc::State::HardwareTesting)
+        while (foc::isHardwareTestInProgress())
         {
             waitFor(0.01F);
         }
@@ -93,15 +93,8 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
 
     void doMotorID(foc::motor_id::Mode mode) const
     {
-        static const auto is_inactive = []()
-        {
-            const auto state = foc::getState();
-            return state == foc::State::Idle ||
-                   state == foc::State::Fault;
-        };
-
         // Aborting immediately if busy
-        if (!is_inactive())
+        if (!foc::isInactive())
         {
             g_logger.puts("Bad state");
             return;
@@ -111,7 +104,7 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
         doHardwareTest();
 
         if (!foc::getHardwareTestReport().isSuccessful() ||
-            !is_inactive())
+            !foc::isInactive())
         {
             g_logger.puts("Bad state or HW test failure");
             return;
@@ -120,7 +113,7 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
         // Identification
         foc::beginMotorIdentification(mode);
 
-        while (foc::getState() == foc::State::MotorIdentification)
+        while (foc::isMotorIdentificationInProgress())
         {
             waitFor(0.01F);
         }

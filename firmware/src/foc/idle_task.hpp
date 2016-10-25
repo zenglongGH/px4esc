@@ -46,6 +46,8 @@ public:
         }
     }
 
+    const char* getName() const override { return "idle"; }
+
     void onMainIRQ(Const period,
                    const board::motor::Status& hw_status) override
     {

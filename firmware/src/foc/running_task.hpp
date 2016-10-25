@@ -271,6 +271,8 @@ public:
         setSetpoint(control_mode, initial_setpoint, initial_setpoint_ttl);
     }
 
+    const char* getName() const override { return "running"; }
+
     void setSetpoint(ControlMode control_mode,
                      Const value,
                      Const request_ttl)

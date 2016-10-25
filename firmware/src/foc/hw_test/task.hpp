@@ -126,6 +126,8 @@ public:
             math::convertCelsiusToKelvin(25.0F)));
     }
 
+    const char* getName() const override { return "hw_test"; }
+
     void onMainIRQ(Const period,
                    const board::motor::Status& hw_status) override
     {

@@ -145,6 +145,8 @@ public:
         destroyCurrentTask();
     }
 
+    const char* getName() const override { return "motor_id"; }
+
     void onMainIRQ(Const period,
                    const board::motor::Status& hw_status) override
     {

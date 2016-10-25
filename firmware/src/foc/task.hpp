@@ -73,6 +73,8 @@ public:
 
     virtual ~ITask() { }
 
+    virtual const char* getName() const = 0;
+
     /**
      * It is guaranteed by the driver that the main IRQ is always invoked immediately after the fast IRQ
      * of the same period.
@@ -173,6 +175,7 @@ class TaskHandler
 {
     class NullPlaceholderTask : public ITask
     {
+        const char* getName() const override { return ""; }
         void onMainIRQ(Const, const board::motor::Status&) override { }
         std::pair<Vector<3>, bool> onNextPWMPeriod(const Vector<2>&, Const) override { return {}; }
         Status getStatus() const override { return {}; }
@@ -259,6 +262,7 @@ public:
     template <typename Head, typename... Tail>
     typename std::enable_if<(sizeof...(Tail) > 0), bool>::type either() const
     {
+        AbsoluteCriticalSectionLocker::assertLocked();
         return is<Head>() || either<Tail...>();
     }
 
