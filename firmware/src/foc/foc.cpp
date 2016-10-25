@@ -181,8 +181,14 @@ bool isInactive(InactiveStateInfo* out_info)
     {
         if (out_info != nullptr)
         {
-            // Meaningful fault codes are not implemented yet
-            out_info->fault_code = g_task_handler.is<FaultTask>() ? 1 : 0;
+            if (auto task = g_task_handler.as<FaultTask>())
+            {
+                out_info->fault_code = task->getFailureCode();
+            }
+            else
+            {
+                out_info->fault_code = 0;
+            }
         }
         return true;
     }
@@ -224,6 +230,8 @@ void beep(Const frequency, Const duration)
 
 void printStatusInfo()
 {
+    // TODO
+    std::printf("Failure Code: 0x%04x\n", g_task_handler.get().getFailureCode());
 }
 
 void plotRealTimeValues()
@@ -294,7 +302,11 @@ void handleMainIRQ(Const period)
     case ITask::Status::Failed:
     {
         assert(!g_task_handler.is<FaultTask>());        // Fault task shouldn't fail
-        g_task_handler.select<FaultTask>();
+
+        // Fault code consists of the task ID (takes the upper 4 bits) and its failure code (lower bits)
+        const auto fault_code = std::uint16_t((g_task_handler.getTaskID() << 12) |
+                                              (g_task_handler.get().getFailureCode() & 0x0FFFU));
+        g_task_handler.select<FaultTask>(fault_code);
         break;
     }
     }

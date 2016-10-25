@@ -36,8 +36,14 @@ namespace foc
  */
 class FaultTask : public ITask
 {
+    const FailureCode failure_code_;
+
 public:
-    FaultTask(const TaskContext&) { }
+    FaultTask(const TaskContext&, std::uint16_t failure_code) :
+        failure_code_(failure_code)
+    { }
+
+    FailureCode getFailureCode() const override { return failure_code_; }
 
     const char* getName() const override { return "fault"; }
 

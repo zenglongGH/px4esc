@@ -34,14 +34,25 @@ namespace foc
  */
 class IdleTask : public ITask
 {
+    static constexpr FailureCode FailureCodeBadHardwareStatus   = 1;
+    static constexpr FailureCode FailureCodeInvalidParameters   = 2;
+    static constexpr FailureCode FailureCodeHardwareTestFailed  = 3;
+
     Status status_ = Status::Running;
+    FailureCode failure_code_ = 0;
 
 public:
     IdleTask(const TaskContext& context)
     {
-        if (!context.params.isValid() ||
-            !context.hw_test_report.isSuccessful())
+        if (!context.params.isValid())
         {
+            failure_code_ = FailureCodeInvalidParameters;
+            status_ = Status::Failed;
+        }
+
+        if (!context.hw_test_report.isSuccessful())
+        {
+            failure_code_ = FailureCodeHardwareTestFailed;
             status_ = Status::Failed;
         }
     }
@@ -55,6 +66,7 @@ public:
 
         if (!hw_status.power_ok)
         {
+            failure_code_ = FailureCodeBadHardwareStatus;
             status_ = Status::Failed;
         }
     }
@@ -69,6 +81,8 @@ public:
     }
 
     Status getStatus() const override { return status_; }
+
+    FailureCode getFailureCode() const override { return failure_code_; }
 };
 
 }

@@ -120,9 +120,9 @@ bool isRunning(RunningStateInfo* out_info = nullptr,
  */
 struct InactiveStateInfo
 {
-    static constexpr std::uint8_t FaultCodeNone = 0;
+    static constexpr std::uint16_t FaultCodeNone = 0;
 
-    std::uint8_t fault_code = FaultCodeNone;    ///< Exact codes are not explicitly specified.
+    std::uint16_t fault_code = FaultCodeNone;   ///< Exact codes are not explicitly specified.
 };
 
 /**

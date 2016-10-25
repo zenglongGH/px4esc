@@ -74,6 +74,7 @@ class MotorIdentificationTask : public ITask
 
     MotorParameters result_;
     Status status_ = Status::Running;
+    FailureCode failure_code_ = 0;
     unsigned next_task_index_ = 0;
     ISubTask* current_task_ = nullptr;
     void (MotorIdentificationTask::* const* const task_chain_)();
@@ -153,7 +154,7 @@ public:
         // TODO: We can't check the general hardware status because FAULT tends to go up randomly.
         //       There might be a hardware bug somewhere. Investigate it later.
         //if (hw_status.isOkay())
-        if (hw_status.power_ok && !hw_status.overload)
+        if (!hw_status.power_ok || hw_status.overload)
         {
             status_ = Status::Failed;
             result_ = MotorParameters();
@@ -203,6 +204,7 @@ public:
 
                 if (status == ISubTask::Status::Failed)
                 {
+                    failure_code_ = FailureCode(next_task_index_);
                     status_ = Status::Failed;
                 }
             }
@@ -242,6 +244,11 @@ public:
     void applyResultToGlobalContext(TaskContext& inout_context) const override
     {
         inout_context.params.motor = result_;
+    }
+
+    FailureCode getFailureCode() const override
+    {
+        return failure_code_;
     }
 
     std::array<Scalar, NumDebugVariables> getDebugVariables() const override { return context_.debug_values_; }

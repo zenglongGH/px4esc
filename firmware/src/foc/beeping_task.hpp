@@ -37,7 +37,10 @@ class BeepingTask : public ITask
     static constexpr math::Range<> DurationLimits{0, 3.0F};
     static constexpr math::Range<> FrequencyLimits{100.0F, 15000.0F};
 
+    static constexpr FailureCode FailureCodeBadHardwareStatus   = 1;
+
     Status status_ = Status::Running;
+    FailureCode failure_code_ = 0;
 
     const TaskContext context_;
 
@@ -67,6 +70,7 @@ public:
         if (!hw_status.power_ok)
         {
             status_ = Status::Failed;
+            failure_code_ = FailureCodeBadHardwareStatus;
         }
     }
 
@@ -101,6 +105,8 @@ public:
     }
 
     Status getStatus() const override { return status_; }
+
+    FailureCode getFailureCode() const override { return failure_code_; }
 };
 
 }

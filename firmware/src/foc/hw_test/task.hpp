@@ -292,6 +292,11 @@ public:
     {
         inout_context.hw_test_report = test_report_;
     }
+
+    FailureCode getFailureCode() const override
+    {
+        return test_report_.mask_;
+    }
 };
 
 }

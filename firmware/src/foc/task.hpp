@@ -97,6 +97,15 @@ public:
         (void) inout_context;
     }
 
+    /**
+     * Returns the code of the reason why the task failed.
+     * The codes are not globally unique, i.e. multiple tasks may use the same code for different reasons.
+     * Note that the 4 most significant bits of the failure code must not be used!
+     * Code 0 is reserved to represent the unknown failure reason.
+     */
+    using FailureCode = std::uint16_t;
+    virtual FailureCode getFailureCode() const { return 0; }
+
     virtual Status getStatus() const = 0;
 
     virtual std::array<Scalar, NumDebugVariables> getDebugVariables() const
@@ -273,6 +282,12 @@ public:
     {
         assert(ptr_ != nullptr);
         return *ptr_;
+    }
+
+    unsigned getTaskID() const
+    {
+        assert(task_id_ >= 0);
+        return unsigned(task_id_);
     }
 };
 
