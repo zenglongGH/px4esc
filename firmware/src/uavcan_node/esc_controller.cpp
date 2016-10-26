@@ -124,6 +124,14 @@ void cbTimer(const uavcan::TimerEvent& event)
         {
             status.current = motor_id_info.inverter_power_filtered / hw_status.inverter_voltage;
             status.rpm     = static_cast<std::int32_t>(std::round(motor_id_info.mechanical_rpm));
+
+            // Progress report
+            {
+                uavcan::protocol::debug::KeyValue msg;
+                msg.key = "Progress.MotorID";
+                msg.value = motor_id_info.progress;
+                (void) g_pub_key_value->broadcast(msg);
+            }
         }
         else
         {
