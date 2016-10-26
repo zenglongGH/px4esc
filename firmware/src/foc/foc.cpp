@@ -290,10 +290,11 @@ void handleMainIRQ(Const period)
 
         if (result.finished)
         {
+            task.applyResultToGlobalContext(g_context);
+
             if (result.exit_code == result.ExitCodeOK)
             {
                 assert(!g_task_handler.is<IdleTask>());         // Idle task shouldn't finish
-                task.applyResultToGlobalContext(g_context);
                 g_task_handler.select<IdleTask>();
             }
             else

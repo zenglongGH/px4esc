@@ -122,7 +122,7 @@ public:
 
     /**
      * This method gives the task a chance to modify the global context with the result of its work.
-     * It is invoked once after the task reported that its Status is Finished.
+     * It is invoked once after the task reported that it has finished (even if failed).
      */
     virtual void applyResultToGlobalContext(TaskContext& inout_context) const
     {
