@@ -353,11 +353,11 @@ public:
 
 
 void updateUAVCANNodeStatus(const bool board_ok,
-                            const std::uint8_t upper_byte_of_vendor_specific_status_code)
+                            const std::uint8_t board_health_mask)
 {
     uavcan_node::setNodeHealth(board_ok ? uavcan_node::NodeHealth::OK : uavcan_node::NodeHealth::Warning);
 
-    std::uint8_t lower_byte_vssc = 0;
+    std::uint16_t vssc = std::uint16_t(board_health_mask << 8);
 
     /*
      * Note that the access is non-atomic - the state may change while we're walking through the checks.
@@ -384,13 +384,11 @@ void updateUAVCANNodeStatus(const bool board_ok,
         {
             // Fault! Keeping the mode unchanged for better diagnostics
             uavcan_node::setNodeHealth(uavcan_node::NodeHealth::Critical);
-            lower_byte_vssc = inactive_info.fault_code;
+            vssc = inactive_info.fault_code;
         }
     }
 
-    uavcan_node::setVendorSpecificNodeStatusCode(
-        std::uint16_t((std::uint16_t(upper_byte_of_vendor_specific_status_code) << 8) |
-                      lower_byte_vssc));
+    uavcan_node::setVendorSpecificNodeStatusCode(vssc);
 }
 
 led_indicator::Pattern makeLEDPattern(const bool board_ok)
