@@ -280,6 +280,8 @@ public:
     {
         inout_context.hw_test_report = report_;
     }
+
+    bool isPreCalibrationRequired() const override { return true; }
 };
 
 }

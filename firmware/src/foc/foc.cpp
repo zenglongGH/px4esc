@@ -54,14 +54,16 @@ IRQDebugPlotter g_debug_plotter;
 using motor_id::MotorIdentificationTask;
 using hw_test::HardwareTestingTask;
 
-TaskHandler
+typedef TaskHandler
 < IdleTask
 , FaultTask
 , BeepingTask
 , RunningTask
 , HardwareTestingTask
 , MotorIdentificationTask
-> g_task_handler([]() { return g_context; });
+> TaskHandlerInstance;
+
+TaskHandlerInstance g_task_handler([]() { return g_context; });
 
 
 inline Scalar convertElectricalAngularVelocityToMechanicalRPM(Const eangvel)
@@ -236,6 +238,7 @@ void printStatusInfo()
     {
         std::printf("Fault Code: 0x%04x\n", task->getFaultCode());
     }
+    std::printf("Task Switch Cnt: %llu\n", static_cast<unsigned long long>(g_task_handler.getTaskSwitchCounter()));
 }
 
 void plotRealTimeValues()
@@ -280,6 +283,20 @@ using namespace foc;
 void handleMainIRQ(Const period)
 {
     const auto hw_status = board::motor::getStatus();
+
+    static TaskHandlerInstance::SwitchCounter last_task_switch_counter;
+    const auto new_task_switch_counter = g_task_handler.getTaskSwitchCounter();
+    if (new_task_switch_counter != last_task_switch_counter)
+    {
+        AbsoluteCriticalSectionLocker locker;
+        last_task_switch_counter = new_task_switch_counter;
+        // OK we just switched task, cool.
+        if (g_task_handler.get().isPreCalibrationRequired())
+        {
+            g_pwm_handle.release();
+            board::motor::beginCalibration();
+        }
+    }
 
     if (!board::motor::isCalibrationInProgress())
     {

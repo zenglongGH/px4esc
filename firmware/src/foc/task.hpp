@@ -131,6 +131,12 @@ public:
     }
 
     /**
+     * If truth is returned, the controller will re-calibrate the hardware before running the task.
+     * By default, false is returned (obviously).
+     */
+    virtual bool isPreCalibrationRequired() const { return false; }
+
+    /**
      * This method gives the task a chance to modify the global context with the result of its work.
      * It is invoked once after the task reported that it has finished (even if failed).
      */
@@ -231,10 +237,15 @@ class TaskHandler
 
     using ContextCloner = std::function<TaskContext ()>;
 
+public:
+    using SwitchCounter = std::uint64_t;
+
+private:
     alignas(Tasks::LargestAlignment) std::uint8_t vinnie_the_pool_[Tasks::LargestSize]{};
     ITask* ptr_ = nullptr;
     std::uint8_t task_id_ = 0;
     ContextCloner context_cloner_;
+    SwitchCounter switch_counter_ = 0;
 
     void destroy()
     {
@@ -286,6 +297,7 @@ public:
         ptr_ = new (vinnie_the_pool_) T(context_cloner_(), std::forward<Args>(args)...);
         // And I, I will execute your demands
         task_id_ = Tasks::template getID<T>();
+        switch_counter_++;
     }
 
     template <typename... SwitchFrom>
@@ -320,6 +332,12 @@ public:
     }
 
     std::uint8_t getTaskID() const { return task_id_; }
+
+    SwitchCounter getTaskSwitchCounter() const
+    {
+        AbsoluteCriticalSectionLocker locker;
+        return switch_counter_;
+    }
 };
 
 }

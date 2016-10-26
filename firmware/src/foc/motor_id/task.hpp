@@ -237,6 +237,8 @@ public:
         inout_context.params.motor = result_;
     }
 
+    bool isPreCalibrationRequired() const override { return true; }
+
     std::array<Scalar, NumDebugVariables> getDebugVariables() const override { return context_.debug_values_; }
 };
 
