@@ -191,6 +191,18 @@ struct TypeEnumerationEntry
     {
         static constexpr int Result = GetIDImpl<T, std::is_same<T, ThisType>::value>::Result;
     };
+
+    template <int TargetID, bool FullSpecializationIsNotAllowedInThisContext = false>
+    struct GetType
+    {
+        typedef typename Next::template GetType<TargetID - 1>::Result Result;
+    };
+
+    template <bool FullSpecializationIsNotAllowedInThisContext>
+    struct GetType<0, FullSpecializationIsNotAllowedInThisContext>
+    {
+        typedef ThisType Result;
+    };
 };
 
 }   // namespace impl_
@@ -215,6 +227,9 @@ struct TypeEnumeration
         typedef typename Head::template GetID<T> Forwarder;
         return Forwarder::Result;
     }
+
+    template <int TargetID>
+    using GetType = typename Head::template GetType<TargetID>::Result;
 };
 
 /**
