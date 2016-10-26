@@ -91,6 +91,7 @@ void setParameters(const Parameters& params)
 {
     AbsoluteCriticalSectionLocker locker;
     g_context.params = params;
+    g_task_handler.from<IdleTask>().to<IdleTask>(); // Cycling to reload new configuration and check it
 }
 
 Parameters getParameters()
