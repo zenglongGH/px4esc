@@ -72,10 +72,11 @@ class MotorIdentificationTask : public ITask
         }
     } context_;
 
+    static constexpr Result::ExitCode ExitCodeBadHardwareStatus     = Result::MaxExitCode - 0;
+    static constexpr Result::ExitCode ExitCodeInvalidParameters     = Result::MaxExitCode - 1;
+
     MotorParameters result_;
-    Status status_ = Status::Running;
-    FailureCode failure_code_ = 0;
-    unsigned next_task_index_ = 0;
+    std::uint8_t next_task_index_ = 0;
     ISubTask* current_task_ = nullptr;
     void (MotorIdentificationTask::* const* const task_chain_)();
 
@@ -137,9 +138,7 @@ public:
         context_(context),
         result_(context.params.motor),
         task_chain_(selectTaskChain(mode))
-    {
-        assert(context.params.motor_id.isValid());
-    }
+    { }
 
     ~MotorIdentificationTask()
     {
@@ -148,16 +147,14 @@ public:
 
     const char* getName() const override { return "motor_id"; }
 
-    void onMainIRQ(Const period,
-                   const board::motor::Status& hw_status) override
+    Result onMainIRQ(Const period, const board::motor::Status& hw_status) override
     {
         // TODO: We can't check the general hardware status because FAULT tends to go up randomly.
         //       There might be a hardware bug somewhere. Investigate it later.
         //if (hw_status.isOkay())
         if (!hw_status.power_ok || hw_status.overload)
         {
-            status_ = Status::Failed;
-            result_ = MotorParameters();
+            return Result::failure(ExitCodeBadHardwareStatus);
         }
 
         if (current_task_ == nullptr)
@@ -167,23 +164,19 @@ public:
             // Making sure the parameters are sane
             if (!context_.params.motor_id.isValid())
             {
-                status_ = Status::Failed;
-                result_ = MotorParameters();
+                return Result::failure(ExitCodeInvalidParameters);
             }
 
             // Switching to the next state
-            if (status_ == Status::Running)
+            const auto constructor = task_chain_[next_task_index_];
+            if (constructor == nullptr)
             {
-                const auto constructor = task_chain_[next_task_index_];
-                if (constructor == nullptr)
-                {
-                    status_ = Status::Finished;
-                }
-                else
-                {
-                    next_task_index_++;
-                    (this->*constructor)();
-                }
+                return Result::success();
+            }
+            else
+            {
+                next_task_index_++;
+                (this->*constructor)();
             }
         }
         else
@@ -204,11 +197,12 @@ public:
 
                 if (status == ISubTask::Status::Failed)
                 {
-                    failure_code_ = FailureCode(next_task_index_);
-                    status_ = Status::Failed;
+                    assert(next_task_index_ > 0);
+                    return Result::failure(next_task_index_);
                 }
             }
         }
+        return Result::inProgress();
     }
 
     std::pair<Vector<3>, bool> onNextPWMPeriod(const Vector<2>& phase_currents_ab,
@@ -224,7 +218,6 @@ public:
         {
             // This can't happen.
             assert(false);
-            status_ = Status::Failed;
             result_ = MotorParameters();
             return { Vector<3>::Zero(), false };
         }
@@ -239,16 +232,9 @@ public:
         return {context_.pwm_output_vector, true};
     }
 
-    Status getStatus() const override { return status_; }
-
     void applyResultToGlobalContext(TaskContext& inout_context) const override
     {
         inout_context.params.motor = result_;
-    }
-
-    FailureCode getFailureCode() const override
-    {
-        return failure_code_;
     }
 
     std::array<Scalar, NumDebugVariables> getDebugVariables() const override { return context_.debug_values_; }

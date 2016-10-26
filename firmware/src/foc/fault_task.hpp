@@ -36,36 +36,21 @@ namespace foc
  */
 class FaultTask : public ITask
 {
-    const FailureCode failure_code_;
+    using FaultCode = std::uint16_t;
+    const FaultCode fault_code_;
 
 public:
-    FaultTask(const TaskContext&, std::uint16_t failure_code) :
-        failure_code_(failure_code)
+    FaultTask(const TaskContext&, FaultCode fault_code) :
+        fault_code_(fault_code)
     { }
 
-    FailureCode getFailureCode() const override { return failure_code_; }
+    FaultCode getFaultCode() const { return fault_code_; }
 
     const char* getName() const override { return "fault"; }
 
-    void onMainIRQ(Const period,
-                   const board::motor::Status& hw_status) override
+    Result onMainIRQ(Const, const board::motor::Status&) override
     {
-        (void) period;
-        (void) hw_status;
-    }
-
-    std::pair<Vector<3>, bool> onNextPWMPeriod(const Vector<2>& phase_currents_ab,
-                                               Const inverter_voltage) override
-    {
-        (void) phase_currents_ab;
-        (void) inverter_voltage;
-
-        return {Vector<3>::Zero(), false};
-    }
-
-    Status getStatus() const override
-    {
-        return Status::Running;     // Never ends
+        return Result::inProgress();    // Never ends
     }
 };
 

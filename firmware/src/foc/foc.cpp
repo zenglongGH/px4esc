@@ -183,7 +183,7 @@ bool isInactive(InactiveStateInfo* out_info)
         {
             if (auto task = g_task_handler.as<FaultTask>())
             {
-                out_info->fault_code = task->getFailureCode();
+                out_info->fault_code = task->getFaultCode();
             }
             else
             {
@@ -231,7 +231,10 @@ void beep(Const frequency, Const duration)
 void printStatusInfo()
 {
     // TODO
-    std::printf("Failure Code: 0x%04x\n", g_task_handler.get().getFailureCode());
+    if (auto task = g_task_handler.as<FaultTask>())
+    {
+        std::printf("Fault Code: 0x%04x\n", task->getFaultCode());
+    }
 }
 
 void plotRealTimeValues()
@@ -280,35 +283,32 @@ void handleMainIRQ(Const period)
     if (!board::motor::isCalibrationInProgress())
     {
         auto& task = g_task_handler.get();
-        task.onMainIRQ(period, hw_status);
-        g_debug_plotter.set(task.getDebugVariables());
-    }
 
-    AbsoluteCriticalSectionLocker locker;
+        const auto result = task.onMainIRQ(period, hw_status);
 
-    switch (g_task_handler.get().getStatus())
-    {
-    case ITask::Status::Running:
-    {
-        break;  // Nothing to do
-    }
-    case ITask::Status::Finished:
-    {
-        assert(!g_task_handler.is<IdleTask>());         // Idle task shouldn't finish
-        g_task_handler.get().applyResultToGlobalContext(g_context);
-        g_task_handler.select<IdleTask>();
-        break;
-    }
-    case ITask::Status::Failed:
-    {
-        assert(!g_task_handler.is<FaultTask>());        // Fault task shouldn't fail
+        AbsoluteCriticalSectionLocker locker;
 
-        // Fault code consists of the task ID (takes the upper 4 bits) and its failure code (lower bits)
-        const auto fault_code = std::uint16_t((g_task_handler.getTaskID() << 12) |
-                                              (g_task_handler.get().getFailureCode() & 0x0FFFU));
-        g_task_handler.select<FaultTask>(fault_code);
-        break;
-    }
+        if (result.finished)
+        {
+            if (result.exit_code == result.ExitCodeOK)
+            {
+                assert(!g_task_handler.is<IdleTask>());         // Idle task shouldn't finish
+                task.applyResultToGlobalContext(g_context);
+                g_task_handler.select<IdleTask>();
+            }
+            else
+            {
+                assert(!g_task_handler.is<FaultTask>());        // Fault task shouldn't fail
+                // Fault code consists of the task ID (takes the upper 4 bits) and its failure code (lower bits)
+                const auto fault_code =
+                    std::uint16_t((g_task_handler.getTaskID() << 12) | (result.exit_code & 0x0FFFU));
+                g_task_handler.select<FaultTask>(fault_code);
+            }
+        }
+        else
+        {
+            g_debug_plotter.set(task.getDebugVariables());
+        }
     }
 }
 

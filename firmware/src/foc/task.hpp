@@ -64,11 +64,37 @@ protected:
 public:
     static constexpr unsigned NumDebugVariables = 7;
 
-    enum class Status
+    /**
+     * Task update result.
+     * When finished, the exit code may be set to a non-zero value to indicate failure and its cause.
+     * Exit codes are not globally unique, i.e. multiple tasks may use the same code for different reasons.
+     * Maximum exit code is limited in order to enable extension by the Task ID value in the outer logic.
+     */
+    struct Result
     {
-        Running,
-        Finished,
-        Failed
+        using ExitCode = std::uint16_t;
+        static constexpr ExitCode ExitCodeOK = 0;
+        static constexpr ExitCode MaxExitCode = 0x0FFF;
+
+        bool finished = false;
+        ExitCode exit_code = 0;     ///< Non-zero exit code means that the task has failed.
+
+        static Result inProgress()
+        {
+            return Result();
+        }
+
+        static Result success()
+        {
+            return {true, ExitCodeOK};
+        }
+
+        static Result failure(std::uint16_t exit_code)
+        {
+            assert(exit_code > 0);
+            assert(exit_code <= MaxExitCode);
+            return {true, exit_code};
+        }
     };
 
     virtual ~ITask() { }
@@ -78,15 +104,21 @@ public:
     /**
      * It is guaranteed by the driver that the main IRQ is always invoked immediately after the fast IRQ
      * of the same period.
+     * It is GUARANTEED that once this method resutns Result::finished = true,
+     * it will never be invoked again on the same instance.
      */
-    virtual void onMainIRQ(Const period,
-                           const board::motor::Status& hw_status) = 0;
+    virtual Result onMainIRQ(Const period, const board::motor::Status& hw_status) = 0;
 
     /**
      * This method is invoked from the highest priority IRQ, preempting the main IRQ.
      */
     virtual std::pair<Vector<3>, bool> onNextPWMPeriod(const Vector<2>& phase_currents_ab,
-                                                       Const inverter_voltage) = 0;
+                                                       Const inverter_voltage)
+    {
+        (void) phase_currents_ab;
+        (void) inverter_voltage;
+        return {Vector<3>::Zero(), false};
+    }
 
     /**
      * This method gives the task a chance to modify the global context with the result of its work.
@@ -98,16 +130,8 @@ public:
     }
 
     /**
-     * Returns the code of the reason why the task failed.
-     * The codes are not globally unique, i.e. multiple tasks may use the same code for different reasons.
-     * Note that the 4 most significant bits of the failure code must not be used!
-     * Code 0 is reserved to represent the unknown failure reason.
+     * Returned values will be transferred over to the real time plotting logic.
      */
-    using FailureCode = std::uint16_t;
-    virtual FailureCode getFailureCode() const { return 0; }
-
-    virtual Status getStatus() const = 0;
-
     virtual std::array<Scalar, NumDebugVariables> getDebugVariables() const
     {
         return {};
@@ -161,6 +185,8 @@ struct TypeEnumerationEntry
 template <typename... TypeList>
 struct TypeEnumeration
 {
+    static constexpr unsigned Length = sizeof...(TypeList);
+
     static constexpr unsigned LargestAlignment  = std::max({alignof(TypeList)...});
     static constexpr unsigned LargestSize       = std::max({sizeof(TypeList)...});
 
@@ -185,20 +211,19 @@ class TaskHandler
     class NullPlaceholderTask : public ITask
     {
         const char* getName() const override { return ""; }
-        void onMainIRQ(Const, const board::motor::Status&) override { }
-        std::pair<Vector<3>, bool> onNextPWMPeriod(const Vector<2>&, Const) override { return {}; }
-        Status getStatus() const override { return {}; }
+        Result onMainIRQ(Const, const board::motor::Status&) override { return {}; }
     public:
         NullPlaceholderTask(const TaskContext&) { }
     };
 
     typedef TypeEnumeration<NullPlaceholderTask, TaskList...> Tasks;
+    static_assert(Tasks::Length < 256, "Too many tasks");
 
     using ContextCloner = std::function<TaskContext ()>;
 
     alignas(Tasks::LargestAlignment) std::uint8_t vinnie_the_pool_[Tasks::LargestSize]{};
     ITask* ptr_ = nullptr;
-    int task_id_ = -1;
+    std::uint8_t task_id_ = 0;
     ContextCloner context_cloner_;
 
     void destroy()
@@ -208,7 +233,7 @@ class TaskHandler
             ptr_->~ITask();
             ptr_ = nullptr;
         }
-        task_id_ = -1;
+        task_id_ = 0;
     }
 
     template <typename... SwitchFrom>
@@ -284,11 +309,7 @@ public:
         return *ptr_;
     }
 
-    unsigned getTaskID() const
-    {
-        assert(task_id_ >= 0);
-        return unsigned(task_id_);
-    }
+    std::uint8_t getTaskID() const { return task_id_; }
 };
 
 }

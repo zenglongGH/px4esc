@@ -187,9 +187,9 @@ public:
  */
 class RunningTask : public ITask
 {
-    const TaskContext context_;
+    static constexpr Result::ExitCode ExitCodeTooManyStalls = 1;
 
-    Status status_ = Status::Running;
+    const TaskContext context_;
 
     const SetpointController setpoint_controller_;
     os::helpers::LazyConstructor<MotorRunner> runner_;
@@ -283,16 +283,8 @@ public:
         remaining_setpoint_timeout_ = request_ttl;
     }
 
-    void onMainIRQ(Const period,
-                   const board::motor::Status& hw_status) override
+    Result onMainIRQ(Const period, const board::motor::Status& hw_status) override
     {
-        if (status_ != Status::Running)
-        {
-            AbsoluteCriticalSectionLocker locker;
-            runner_.destroy();
-            return;
-        }
-
         if (!runner_.isConstructed())
         {
             AbsoluteCriticalSectionLocker locker;
@@ -340,7 +332,7 @@ public:
                 num_successive_stalls_ = 0;
                 if (os::float_eq::closeToZero(raw_setpoint_))
                 {
-                    status_ = Status::Finished;
+                    return Result::success();
                 }
                 break;
             }
@@ -351,11 +343,11 @@ public:
                 num_successive_stalls_++;
                 if (num_successive_stalls_ > context_.params.controller.num_stalls_to_latch)
                 {
-                    status_ = Status::Failed;
+                    return Result::failure(ExitCodeTooManyStalls);
                 }
                 else if (os::float_eq::closeToZero(raw_setpoint_))
                 {
-                    status_ = Status::Finished;
+                    return Result::success();
                 }
                 else
                 {
@@ -376,6 +368,8 @@ public:
             LowPassFilteredValues::update(low_pass_filtered_values_.demand_factor,
                                           std::abs(runner_->getIdq()[1]) / context_.params.motor.max_current);
         }
+
+        return Result::inProgress();
     }
 
     std::pair<Vector<3>, bool> onNextPWMPeriod(const Vector<2>& phase_currents_ab,
@@ -393,8 +387,6 @@ public:
             return { Vector<3>::Zero(), false };
         }
     }
-
-    Status getStatus() const override { return status_; }
 
     std::array<Scalar, NumDebugVariables> getDebugVariables() const override
     {

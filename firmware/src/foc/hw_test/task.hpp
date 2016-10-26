@@ -128,8 +128,7 @@ public:
 
     const char* getName() const override { return "hw_test"; }
 
-    void onMainIRQ(Const period,
-                   const board::motor::Status& hw_status) override
+    Result onMainIRQ(Const period, const board::motor::Status& hw_status) override
     {
         hardware_status_ = hw_status;
 
@@ -244,7 +243,7 @@ public:
             {
                 registerError(Report::ErrorFlag::InverterFaultSignal);
             }
-            break;
+            return {true, test_report_.mask_};
         }
 
         default:
@@ -253,6 +252,8 @@ public:
             break;
         }
         }
+
+        return Result::inProgress();
     }
 
     std::pair<Vector<3>, bool> onNextPWMPeriod(const Vector<2>& phase_currents_ab,
@@ -261,18 +262,6 @@ public:
         (void) inverter_voltage;
         currents_filter_.update(phase_currents_ab);
         return {pwm_output_, true};
-    }
-
-    Status getStatus() const override
-    {
-        if (state_ == State::Finished)
-        {
-            return test_report_.isSuccessful() ? Status::Finished : Status::Failed;
-        }
-        else
-        {
-            return Status::Running;
-        }
     }
 
     std::array<Scalar, NumDebugVariables> getDebugVariables() const override
@@ -291,11 +280,6 @@ public:
     void applyResultToGlobalContext(TaskContext& inout_context) const override
     {
         inout_context.hw_test_report = test_report_;
-    }
-
-    FailureCode getFailureCode() const override
-    {
-        return test_report_.mask_;
     }
 };
 

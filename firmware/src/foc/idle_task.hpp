@@ -34,55 +34,39 @@ namespace foc
  */
 class IdleTask : public ITask
 {
-    static constexpr FailureCode FailureCodeBadHardwareStatus   = 1;
-    static constexpr FailureCode FailureCodeInvalidParameters   = 2;
-    static constexpr FailureCode FailureCodeHardwareTestFailed  = 3;
+    static constexpr Result::ExitCode ExitCodeBadHardwareStatus   = 1;
+    static constexpr Result::ExitCode ExitCodeInvalidParameters   = 2;
+    static constexpr Result::ExitCode ExitCodeHardwareTestFailed  = 3;
 
-    Status status_ = Status::Running;
-    FailureCode failure_code_ = 0;
+    Result result_;
 
 public:
     IdleTask(const TaskContext& context)
     {
         if (!context.params.isValid())
         {
-            failure_code_ = FailureCodeInvalidParameters;
-            status_ = Status::Failed;
+            result_ = Result::failure(ExitCodeInvalidParameters);
         }
 
         if (!context.hw_test_report.isSuccessful())
         {
-            failure_code_ = FailureCodeHardwareTestFailed;
-            status_ = Status::Failed;
+            result_ = Result::failure(ExitCodeHardwareTestFailed);
         }
     }
 
     const char* getName() const override { return "idle"; }
 
-    void onMainIRQ(Const period,
-                   const board::motor::Status& hw_status) override
+    Result onMainIRQ(Const period, const board::motor::Status& hw_status) override
     {
         (void) period;
 
         if (!hw_status.power_ok)
         {
-            failure_code_ = FailureCodeBadHardwareStatus;
-            status_ = Status::Failed;
+            result_ = Result::failure(ExitCodeBadHardwareStatus);
         }
+
+        return result_;
     }
-
-    std::pair<Vector<3>, bool> onNextPWMPeriod(const Vector<2>& phase_currents_ab,
-                                               Const inverter_voltage) override
-    {
-        (void) phase_currents_ab;
-        (void) inverter_voltage;
-
-        return {Vector<3>::Zero(), false};
-    }
-
-    Status getStatus() const override { return status_; }
-
-    FailureCode getFailureCode() const override { return failure_code_; }
 };
 
 }

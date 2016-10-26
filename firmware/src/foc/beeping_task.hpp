@@ -37,10 +37,7 @@ class BeepingTask : public ITask
     static constexpr math::Range<> DurationLimits{0, 3.0F};
     static constexpr math::Range<> FrequencyLimits{100.0F, 15000.0F};
 
-    static constexpr FailureCode FailureCodeBadHardwareStatus   = 1;
-
-    Status status_ = Status::Running;
-    FailureCode failure_code_ = 0;
+    static constexpr Result::ExitCode ExitCodeBadHardwareStatus = 1;
 
     const TaskContext context_;
 
@@ -62,16 +59,21 @@ public:
 
     const char* getName() const override { return "beep"; }
 
-    void onMainIRQ(Const period,
-                   const board::motor::Status& hw_status) override
+    Result onMainIRQ(Const period, const board::motor::Status& hw_status) override
     {
         (void) period;
 
         if (!hw_status.power_ok)
         {
-            status_ = Status::Failed;
-            failure_code_ = FailureCodeBadHardwareStatus;
+            return Result::failure(ExitCodeBadHardwareStatus);
         }
+
+        if (remaining_duration_ <= 0)
+        {
+            return Result::success();
+        }
+
+        return Result::inProgress();
     }
 
     std::pair<Vector<3>, bool> onNextPWMPeriod(const Vector<2>& phase_currents_ab,
@@ -81,7 +83,7 @@ public:
         (void) inverter_voltage;
 
         // Beeping
-        if (remaining_duration_ > 0)
+        if (remaining_duration_ >= 0)
         {
             remaining_duration_ -= context_.board.pwm.period;
             time_to_next_excitation_ -= context_.board.pwm.period;
@@ -94,19 +96,14 @@ public:
             }
             else
             {
-                return {Vector<3>::Zero(), true};
+                return {Vector<3>::Zero(), true};   // Keeping the driver active!
             }
         }
         else
         {
-            status_ = Status::Finished;
             return {Vector<3>::Zero(), false};
         }
     }
-
-    Status getStatus() const override { return status_; }
-
-    FailureCode getFailureCode() const override { return failure_code_; }
 };
 
 }

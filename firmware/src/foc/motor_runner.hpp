@@ -33,6 +33,8 @@ namespace foc
 {
 /**
  * Main motor control class used during normal operation (spinup/running).
+ * Fundamentally, the rest of the application exists only for the sake of this class.
+ * This is the main business logic.
  */
 class MotorRunner final
 {
