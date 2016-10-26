@@ -24,14 +24,24 @@
 
 #pragma once
 
-#include "common.hpp"
 #include "parameters.hpp"
 #include "hw_test/report.hpp"
+#include <math/math.hpp>
+#include <board/motor.hpp>
+#include <cassert>
+#include <array>
 #include <functional>
+#include <algorithm>
 
 
 namespace foc
 {
+
+using math::Scalar;
+using math::Const;
+using math::Vector;
+using board::motor::AbsoluteCriticalSectionLocker;
+
 /**
  * Entity that holds all immutable data tasks may need to read (but never write).
  */

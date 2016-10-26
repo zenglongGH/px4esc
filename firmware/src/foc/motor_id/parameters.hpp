@@ -24,13 +24,17 @@
 
 #pragma once
 
-#include <foc/common.hpp>
+#include <math/math.hpp>
+#include <zubax_chibios/util/heapless.hpp>
 
 
 namespace foc
 {
 namespace motor_id
 {
+
+using math::Scalar;
+
 /**
  * Greater modes (listed later) allow to identify more parameters,
  * but impose more restrictions on the connected load.

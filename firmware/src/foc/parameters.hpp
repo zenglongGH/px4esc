@@ -24,17 +24,23 @@
 
 #pragma once
 
-#include "common.hpp"
 #include "transforms.hpp"
 #include "observer/observer.hpp"
 #include "motor_id/parameters.hpp"
 #include <zubax_chibios/util/heapless.hpp>
+#include <zubax_chibios/util/float_eq.hpp>
 #include <math/math.hpp>
 #include <cstdint>
+#include <cassert>
 
 
 namespace foc
 {
+
+using math::Scalar;
+using math::Const;
+using math::Vector;
+
 /**
  * This structure entails all information about the connected load.
  * Some of these parameters can be automatically identified.

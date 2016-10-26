@@ -106,7 +106,7 @@ public:
             last_modulator_output_.reference_Udq[1],
             last_modulator_output_.estimated_Idq[0],
             last_modulator_output_.estimated_Idq[1],
-            Scalar(modulator_.getUdqNormalizationCounter().get())
+            Scalar(modulator_.getUdqNormalizationCounter())
         });
     }
 

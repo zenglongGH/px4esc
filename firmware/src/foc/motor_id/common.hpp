@@ -27,6 +27,7 @@
 #include <foc/task.hpp>
 #include <foc/voltage_modulator.hpp>
 #include <foc/irq_debug.hpp>
+#include <math/math.hpp>
 #include <cstdint>
 
 

@@ -24,14 +24,19 @@
 
 #pragma once
 
-#include "common.hpp"
 #include "transforms.hpp"
 #include <math/math.hpp>
+#include <board/motor.hpp>
 #include <cassert>
 
 
 namespace foc
 {
+
+using math::Scalar;
+using math::Const;
+using math::Vector;
+
 /**
  * Serial PI controller, Idq Current --> Udq Voltage.
  */
@@ -113,7 +118,7 @@ private:
 
     math::SimpleMovingAverageFilter<IdqMovingAverageLength, Vector<2>> estimated_Idq_filter_;
 
-    EventCounter Udq_normalization_count_;
+    std::uint64_t Udq_normalization_count_ = 0;
 
 public:
     struct Output
@@ -208,7 +213,7 @@ public:
         {
             out.reference_Udq = out.reference_Udq.normalized() * Udq_magnitude_limit;
             out.Udq_was_limited = true;
-            Udq_normalization_count_.increment();
+            Udq_normalization_count_++;
         }
 
         /*
@@ -234,7 +239,7 @@ public:
         return out;
     }
 
-    EventCounter getUdqNormalizationCounter() const { return Udq_normalization_count_; }
+    std::uint64_t getUdqNormalizationCounter() const { return Udq_normalization_count_; }
 };
 
 }

@@ -24,7 +24,6 @@
 
 #pragma once
 
-#include "common.hpp"
 #include "parameters.hpp"
 #include "running_task.hpp"
 #include "hw_test/report.hpp"

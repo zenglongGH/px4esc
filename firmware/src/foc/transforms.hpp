@@ -24,12 +24,19 @@
 
 #pragma once
 
-#include "common.hpp"
 #include <math/math.hpp>
+#include <cassert>
 
 
 namespace foc
 {
+
+using math::Scalar;
+using math::Const;
+using math::Vector;
+
+constexpr Scalar SquareRootOf3 = Scalar(1.7320508075688772);
+
 /**
  * Space Vector PWM modulation.
  * Refer to the Dmitry's documents for theory.

@@ -24,13 +24,21 @@
 
 #pragma once
 
-#include "common.hpp"
 #include "parameters.hpp"
 #include "voltage_modulator.hpp"
+#include <math/math.hpp>
+#include <board/motor.hpp>
+#include <cassert>
 
 
 namespace foc
 {
+
+using math::Scalar;
+using math::Const;
+using math::Vector;
+using board::motor::AbsoluteCriticalSectionLocker;
+
 /**
  * Main motor control class used during normal operation (spinup/running).
  * Fundamentally, the rest of the application exists only for the sake of this class.

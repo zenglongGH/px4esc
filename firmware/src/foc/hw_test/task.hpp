@@ -24,7 +24,6 @@
 
 #pragma once
 
-#include <foc/common.hpp>
 #include <foc/task.hpp>
 #include "report.hpp"
 

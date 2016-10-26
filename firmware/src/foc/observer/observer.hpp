@@ -24,8 +24,9 @@
 
 #pragma once
 
-#include <foc/common.hpp>
+#include <math/math.hpp>
 #include <zubax_chibios/util/heapless.hpp>
+#include <zubax_chibios/util/float_eq.hpp>
 #include <cassert>
 
 
@@ -33,6 +34,13 @@ namespace foc
 {
 namespace observer
 {
+
+using math::Scalar;
+using math::Const;
+using math::Vector;
+using math::Matrix;
+using math::DiagonalMatrix;
+
 /**
  * Observer constants that are invariant to the motor model.
  * Model of the motor is defined separately.

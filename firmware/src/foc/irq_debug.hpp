@@ -24,12 +24,16 @@
 
 #pragma once
 
-#include "common.hpp"
+#include <math/math.hpp>
 #include <array>
 
 
 namespace foc
 {
+
+using math::Scalar;
+using math::Const;
+
 /**
  * Stores arbitrary values from IRQ to print them later into stdout.
  */

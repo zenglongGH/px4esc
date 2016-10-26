@@ -24,7 +24,8 @@
 
 #pragma once
 
-#include <foc/common.hpp>
+#include <cstdint>
+#include <zubax_chibios/util/heapless.hpp>
 
 
 namespace foc
