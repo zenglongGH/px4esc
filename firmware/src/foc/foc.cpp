@@ -214,7 +214,7 @@ void setSetpoint(ControlMode control_mode,
     {
         if (os::float_eq::closeToZero(value))
         {
-            g_task_handler.from<FaultTask>().to<IdleTask>();
+            g_task_handler.from<FaultTask, MotorIdentificationTask>().to<IdleTask>();
         }
         else
         {
