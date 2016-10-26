@@ -38,7 +38,11 @@ class Report
 {
     friend class HardwareTestingTask;
 
-    std::uint16_t mask_ = 0;
+public:
+    using Mask = std::uint16_t;
+
+private:
+    Mask mask_ = 0;
 
 public:
     enum class ErrorFlag
@@ -54,9 +58,9 @@ public:
         InverterFaultSignal
     };
 
-    static constexpr std::uint16_t flag2mask(const ErrorFlag f) { return 1U << unsigned(f); }
+    static constexpr Mask flag2mask(const ErrorFlag f) { return Mask(1U << unsigned(f)); }
 
-    std::uint16_t getErrorMask() const { return mask_; }
+    Mask getErrorMask() const { return mask_; }
 
     unsigned getNumberOfErrors() const
     {

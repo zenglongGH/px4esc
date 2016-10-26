@@ -69,7 +69,7 @@ class HardwareTestingTask : public ITask
 
     math::SimpleMovingAverageFilter<200, Vector<2>> currents_filter_;
 
-    Report test_report_;
+    Report report_;
 
     board::motor::Status hardware_status_;
 
@@ -103,17 +103,17 @@ class HardwareTestingTask : public ITask
 
     void registerError(const Report::ErrorFlag f)
     {
-        test_report_.mask_ |= Report::flag2mask(f);
+        report_.mask_ = Report::Mask(report_.mask_ | Report::flag2mask(f));
 
         // If all three phases are misbehaving, the motor is probably not connected.
         constexpr auto PhaseFlags = Report::flag2mask(Report::ErrorFlag::PhaseAError) |
                                     Report::flag2mask(Report::ErrorFlag::PhaseBError) |
                                     Report::flag2mask(Report::ErrorFlag::PhaseCError);
 
-        if ((test_report_.mask_ & PhaseFlags) == PhaseFlags)
+        if ((report_.mask_ & PhaseFlags) == PhaseFlags)
         {
-            test_report_.mask_ &= ~PhaseFlags;
-            test_report_.mask_ |= Report::flag2mask(Report::ErrorFlag::MotorNotConnected);
+            report_.mask_ = Report::Mask(report_.mask_ & ~PhaseFlags);
+            report_.mask_ = Report::Mask(report_.mask_ | Report::flag2mask(Report::ErrorFlag::MotorNotConnected));
         }
     }
 
@@ -243,7 +243,7 @@ public:
             {
                 registerError(Report::ErrorFlag::InverterFaultSignal);
             }
-            return {true, test_report_.mask_};
+            return {true, report_.mask_};
         }
 
         default:
@@ -279,7 +279,7 @@ public:
 
     void applyResultToGlobalContext(TaskContext& inout_context) const override
     {
-        inout_context.hw_test_report = test_report_;
+        inout_context.hw_test_report = report_;
     }
 };
 
