@@ -131,8 +131,7 @@ bool isMotorIdentificationInProgress(MotorIdentificationStateInfo* out_info)
         AbsoluteCriticalSectionLocker locker;
         if (auto task = g_task_handler.as<MotorIdentificationTask>())
         {
-            (void) task;                // TODO: Fill the state info
-            out_info->progress = 0;
+            out_info->progress = task->getProgress();
             out_info->inverter_power_filtered = 0;
             out_info->mechanical_rpm = 0;
             return true;

@@ -240,6 +240,16 @@ public:
     bool isPreCalibrationRequired() const override { return true; }
 
     std::array<Scalar, NumDebugVariables> getDebugVariables() const override { return context_.debug_values_; }
+
+    Scalar getProgress() const
+    {
+        unsigned num_tasks = 1;     // For purposes of progress estimation, we consider pre-calibration as a task
+        for (int i = 0; task_chain_[i] != nullptr; i++)
+        {
+            num_tasks++;
+        }
+        return Scalar(next_task_index_) / Scalar(num_tasks);
+    }
 };
 
 }

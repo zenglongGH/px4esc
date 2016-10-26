@@ -581,7 +581,8 @@ class MotorIdentificationCommand : public os::shell::ICommandHandler
 
         bool aborted = false;
 
-        while (foc::isMotorIdentificationInProgress())
+        foc::MotorIdentificationStateInfo info;
+        while (foc::isMotorIdentificationInProgress(&info))
         {
             if (do_plot)
             {
@@ -589,7 +590,7 @@ class MotorIdentificationCommand : public os::shell::ICommandHandler
             }
             else
             {
-                ios.putChar('.');
+                ios.print("\r%u %% \r", unsigned(info.progress * 100.0F));
             }
 
             if (ios.getChar(do_plot ? 0 : 1000) > 0)
