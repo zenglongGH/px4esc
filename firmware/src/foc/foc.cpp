@@ -200,10 +200,13 @@ bool isInactive(InactiveStateInfo* out_info)
     return false;
 }
 
-const char* getCurrentTaskName()
+ExtendedStatus getExtendedStatus()
 {
     AbsoluteCriticalSectionLocker locker;
-    return g_task_handler.get().getName();
+    return {
+        g_task_handler.get().getName(),
+        g_task_handler.getTaskSwitchCounter()
+    };
 }
 
 void setSetpoint(ControlMode control_mode,
@@ -231,16 +234,6 @@ void setSetpoint(ControlMode control_mode,
 void beep(Const frequency, Const duration)
 {
     g_task_handler.from<IdleTask>().to<BeepingTask>(frequency, duration);
-}
-
-void printStatusInfo()
-{
-    // TODO
-    if (auto task = g_task_handler.as<FaultTask>())
-    {
-        std::printf("Fault Code: 0x%04x\n", task->getFaultCode());
-    }
-    std::printf("Task Switch Cnt: %llu\n", static_cast<unsigned long long>(g_task_handler.getTaskSwitchCounter()));
 }
 
 void plotRealTimeValues()

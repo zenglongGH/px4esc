@@ -130,9 +130,18 @@ struct InactiveStateInfo
 bool isInactive(InactiveStateInfo* out_info = nullptr);
 
 /**
- * Returns a human-readable name of the currently active task.
+ * @ref getExtendedStatus().
  */
-const char* getCurrentTaskName();
+struct ExtendedStatus
+{
+    const char* current_task_name = nullptr;
+    std::uint64_t task_switch_count = 0;
+};
+
+/**
+ * Returns non-vital status information; useful for debugging.
+ */
+ExtendedStatus getExtendedStatus();
 
 /**
  * Assigns new setpoint; the units depend on the selected control mode.
@@ -164,13 +173,6 @@ inline void stop()
  */
 void beep(Const frequency,
           Const duration);
-
-/**
- * Prints the current status information into stdout.
- * This command is mostly useful for debugging, diagnostics and tuning.
- * The function makes blocking calls to printf() and may moderately disturb IRQ processing due to critical sections.
- */
-void printStatusInfo();
 
 /**
  * This command is intended for use with CLI plotting tool.

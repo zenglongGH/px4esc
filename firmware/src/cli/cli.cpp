@@ -176,13 +176,110 @@ class PWMCommand : public os::shell::ICommandHandler
 } static cmd_pwm;
 
 
+class BriefStatusCommand : public os::shell::ICommandHandler
+{
+    const char* getName() const override { return "s"; }
+
+    void execute(os::shell::BaseChannelWrapper&, int, char**) override { execute(); }
+
+public:
+    void execute()
+    {
+        const auto voltage = board::motor::getInverterVoltage();
+
+        bool printed = false;
+
+        if (!printed)
+        {
+            foc::RunningStateInfo info;
+            bool spinup_in_progress = false;
+            if (foc::isRunning(&info, &spinup_in_progress))
+            {
+                std::printf("RUNNING, %s\n", spinup_in_progress ? "SPINUP" : "NORMAL");
+
+                std::printf("%5.1f W     %6.2f A     %4.1f V\n",
+                            double(info.inverter_power_filtered),
+                            double(info.inverter_power_filtered / voltage),
+                            double(voltage));
+
+                std::printf("%5.0f MRPM  %3.0f %%\n",
+                            double(info.mechanical_rpm),
+                            double(info.demand_factor_filtered * 100.0F));
+
+                std::printf("%5u stalls\n", static_cast<unsigned>(info.stall_count));
+
+                printed = true;
+            }
+        }
+
+        if (!printed)
+        {
+            foc::MotorIdentificationStateInfo info;
+            if (foc::isMotorIdentificationInProgress(&info))
+            {
+                std::printf("MOTOR ID, %.0f %% complete\n", double(info.progress * 100.0F));
+                std::printf("%5.1f W     %6.2f A     %4.1f V     %5.0f MRPM\n",
+                            double(info.inverter_power_filtered),
+                            double(info.inverter_power_filtered / voltage),
+                            double(voltage),
+                            double(info.mechanical_rpm));
+                printed = true;
+            }
+        }
+
+        if (!printed)
+        {
+            foc::InactiveStateInfo info;
+            if (foc::isInactive(&info))
+            {
+                if (info.fault_code == info.FaultCodeNone)
+                {
+                    std::printf("IDLE, %llu task switches\n",
+                                static_cast<unsigned long long>(foc::getExtendedStatus().task_switch_count));
+                }
+                else
+                {
+                    std::printf("FAULT 0x%04x\n", info.fault_code);
+                }
+                printed = true;
+            }
+        }
+
+        if (!printed)
+        {
+            std::puts("No status description available");
+            printed = true;
+        }
+
+        assert(printed);
+
+        {
+            const auto kv = foc::getDebugKeyValuePairs();
+            if (std::any_of(kv.begin(), kv.end(), [](auto& item) { return !item.first.empty(); }))
+            {
+                std::printf("Debug Values:");
+                for (auto& x : kv)
+                {
+                    if (!x.first.empty())
+                    {
+                        std::printf("    %s %g", x.first.c_str(), double(x.second));
+                    }
+                }
+                std::puts("");
+            }
+        }
+    }
+
+} static cmd_brief_status;
+
+
 class StatusCommand : public os::shell::ICommandHandler
 {
     const char* getName() const override { return "status"; }
 
     void execute(os::shell::BaseChannelWrapper&, int, char**) override
     {
-        foc::printStatusInfo();
+        cmd_brief_status.execute();
 
         std::puts("\nFOC Parameters:");
         std::puts(foc::getParameters().toString().c_str());
@@ -203,17 +300,6 @@ class StatusCommand : public os::shell::ICommandHandler
                     double(pwm_params.dead_time) * 1e9);
     }
 } static cmd_status;
-
-
-class BriefStatusCommand : public os::shell::ICommandHandler
-{
-    const char* getName() const override { return "s"; }
-
-    void execute(os::shell::BaseChannelWrapper&, int, char**) override
-    {
-        foc::printStatusInfo();
-    }
-} static cmd_brief_status;
 
 
 class CalibrateCommand : public os::shell::ICommandHandler
@@ -893,7 +979,8 @@ class CLIThread : public chibios_rt::BaseStaticThread<2048>
 
     static auto renderPrompt()
     {
-        return os::heapless::concatenate<decltype(shell_)::Prompt::Capacity>(foc::getCurrentTaskName(), "> ");
+        return os::heapless::concatenate<decltype(shell_)::Prompt::Capacity>(
+            foc::getExtendedStatus().current_task_name, "> ");
     }
 
 public:
