@@ -339,8 +339,20 @@ public:
 
             case MotorRunner::State::Stalled:
             {
+                const auto direction = runner_->getDirection();
+
                 runner_.destroy();
-                num_successive_stalls_++;
+
+                if (((direction == MotorRunner::Direction::Forward) && (raw_setpoint_ < 0)) ||
+                    ((direction == MotorRunner::Direction::Reverse) && (raw_setpoint_ > 0)))
+                {
+                    num_successive_stalls_ = 0;
+                }
+                else
+                {
+                    num_successive_stalls_++;
+                }
+
                 if (num_successive_stalls_ > context_.params.controller.num_stalls_to_latch)
                 {
                     return Result::failure(ExitCodeTooManyStalls);

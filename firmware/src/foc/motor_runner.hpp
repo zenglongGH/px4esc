@@ -296,6 +296,8 @@ public:
         return (reference_Udq_.transpose() * estimated_Idq_)[0] * 1.5F;
     }
 
+    Direction getDirection() const { return direction_; }
+
     DebugVariables getDebugVariables() const
     {
         AbsoluteCriticalSectionLocker locker;
