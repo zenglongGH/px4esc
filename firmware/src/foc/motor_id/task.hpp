@@ -35,6 +35,105 @@ namespace foc
 namespace motor_id
 {
 /**
+ * This part is internal to the motor ID task. Do not use it from outside.
+ */
+template <typename... TaskList>
+class SubTaskSequencer
+{
+    SubTaskSequencer(const volatile SubTaskSequencer&) = delete;
+    SubTaskSequencer(const volatile SubTaskSequencer&&) = delete;
+    SubTaskSequencer& operator=(const volatile SubTaskSequencer&) = delete;
+    SubTaskSequencer& operator=(const volatile SubTaskSequencer&&) = delete;
+
+    typedef TypeEnumeration<TaskList...> Tasks;
+    friend Tasks;   // This is needed for type resolution methods
+
+    // We multiply the sequence length by 2 in order to allow repeating tasks, should it become necessary.
+    static constexpr std::uint8_t MaxSequenceLength = sizeof...(TaskList) * 2;
+
+    std::array<std::uint8_t, MaxSequenceLength> sequence_{};
+    std::uint8_t sequence_length_ = 0;
+    std::uint8_t current_task_index_ = 0;
+    ISubTask* current_task_ = nullptr;
+
+    alignas(Tasks::LargestAlignment) mutable std::uint8_t pool_[Tasks::LargestSize];
+
+    SubTaskContext& context_ref_;
+    MotorParameters& result_ref_;
+
+    template <typename T>
+    ISubTask* onTypeResolutionSuccess() const
+    {
+        static_assert(sizeof(T) <= sizeof(pool_), "Congratulations, you broke your C++ compiler!");
+        return new (pool_) T(context_ref_, result_ref_);
+    }
+
+    ISubTask* onTypeResolutionFailure() const
+    {
+        ::chSysHalt("motor_id::SubTaskSequencer TYPE RESOLVER");     // Oh how I miss RTTI
+        return nullptr;
+    }
+
+    void destroyCurrentTask()
+    {
+        if (current_task_ != nullptr)
+        {
+            current_task_->~ISubTask();
+            current_task_ = nullptr;
+        }
+    }
+
+public:
+    SubTaskSequencer(SubTaskContext& context_reference,
+                     MotorParameters& result_reference) :
+        context_ref_(context_reference),
+        result_ref_(result_reference)
+    { }
+
+    ~SubTaskSequencer() { destroyCurrentTask(); }
+
+    template <typename... TaskTypes>
+    void setSequence()
+    {
+        static_assert(sizeof...(TaskTypes) > 0, "Zero length sequence is not allowed");
+        static_assert(sizeof...(TaskTypes) <= MaxSequenceLength, "Sequence is too long");
+
+        assert(sequence_length_ == 0);
+        assert(current_task_index_ == 0);
+
+        destroyCurrentTask();
+
+        sequence_ = {Tasks::template getID<TaskTypes>()...};
+        sequence_length_ = sizeof...(TaskTypes);
+        current_task_index_ = 0;
+
+        current_task_ = Tasks::findTypeByID(*this, current_task_index_);
+    }
+
+    bool selectNextTask()
+    {
+        if (current_task_index_ + 1 < sequence_length_)
+        {
+            destroyCurrentTask();
+            current_task_index_++;
+            current_task_ = Tasks::findTypeByID(*this, current_task_index_);
+            return true;
+        }
+        return false;
+    }
+
+    ISubTask& getCurrentTask()
+    {
+        assert(current_task_ != nullptr);
+        return *current_task_;
+    }
+
+    std::uint8_t getSequenceLength() const { return sequence_length_; }
+
+    std::uint8_t getCurrentTaskIndex() const { return current_task_index_; }
+};
+
+/**
  * Motor identification logic.
  * Refer to the Dmitry's doc for derivations and explanation of what's going on here.
  */
@@ -44,7 +143,7 @@ class MotorIdentificationTask : public ITask
     {
         std::uint32_t pwm_period_counter = 0;
         Vector<3> pwm_output_vector = Vector<3>::Zero();
-        std::array<Scalar, ITask::NumDebugVariables> debug_values_{};
+        std::array<Scalar, ITask::NumDebugVariables> debug_values{};
 
         ContextImplementation(const TaskContext& cont)
         {
@@ -61,8 +160,8 @@ class MotorIdentificationTask : public ITask
         {
             AbsoluteCriticalSectionLocker locker;
             std::copy_n(variables.begin(),
-                        std::min(variables.size(), debug_values_.size()),
-                        debug_values_.begin());
+                        std::min(variables.size(), debug_values.size()),
+                        debug_values.begin());
         }
 
         Scalar getTime() const override
@@ -74,81 +173,59 @@ class MotorIdentificationTask : public ITask
 
     static constexpr Result::ExitCode ExitCodeBadHardwareStatus     = Result::MaxExitCode - 0;
     static constexpr Result::ExitCode ExitCodeInvalidParameters     = Result::MaxExitCode - 1;
+    static constexpr Result::ExitCode ExitCodeInvalidSequence       = Result::MaxExitCode - 2;
 
     MotorParameters result_;
-    std::uint8_t next_task_index_ = 0;
-    ISubTask* current_task_ = nullptr;
-    void (MotorIdentificationTask::* const* const task_chain_)();
 
-    alignas(32) std::uint8_t vinnie_the_pool_[std::max({
-        sizeof(ResistanceTask),
-        sizeof(InductanceTask),
-        sizeof(MagneticFluxTask)
-    })]{};
+    SubTaskSequencer
+    < ResistanceTask
+    , InductanceTask
+    , MagneticFluxTask
+    > sequencer_;
 
-    void destroyCurrentTask()
-    {
-        if (current_task_ != nullptr)
-        {
-            current_task_->~ISubTask();
-            current_task_ = nullptr;
-        }
-    }
+    bool started_ = false;
 
-    template <typename Task>
-    void switchTask()
-    {
-        static_assert(sizeof(Task) <= sizeof(vinnie_the_pool_), "Vinnie the Pool is not large enough :(");
-        destroyCurrentTask();
-        std::fill(std::begin(vinnie_the_pool_), std::end(vinnie_the_pool_), 0);
-        current_task_ = new (vinnie_the_pool_) Task(context_, result_);
-    }
-
-    static void (MotorIdentificationTask::* const* selectTaskChain(Mode mode))()
+public:
+    MotorIdentificationTask(const TaskContext& context,
+                            const Mode mode) :
+        context_(context),
+        result_(context.params.motor),
+        sequencer_(context_, result_)
     {
         switch (mode)
         {
         case Mode::Static:
         {
-            static constexpr void (MotorIdentificationTask::* chain[])() = {
-                &MotorIdentificationTask::switchTask<ResistanceTask>,
-                &MotorIdentificationTask::switchTask<InductanceTask>,
-                nullptr
-            };
-            return chain;
+            sequencer_.setSequence<ResistanceTask, InductanceTask>();
+            break;
         }
         case Mode::RotationWithoutMechanicalLoad:
         {
-            static constexpr void (MotorIdentificationTask::* chain[])() = {
-                &MotorIdentificationTask::switchTask<ResistanceTask>,
-                &MotorIdentificationTask::switchTask<InductanceTask>,
-                &MotorIdentificationTask::switchTask<MagneticFluxTask>,
-                nullptr
-            };
-            return chain;
+            sequencer_.setSequence<ResistanceTask, InductanceTask, MagneticFluxTask>();
+            break;
         }
         }
-        assert(false);
-        return nullptr;
-    }
-
-public:
-    MotorIdentificationTask(const TaskContext& context,
-                            Mode mode) :
-        context_(context),
-        result_(context.params.motor),
-        task_chain_(selectTaskChain(mode))
-    { }
-
-    ~MotorIdentificationTask()
-    {
-        destroyCurrentTask();
     }
 
     const char* getName() const override { return "motor_id"; }
 
     Result onMainIRQ(Const period, const board::motor::Status& hw_status) override
     {
+        if (!started_)
+        {
+            started_ = true;
+
+            if (sequencer_.getSequenceLength() < 1)
+            {
+                return Result::failure(ExitCodeInvalidSequence);
+            }
+
+            if (!context_.params.motor_id.isValid())
+            {
+                return Result::failure(ExitCodeInvalidParameters);
+            }
+        }
+
         // TODO: We can't check the general hardware status because FAULT tends to go up randomly.
         //       There might be a hardware bug somewhere. Investigate it later.
         //if (hw_status.isOkay())
@@ -157,51 +234,29 @@ public:
             return Result::failure(ExitCodeBadHardwareStatus);
         }
 
-        if (current_task_ == nullptr)
-        {
-            AbsoluteCriticalSectionLocker locker;
+        AbsoluteCriticalSectionLocker::assertNotLocked();   // This is the only brief period where we aren't IRQ-safe.
 
-            // Making sure the parameters are sane
-            if (!context_.params.motor_id.isValid())
+        sequencer_.getCurrentTask().onMainIRQ(period);
+
+        AbsoluteCriticalSectionLocker locker;           // Once the business processing is finished, lock again ASAP.
+
+        const auto status = sequencer_.getCurrentTask().getStatus();
+        if (status != ISubTask::Status::InProgress)
+        {
+            result_ = sequencer_.getCurrentTask().getEstimatedMotorParameters();
+
+            if (status == ISubTask::Status::Failed)
             {
-                return Result::failure(ExitCodeInvalidParameters);
+                // +1 because we can't use zero - it would mean that there's no failure
+                return Result::failure(Result::ExitCode(sequencer_.getCurrentTaskIndex() + 1));
             }
 
-            // Switching to the next state
-            const auto constructor = task_chain_[next_task_index_];
-            if (constructor == nullptr)
+            if (!sequencer_.selectNextTask())
             {
                 return Result::success();
             }
-            else
-            {
-                next_task_index_++;
-                (this->*constructor)();
-            }
         }
-        else
-        {
-            // This is the only brief period of time where we aren't IRQ-safe.
-            AbsoluteCriticalSectionLocker::assertNotLocked();
-            current_task_->onMainIRQ(period);
 
-            // Immediately once the business logic processing is finished, lock again
-            AbsoluteCriticalSectionLocker locker;
-
-            const auto status = current_task_->getStatus();
-            if (status != ISubTask::Status::InProgress)
-            {
-                result_ = current_task_->getEstimatedMotorParameters();
-
-                destroyCurrentTask();
-
-                if (status == ISubTask::Status::Failed)
-                {
-                    assert(next_task_index_ > 0);
-                    return Result::failure(next_task_index_);
-                }
-            }
-        }
         return Result::inProgress();
     }
 
@@ -210,24 +265,24 @@ public:
     {
         AbsoluteCriticalSectionLocker::assertNotLocked();
 
+        if (!started_)
+        {
+            return {};
+        }
+
         if (context_.pwm_period_counter < std::numeric_limits<decltype(context_.pwm_period_counter)>::max())
         {
             context_.pwm_period_counter++;
         }
         else
         {
-            // This can't happen.
-            assert(false);
-            result_ = MotorParameters();
-            return { Vector<3>::Zero(), false };
+            ::chSysHalt("MotorIdentificationTask TIME OVERFLOW");   // This can't happen.
+            return {};
         }
 
         context_.pwm_output_vector.setZero();   // Default
 
-        if (current_task_ != nullptr)
-        {
-            current_task_->onNextPWMPeriod(phase_currents_ab, inverter_voltage);
-        }
+        sequencer_.getCurrentTask().onNextPWMPeriod(phase_currents_ab, inverter_voltage);
 
         return {context_.pwm_output_vector, true};
     }
@@ -239,16 +294,19 @@ public:
 
     bool isPreCalibrationRequired() const override { return true; }
 
-    std::array<Scalar, NumDebugVariables> getDebugVariables() const override { return context_.debug_values_; }
+    std::array<Scalar, NumDebugVariables> getDebugVariables() const override { return context_.debug_values; }
 
     Scalar getProgress() const
     {
-        unsigned num_tasks = 1;     // For purposes of progress estimation, we consider pre-calibration as a task
-        for (int i = 0; task_chain_[i] != nullptr; i++)
+        // For purposes of progress estimation, we consider pre-calibration as a dedicated task in the sequencer
+        if (!started_)
         {
-            num_tasks++;
+            return 0.0F;
         }
-        return Scalar(next_task_index_) / Scalar(num_tasks);
+        else
+        {
+            return Scalar(sequencer_.getCurrentTaskIndex() + 1) / Scalar(sequencer_.getSequenceLength() + 1);
+        }
     }
 };
 
