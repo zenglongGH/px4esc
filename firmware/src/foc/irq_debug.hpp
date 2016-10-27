@@ -117,6 +117,18 @@ public:
 private:
     std::array<Scalar, NumVariables> vars_ = {};
 
+    mutable ::systime_t previous_time_systicks_ = 0;
+    mutable std::uint64_t absolute_time_systicks_ = 0;
+
+    Scalar getAbsoluteTimeInSeconds() const
+    {
+        // This is super wonky, should be improved someday
+        const auto delta = chVTTimeElapsedSinceX(previous_time_systicks_);
+        previous_time_systicks_ += delta;
+        absolute_time_systicks_ += delta;
+        return Scalar(absolute_time_systicks_) / Scalar(CH_CFG_ST_FREQUENCY);
+    }
+
 public:
     template <unsigned Index, typename Value>
     void set(const Value x)
@@ -141,7 +153,7 @@ public:
         }
 
         std::printf("$%.4f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
-                    double(ST2US(chVTGetSystemTimeX())) * 1e-6,     // TODO: Avoid wraparound!
+                    double(getAbsoluteTimeInSeconds()),
                     double(vars_copy[0]),
                     double(vars_copy[1]),
                     double(vars_copy[2]),
