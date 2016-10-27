@@ -148,10 +148,13 @@ void cbTimer(const uavcan::TimerEvent& event)
 
     for (auto& kv : foc::getDebugKeyValuePairs())
     {
-        uavcan::protocol::debug::KeyValue msg;
-        msg.key = kv.first.c_str();
-        msg.value = kv.second;
-        (void) g_pub_key_value->broadcast(msg);
+        if (!kv.first.empty())
+        {
+            uavcan::protocol::debug::KeyValue msg;
+            msg.key = kv.first.c_str();
+            msg.value = kv.second;
+            (void) g_pub_key_value->broadcast(msg);
+        }
     }
 
 #endif
