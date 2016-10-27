@@ -87,6 +87,9 @@ void init(const Parameters& params)
     g_context.board.limits  = board::motor::getLimits();
 
     g_task_handler.select<IdleTask>();
+
+    DEBUG_LOG("FOC sizeof: %u %u %u %u\n",
+              sizeof(g_task_handler), sizeof(MotorIdentificationTask), sizeof(g_context), sizeof(g_context.params));
 }
 
 void setParameters(const Parameters& params)
