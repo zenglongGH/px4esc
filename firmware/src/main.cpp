@@ -351,6 +351,40 @@ public:
     bool hasBeenSaved() { return doDestructiveTruthTest(just_saved_); }
 };
 
+/**
+ * Continuously checks invariants, crashes the system if any are broken.
+ * Note that this class may acquire the OS-level critical section for a long time.
+ */
+class BackgroundIntegrityChecker
+{
+    void checkOnce(unsigned mask) const
+    {
+        bool failure = false;
+
+        {
+            os::CriticalSectionLocker locker;
+            failure = chibios_rt::System::integrityCheckI(mask);
+        }
+
+        if (failure)
+        {
+            g_logger.println("SYSTEM INTEGRITY CHECK FAILED [%u]", mask);
+            os::requestReboot();
+            g_logger.puts("FORCING SELF REBOOT");
+        }
+    }
+
+public:
+    void check() const
+    {
+        // We don't check all at once in order to avoid taking long critical sections
+        checkOnce(CH_INTEGRITY_RLIST);
+        checkOnce(CH_INTEGRITY_VTLIST);
+        checkOnce(CH_INTEGRITY_REGISTRY);
+        checkOnce(CH_INTEGRITY_PORT);
+    }
+};
+
 
 void updateUAVCANNodeStatus(const bool board_ok,
                             const std::uint8_t board_health_mask)
@@ -487,12 +521,15 @@ int main()
 
     led_indicator::Indicator led_indicator;     // Dependent on the loop period
     app::BackgroundConfigManager config_manager;
+    app::BackgroundIntegrityChecker integrity_checker;
 
     auto next_step_at = chVTGetSystemTime();
 
     while (!os::isRebootRequested())
     {
         watchdog.reset();
+
+        integrity_checker.check();
 
         config_manager.poll();
         if (config_manager.hasBeenSaved())
