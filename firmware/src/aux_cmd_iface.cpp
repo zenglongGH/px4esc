@@ -185,6 +185,7 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
             const auto cmd = g_param_cmd.get();
             if (cmd >= 0)
             {
+                DEBUG_LOG("%s: %d\n", g_logger.getName(), cmd);
                 g_param_cmd.set(CmdNone);
                 execute(cmd);
             }
