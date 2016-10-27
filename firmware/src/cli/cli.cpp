@@ -234,7 +234,7 @@ public:
             {
                 if (info.fault_code == info.FaultCodeNone)
                 {
-                    std::printf("IDLE, %llu task switches\n",
+                    std::printf("IDLE, %llu task switchings\n",
                                 static_cast<unsigned long long>(foc::getExtendedStatus().task_switch_count));
                 }
                 else
