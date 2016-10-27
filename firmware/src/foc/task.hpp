@@ -66,7 +66,7 @@ class ITask
     ITask(const volatile ITask&) = delete;
     ITask(const volatile ITask&&) = delete;
     ITask& operator=(const volatile ITask&) = delete;
-    ITask& operator=(const volatile ITask&&)= delete;
+    ITask& operator=(const volatile ITask&&) = delete;
 
 protected:
     ITask() { }
@@ -230,6 +230,41 @@ struct TypeEnumeration
 
     template <int TargetID>
     using GetType = typename Head::template GetType<TargetID>::Result;
+
+    /**
+     * Dynamically searches for a type given its ID at runtime.
+     * If found, invokes onTypeResolutionSuccess<T>() on the specified object, where T is the found type.
+     * If not found, invokes onTypeResolutionFailure() on the same object.
+     * @param obj           Resolver object, on which the methods will be invoked as described above.
+     * @param target_id     ID of the type to find.
+     * @param args          Optional extra arguments; they will be passed on to the target methods without change.
+     * @return              Whatever the target methods return will be returned without change.
+     */
+    template <typename Resolver, int CandidateID = 0, typename... PassThroughArgs>
+    static auto findTypeByID(Resolver& obj,
+                             const typename std::enable_if<(CandidateID < sizeof...(TypeList)), int>::type target_id,
+                             PassThroughArgs... args)
+    {
+        if (target_id == CandidateID)
+        {
+            return obj.template onTypeResolutionSuccess<GetType<CandidateID>>(std::forward<PassThroughArgs>(args)...);
+        }
+        else        // Hail Alexandrescu! o/
+        {
+            return findTypeByID<Resolver, CandidateID + 1, PassThroughArgs...>(obj, target_id, args...);
+        }
+    }
+
+    /**
+     * Refer to the overload above.
+     */
+    template <typename Resolver, int CandidateID = 0, typename... PassThroughArgs>
+    static auto findTypeByID(Resolver& obj,
+                             const typename std::enable_if<(CandidateID >= sizeof...(TypeList)), int>::type,
+                             PassThroughArgs... args)
+    {
+        return obj.onTypeResolutionFailure(std::forward<PassThroughArgs>(args)...);
+    }
 };
 
 /**
