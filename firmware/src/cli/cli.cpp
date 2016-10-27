@@ -197,17 +197,15 @@ public:
             {
                 std::printf("RUNNING, %s\n", spinup_in_progress ? "SPINUP" : "NORMAL");
 
-                std::printf("%5.1f W     %6.2f A     %4.1f V\n",
+                std::printf("%6.1f W     %6.2f A     %4.1f V\n",
                             double(info.inverter_power_filtered),
                             double(info.inverter_power_filtered / voltage),
                             double(voltage));
 
-                std::printf("%5.0f MRPM  %3.0f %%\n",
+                std::printf("%6.0f MRPM  %3.0f %%    %5u stalls\n",
                             double(info.mechanical_rpm),
-                            double(info.demand_factor_filtered * 100.0F));
-
-                std::printf("%5u stalls\n", static_cast<unsigned>(info.stall_count));
-
+                            double(info.demand_factor_filtered * 100.0F),
+                            static_cast<unsigned>(info.stall_count));
                 printed = true;
             }
         }
