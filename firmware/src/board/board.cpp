@@ -118,7 +118,7 @@ os::watchdog::Timer init(unsigned watchdog_timeout_msec,
      * OS initialization first
      */
     halInit();
-    chSysInit();
+    chibios_rt::System::init();
 
     /*
      * Serial port
@@ -158,7 +158,7 @@ os::watchdog::Timer init(unsigned watchdog_timeout_msec,
 __attribute__((noreturn))
 void die(int reason)
 {
-    chSysHalt(os::heapless::intToString(reason));
+    chibios_rt::System::halt(os::heapless::intToString(reason));
     while (1)
     {
     }

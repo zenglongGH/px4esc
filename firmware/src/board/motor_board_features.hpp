@@ -157,7 +157,7 @@ class BoardFeatures final
             };
         }
 
-        chSysHalt("UNSUPPORTED HARDWARE");
+        chibios_rt::System::halt("UNSUPPORTED HARDWARE");
         return BoardConfig();
     }
 

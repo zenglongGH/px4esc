@@ -70,7 +70,7 @@ class SubTaskSequencer
 
     ISubTask* onTypeResolutionFailure() const
     {
-        ::chSysHalt("motor_id::SubTaskSequencer TYPE RESOLVER");     // Oh how I miss RTTI
+        chibios_rt::System::halt("motor_id::SubTaskSequencer TYPE RESOLVER");     // Oh how I miss RTTI
         return nullptr;
     }
 
@@ -276,7 +276,7 @@ public:
         }
         else
         {
-            ::chSysHalt("MotorIdentificationTask TIME OVERFLOW");   // This can't happen.
+            chibios_rt::System::halt("MotorIdentificationTask TIME OVERFLOW");   // This can't happen.
             return {};
         }
 
