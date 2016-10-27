@@ -948,6 +948,26 @@ class ThreadsCommand : public os::shell::ICommandHandler
 } static cmd_threads;
 
 
+class SystemInfoCommand : public os::shell::ICommandHandler
+{
+    const char* getName() const override { return "sysinfo"; }
+
+    void execute(os::shell::BaseChannelWrapper& ios, int, char**) override
+    {
+        const auto sys_time = chibios_rt::System::getTimeX();
+        bool check_result = false;
+
+        {
+            os::CriticalSectionLocker locker;
+            check_result = chibios_rt::System::integrityCheckI(0xFFFFU);
+        }
+
+        ios.print("System time: %lu\n", sys_time);
+        ios.print("System integrity check result: %s\n", check_result ? "FAILURE" : "OK");
+    }
+} static cmd_sysinfo;
+
+
 class CLIThread : public chibios_rt::BaseStaticThread<2048>
 {
     os::shell::Shell<20> shell_;
@@ -1002,6 +1022,7 @@ public:
         (void) shell_.addCommandHandler(&cmd_motor_database);
         (void) shell_.addCommandHandler(&cmd_plot);
         (void) shell_.addCommandHandler(&cmd_threads);
+        (void) shell_.addCommandHandler(&cmd_sysinfo);
     }
 
     virtual ~CLIThread() { }
