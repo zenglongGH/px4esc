@@ -945,17 +945,41 @@ class SystemInfoCommand : public os::shell::ICommandHandler
             return num_bytes;
         };
 
+        static const auto real_time_to_second = [](auto val) { return double(val) / double(STM32_SYSCLK); };
+
+        std::uint64_t total_cumulative = 0;
+
+        {
+            ::thread_t* tp = chRegFirstThread();
+            do
+            {
+                total_cumulative += tp->p_stats.cumulative;
+                tp = chRegNextThread(tp);
+            }
+            while (tp != nullptr);
+        }
+        assert(total_cumulative > 0);
+
         ios.puts("Threads:");
-        ios.puts("Name             State     FStk Prio");
-        ios.puts("-------------------------------------");
+        ios.puts("                           Free         Avg  |   Timing Stat [sec]");
+        ios.puts("Name             State     Stack  Prio  Load |  Avg    Best   Worst");
+        ios.puts("---------------------------------------------+----------------------");
         ::thread_t* tp = chRegFirstThread();
         do
         {
-            ios.print("%-16s %-9s %-4u %-4u\n",
+            const auto average_load = unsigned((100 * tp->p_stats.cumulative + 50) / total_cumulative);
+
+            const auto average_timing = real_time_to_second(double(tp->p_stats.cumulative) / double(tp->p_stats.n));
+
+            ios.print("%-16s %-9s %5u  %3u   %3u%% | %6.3f %6.3f %6.3f\n",
                       tp->p_name,
                       ThreadStateNames[tp->p_state],
                       gauge_free_stack(tp),
-                      static_cast<unsigned>(tp->p_prio));
+                      static_cast<unsigned>(tp->p_prio),
+                      average_load,
+                      average_timing,
+                      real_time_to_second(tp->p_stats.best),
+                      real_time_to_second(tp->p_stats.worst));
             tp = chRegNextThread(tp);
         }
         while (tp != nullptr);
