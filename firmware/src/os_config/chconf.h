@@ -27,11 +27,6 @@
 #define CH_CFG_ST_RESOLUTION            32
 #define CH_CFG_ST_FREQUENCY             10000
 
-#define CH_CFG_USE_SEMAPHORES           TRUE
-#define CH_CFG_USE_REGISTRY             TRUE
-#define CH_CFG_USE_SEMAPHORES           TRUE
-#define CH_DBG_FILL_THREADS             TRUE
-
 #define PORT_INT_REQUIRED_STACK         4096
 
 #include <zubax_chibios/sys/chconf_tail.h>
