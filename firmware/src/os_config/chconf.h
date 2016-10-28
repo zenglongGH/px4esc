@@ -29,4 +29,10 @@
 
 #define PORT_INT_REQUIRED_STACK         4096
 
+#if !defined(__ASSEMBLER__) && !defined(__cplusplus)
+extern void fastLowLevelSystemIntegrityCheckHook(void);
+#endif
+#define CH_CFG_CONTEXT_SWITCH_HOOK(...)     fastLowLevelSystemIntegrityCheckHook()
+#define CH_CFG_SYSTEM_TICK_HOOK(...)        fastLowLevelSystemIntegrityCheckHook()
+
 #include <zubax_chibios/sys/chconf_tail.h>

@@ -23,10 +23,11 @@
  */
 
 #include "board.hpp"
-#include <cstring>
 #include <ch.hpp>
-#include <unistd.h>
 #include <zubax_chibios/util/heapless.hpp>
+#include <cstring>
+#include <unistd.h>
+#include <numeric>
 
 // Making sure that the priority level 0 (highest) is not occupied by the OS.
 #ifndef CORTEX_PRIORITY_SVCALL
@@ -252,6 +253,75 @@ void __early_init(void)
 
 void boardInit(void)
 {
+}
+
+void fastLowLevelSystemIntegrityCheckHook()
+{
+    /*
+     * Ensuring that the hard real-time IRQ processing is still configured correctly.
+     * Remember that these IRQ must never be disabled, except by the FOC module itself,
+     * which in turn must never access the RTOS services on its own.
+     */
+    ASSERT_ALWAYS(__get_PRIMASK() == 0);
+
+    /*
+     * ChibiOS is one of the very few open source RTOS that are fully preemptible and support tickless mode.
+     *
+     * Fully preemptible means that the OS never disables IRQ whose priority is higher than a certain
+     * pre-configured level; therefore these IRQ can be used to perform hard real time tasks with zero latency/jitter
+     * imposed by the RTOS. In this application we make heavy use of this feature.
+     *
+     * A tickless mode is another neat feature that enables the OS to use a free-running counter with programmable
+     * alarms which trigger IRQ only when needed, rather than triggering a system tick IRQ at a fixed rate even when
+     * it's not needed. I won't go into detail here, this feature is well described in the documentation.
+     *
+     * So, we have two neat features that have a major caveat: when used together, they turn the RTOS into a fucking
+     * minefield. When the RTOS configures a new deadline on the system timer, it basically performs the following
+     * steps:
+     *
+     *  1. Read the current system timer value.
+     *  2. Add the time remaining to the deadline.
+     *  3. Write the result into the compare register.
+     *
+     * See, the timer keeps running the whole time the sequence is executed, so it is possible that by the time we
+     * reach the step 3, the value obtained at the step 1 is obsolete. Obviously, the designer of the RTOS has taken
+     * that into account, and put in place two safeguards:
+     *
+     *  - The minimum configurable delay is limited, typically to just 2 timer ticks. So if the timer increments in the
+     *    process, it's fine. The minimum is defined by the configuration parameter CH_CFG_ST_TIMEDELTA.
+     *
+     *  - The process is protected by the critical section, which makes it quasiatomic.
+     *
+     * Now remember that we have hard real time IRQ that can interrupt the RTOS at any moment.
+     * See the problem? Took me 2 days...
+     *
+     * If the OS is interrupted between the steps 1 and 3, it may configure a deadline that is already in the past.
+     * The IRQ will never fire until the system timer overflows, which may take days. Until that time, the RTOS will
+     * not receive any tick interrupts, which will halt a lot of its functions. For example, if a thread goes to sleep,
+     * it will never wake up (until the system timer overflows). Worse yet, if a thread is locked on a non-time related
+     * event, such as arrival of data via some communication interface or whatever, it will continue to function
+     * correctly, blowing the developer's mind even further.
+     *
+     * The check below verifies that the deadline is always configured in the future, otherwise it crashes the system.
+     */
+#if defined(DEBUG_BUILD) && DEBUG_BUILD
+    {
+        using TimeType = decltype(st_lld_get_counter());
+        static constexpr TimeType HalfRange = std::numeric_limits<TimeType>::max() / 2;
+        static constexpr TimeType DetectionThreshold = S2ST(2);
+
+        const TimeType counter = st_lld_get_counter();
+        const TimeType real_alarm = st_lld_get_alarm();
+        const TimeType alarm_with_offset = real_alarm + DetectionThreshold;
+
+        if (TimeType(alarm_with_offset - counter) >= HalfRange)
+        {
+            chibios_rt::System::halt(os::heapless::concatenate(
+                "OS TIMER DEADLINE MISSED: CNT=", counter, " ALARM=", real_alarm
+                ).c_str());
+        }
+    }
+#endif
 }
 
 }
