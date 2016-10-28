@@ -1003,9 +1003,7 @@ class SystemInfoCommand : public os::shell::ICommandHandler
             }
 
             const auto average_load = unsigned((100 * stats.cumulative + 50) / total_cumulative);
-
-            const auto average_timing =
-                convertStatTickCountToSeconds(double(stats.cumulative) / double(stats.n));
+            const auto average_timing = convertStatTickCountToSeconds(double(stats.cumulative) / double(stats.n));
 
             ios.print("%-16s %-9s %5u  %3u   %3u%% | %6.3f %6.3f %6.3f\n",
                       tp->p_name,
