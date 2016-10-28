@@ -910,6 +910,12 @@ class SystemInfoCommand : public os::shell::ICommandHandler
 {
     const char* getName() const override { return "sysinfo"; }
 
+    template <typename T>
+    static double convertStatTickCountToSeconds(T val)
+    {
+        return double(val) / double(STM32_SYSCLK);
+    }
+
     static void showTime(os::shell::BaseChannelWrapper& ios)
     {
         const auto sys_time = chibios_rt::System::getTimeX();
@@ -924,6 +930,31 @@ class SystemInfoCommand : public os::shell::ICommandHandler
             check_result = chibios_rt::System::integrityCheckI(0xFFFFU);
         }
         ios.print("System integrity check: %s\n", check_result ? "FAILURE" : "OK");
+    }
+
+    static void showKernelStats(os::shell::BaseChannelWrapper& ios)
+    {
+        decltype(ch.kernel_stats) stats;
+
+        {
+            os::CriticalSectionLocker locker;
+            stats = ch.kernel_stats;
+        }
+
+        static const auto show_once = [&ios](const char* name, const ::time_measurement_t& tm)
+        {
+            const auto average_timing = convertStatTickCountToSeconds(double(tm.cumulative) / double(tm.n));
+            ios.print("%s: average %7.3f us     best %7.3f us     worst %7.3f us\n",
+                      name,
+                      average_timing * 1e6,
+                      convertStatTickCountToSeconds(tm.best) * 1e6,
+                      convertStatTickCountToSeconds(tm.worst) * 1e6);
+        };
+
+        ios.print("Sys IRQ handled: %lu\n", stats.n_irq);
+        ios.print("Context switch.: %lu\n", stats.n_ctxswc);
+        show_once("Thread critsect", stats.m_crit_thd);
+        show_once("IRQ critsect   ", stats.m_crit_isr);
     }
 
     static void showThreads(os::shell::BaseChannelWrapper& ios)
@@ -945,8 +976,6 @@ class SystemInfoCommand : public os::shell::ICommandHandler
             return num_bytes;
         };
 
-        static const auto real_time_to_second = [](auto val) { return double(val) / double(STM32_SYSCLK); };
-
         std::uint64_t total_cumulative = 0;
 
         {
@@ -960,16 +989,23 @@ class SystemInfoCommand : public os::shell::ICommandHandler
         }
         assert(total_cumulative > 0);
 
-        ios.puts("Threads:");
         ios.puts("                           Free         Avg  |   Timing Stat [sec]");
         ios.puts("Name             State     Stack  Prio  Load |  Avg    Best   Worst");
         ios.puts("---------------------------------------------+----------------------");
         ::thread_t* tp = chRegFirstThread();
         do
         {
-            const auto average_load = unsigned((100 * tp->p_stats.cumulative + 50) / total_cumulative);
+            decltype(tp->p_stats) stats;
 
-            const auto average_timing = real_time_to_second(double(tp->p_stats.cumulative) / double(tp->p_stats.n));
+            {
+                os::CriticalSectionLocker locker;
+                stats = tp->p_stats;
+            }
+
+            const auto average_load = unsigned((100 * stats.cumulative + 50) / total_cumulative);
+
+            const auto average_timing =
+                convertStatTickCountToSeconds(double(stats.cumulative) / double(stats.n));
 
             ios.print("%-16s %-9s %5u  %3u   %3u%% | %6.3f %6.3f %6.3f\n",
                       tp->p_name,
@@ -978,8 +1014,8 @@ class SystemInfoCommand : public os::shell::ICommandHandler
                       static_cast<unsigned>(tp->p_prio),
                       average_load,
                       average_timing,
-                      real_time_to_second(tp->p_stats.best),
-                      real_time_to_second(tp->p_stats.worst));
+                      convertStatTickCountToSeconds(stats.best),
+                      convertStatTickCountToSeconds(stats.worst));
             tp = chRegNextThread(tp);
         }
         while (tp != nullptr);
@@ -989,6 +1025,11 @@ class SystemInfoCommand : public os::shell::ICommandHandler
     {
         showTime(ios);
         performSystemIntegrityCheck(ios);
+
+        ios.puts("\nKernel Stats:");
+        showKernelStats(ios);
+
+        ios.puts("\nThreads:");
         showThreads(ios);
     }
 } static cmd_sysinfo;
@@ -1059,7 +1100,7 @@ public:
 void init(const RebootRequestCallback& reboot_callback)
 {
     g_reboot_request_callback = reboot_callback;
-    (void) g_cli_thread.start(LOWPRIO + 1);
+    (void) g_cli_thread.start(LOWPRIO);
 }
 
 }
