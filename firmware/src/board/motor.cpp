@@ -114,6 +114,55 @@ float g_inverter_temperature_sensor_voltage;
 BoardFeatures* g_board_features = nullptr;
 
 
+class IRQTimingStatistics
+{
+    static constexpr float SmoothingInnovationWeight = 1e-4F;
+
+    float worst_duration_ = 0;
+    float smoothed_duration_ = 0;
+
+public:
+    void updateWithNewMeasurement(const float duration)
+    {
+        worst_duration_ = std::max(worst_duration_, duration);
+        smoothed_duration_ += SmoothingInnovationWeight * (duration - smoothed_duration_);
+    }
+
+    auto toString() const
+    {
+        float worst = 0;
+        float smoothed = 0;
+
+        {
+            AbsoluteCriticalSectionLocker locker;
+            worst = worst_duration_;
+            smoothed = smoothed_duration_;
+        }
+
+        return os::heapless::format("worst %6.3f us     smoothed %6.3f us",
+                                    double(worst) * 1e6,
+                                    double(smoothed) * 1e6);
+    }
+
+    class RAIIUpdater
+    {
+        SmallTimeIntervalMeasurer measurer_;
+        IRQTimingStatistics& target_;
+
+    public:
+        RAIIUpdater(IRQTimingStatistics& target) : target_(target) { }
+
+        ~RAIIUpdater()
+        {
+            target_.updateWithNewMeasurement(measurer_.sample());
+        }
+    };
+};
+
+IRQTimingStatistics g_irq_timing_stat_fast;
+IRQTimingStatistics g_irq_timing_stat_main;
+
+
 void initPWM(const double pwm_frequency,
              const double pwm_dead_time)
 {
@@ -680,6 +729,10 @@ void printStatus()
     {
         std::printf("\t%s\n", math::toString(ofs).c_str());
     }
+
+    std::puts("IRQ timing statistics:");
+    std::printf("\tFast: %s\n", g_irq_timing_stat_fast.toString().c_str());
+    std::printf("\tMain: %s\n", g_irq_timing_stat_main.toString().c_str());
 }
 
 Status getStatus()
@@ -718,6 +771,8 @@ extern "C"
 CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
 {
     using namespace board::motor;
+
+    IRQTimingStatistics::RAIIUpdater time_stat_updater(g_irq_timing_stat_fast);
 
     board::RAIIToggler<board::setTestPointB> tp_toggler;
 
@@ -812,6 +867,8 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
 CH_FAST_IRQ_HANDLER(STM32_TIM8_CC_HANDLER)
 {
     using namespace board::motor;
+
+    IRQTimingStatistics::RAIIUpdater time_stat_updater(g_irq_timing_stat_main);
 
     board::RAIIToggler<board::setTestPointA> tp_toggler;
 

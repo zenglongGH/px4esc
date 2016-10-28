@@ -137,4 +137,24 @@ struct RAIIToggler
     ~RAIIToggler() { Target(false); }
 };
 
+/**
+ * Measures time intervals starting from the point it was created.
+ * The class uses the DWT counter, so the maximum duration it can measure is very limited.
+ */
+class SmallTimeIntervalMeasurer
+{
+    const std::uint32_t started_at_ = DWT->CYCCNT;
+
+    static float convertToSecond(std::uint32_t value) { return float(value) / float(STM32_SYSCLK); }
+
+public:
+    /**
+     * Returns the number of seconds passed since the interval measurement started.
+     */
+    float sample() const
+    {
+        return convertToSecond(DWT->CYCCNT - started_at_);
+    }
+};
+
 }
