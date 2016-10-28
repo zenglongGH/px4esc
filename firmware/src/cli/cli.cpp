@@ -906,13 +906,31 @@ class PlotCommand : public os::shell::ICommandHandler
 } static cmd_plot;
 
 
-class ThreadsCommand : public os::shell::ICommandHandler
+class SystemInfoCommand : public os::shell::ICommandHandler
 {
-    const char* getName() const override { return "threads"; }
+    const char* getName() const override { return "sysinfo"; }
 
-    void execute(os::shell::BaseChannelWrapper& ios, int, char**) override
+    static void showTime(os::shell::BaseChannelWrapper& ios)
     {
-        static const char* const ThreadStateNames[] = { CH_STATE_NAMES };
+        const auto sys_time = chibios_rt::System::getTimeX();
+        ios.print("System time: %lu ticks / %g sec\n", sys_time, double(sys_time) / double(CH_CFG_ST_FREQUENCY));
+    }
+
+    static void performSystemIntegrityCheck(os::shell::BaseChannelWrapper& ios)
+    {
+        bool check_result = false;
+        {
+            os::CriticalSectionLocker locker;
+            check_result = chibios_rt::System::integrityCheckI(0xFFFFU);
+        }
+        ios.print("System integrity check: %s\n", check_result ? "FAILURE" : "OK");
+    }
+
+    static void showThreads(os::shell::BaseChannelWrapper& ios)
+    {
+        const char* const ThreadStateNames[] = { CH_STATE_NAMES };
+
+        ios.print("Stack reserved for IRQ: %u B\n", PORT_INT_REQUIRED_STACK);
 
         static const auto gauge_free_stack = [](const ::thread_t* tp)
         {
@@ -927,6 +945,7 @@ class ThreadsCommand : public os::shell::ICommandHandler
             return num_bytes;
         };
 
+        ios.puts("Threads:");
         ios.puts("Name             State     FStk Prio");
         ios.puts("-------------------------------------");
         ::thread_t* tp = chRegFirstThread();
@@ -940,30 +959,13 @@ class ThreadsCommand : public os::shell::ICommandHandler
             tp = chRegNextThread(tp);
         }
         while (tp != nullptr);
-
-        ios.puts("");
-
-        ios.print("Stack reserved for IRQ handlers: %u\n", PORT_INT_REQUIRED_STACK);
     }
-} static cmd_threads;
-
-
-class SystemInfoCommand : public os::shell::ICommandHandler
-{
-    const char* getName() const override { return "sysinfo"; }
 
     void execute(os::shell::BaseChannelWrapper& ios, int, char**) override
     {
-        const auto sys_time = chibios_rt::System::getTimeX();
-        bool check_result = false;
-
-        {
-            os::CriticalSectionLocker locker;
-            check_result = chibios_rt::System::integrityCheckI(0xFFFFU);
-        }
-
-        ios.print("System time: %lu\n", sys_time);
-        ios.print("System integrity check result: %s\n", check_result ? "FAILURE" : "OK");
+        showTime(ios);
+        performSystemIntegrityCheck(ios);
+        showThreads(ios);
     }
 } static cmd_sysinfo;
 
@@ -1021,7 +1023,6 @@ public:
         (void) shell_.addCommandHandler(&cmd_hardware_test);
         (void) shell_.addCommandHandler(&cmd_motor_database);
         (void) shell_.addCommandHandler(&cmd_plot);
-        (void) shell_.addCommandHandler(&cmd_threads);
         (void) shell_.addCommandHandler(&cmd_sysinfo);
     }
 
