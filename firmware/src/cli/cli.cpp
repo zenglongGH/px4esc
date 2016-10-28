@@ -922,16 +922,6 @@ class SystemInfoCommand : public os::shell::ICommandHandler
         ios.print("System time: %lu ticks / %g sec\n", sys_time, double(sys_time) / double(CH_CFG_ST_FREQUENCY));
     }
 
-    static void performSystemIntegrityCheck(os::shell::BaseChannelWrapper& ios)
-    {
-        bool check_result = false;
-        {
-            os::CriticalSectionLocker locker;
-            check_result = chibios_rt::System::integrityCheckI(0xFFFFU);
-        }
-        ios.print("System integrity check: %s\n", check_result ? "FAILURE" : "OK");
-    }
-
     static void showKernelStats(os::shell::BaseChannelWrapper& ios)
     {
         decltype(ch.kernel_stats) stats;
@@ -954,14 +944,12 @@ class SystemInfoCommand : public os::shell::ICommandHandler
         ios.print("Sys IRQ handled: %lu\n", stats.n_irq);
         ios.print("Context switch.: %lu\n", stats.n_ctxswc);
         show_once("Thread critsect", stats.m_crit_thd);
-        show_once("IRQ critsect   ", stats.m_crit_isr);
+        show_once("Sys IRQ critsec", stats.m_crit_isr);
     }
 
     static void showThreads(os::shell::BaseChannelWrapper& ios)
     {
         const char* const ThreadStateNames[] = { CH_STATE_NAMES };
-
-        ios.print("Stack reserved for IRQ: %u B\n", PORT_INT_REQUIRED_STACK);
 
         static const auto gauge_free_stack = [](const ::thread_t* tp)
         {
@@ -1017,12 +1005,13 @@ class SystemInfoCommand : public os::shell::ICommandHandler
             tp = chRegNextThread(tp);
         }
         while (tp != nullptr);
+
+        ios.print("Stack reserved for IRQ: %u B\n", PORT_INT_REQUIRED_STACK);
     }
 
     void execute(os::shell::BaseChannelWrapper& ios, int, char**) override
     {
         showTime(ios);
-        performSystemIntegrityCheck(ios);
 
         ios.puts("\nKernel Stats:");
         showKernelStats(ios);
