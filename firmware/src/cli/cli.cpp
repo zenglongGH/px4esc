@@ -977,9 +977,9 @@ class SystemInfoCommand : public os::shell::ICommandHandler
         }
         assert(total_cumulative > 0);
 
-        ios.puts("                           Free         Avg  |   Timing Stat [sec]");
-        ios.puts("Name             State     Stack  Prio  Load |  Avg    Best   Worst");
-        ios.puts("---------------------------------------------+----------------------");
+        ios.puts("                           Free         Avg  |     Timing Stat [ms]");
+        ios.puts("Name             State     Stack  Prio  Load |   Avg     Best     Worst");
+        ios.puts("---------------------------------------------+--------------------------");
         ::thread_t* tp = chRegFirstThread();
         do
         {
@@ -993,15 +993,15 @@ class SystemInfoCommand : public os::shell::ICommandHandler
             const auto average_load = unsigned((100 * stats.cumulative + 50) / total_cumulative);
             const auto average_timing = convertStatTickCountToSeconds(double(stats.cumulative) / double(stats.n));
 
-            ios.print("%-16s %-9s %5u  %3u   %3u%% | %6.3f %6.3f %6.3f\n",
+            ios.print("%-16s %-9s %5u  %3u   %3u%% | %7.3f %7.3f %8.3f\n",
                       tp->p_name,
                       ThreadStateNames[tp->p_state],
                       gauge_free_stack(tp),
                       static_cast<unsigned>(tp->p_prio),
                       average_load,
-                      average_timing,
-                      convertStatTickCountToSeconds(stats.best),
-                      convertStatTickCountToSeconds(stats.worst));
+                      average_timing * 1e3,
+                      convertStatTickCountToSeconds(stats.best) * 1e3,
+                      convertStatTickCountToSeconds(stats.worst) * 1e3);
             tp = chRegNextThread(tp);
         }
         while (tp != nullptr);
