@@ -262,7 +262,8 @@ void fastLowLevelSystemIntegrityCheckHook()
      * Remember that these IRQ must never be disabled, except by the FOC module itself,
      * which in turn must never access the RTOS services on its own.
      */
-    ASSERT_ALWAYS(__get_PRIMASK() == 0);
+    ASSERT_ALWAYS((__get_PRIMASK() & 1) == 0);
+    ASSERT_ALWAYS((__get_FAULTMASK() & 1) == 0);
 
     /*
      * ChibiOS is one of the very few open source RTOS that are fully preemptible and support tickless mode.
