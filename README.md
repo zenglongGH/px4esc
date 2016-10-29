@@ -37,9 +37,9 @@ We accept extensions to this list via pull requests.
 * [Pixhawk ESC v1.6](http://www.auav.co/product-p/pixhawkesc16dev.htm)
   * Voltage: 9~26 V (intended to support 55 V, but a hardware bug limits the maximum voltage)
   * Dual CAN bus, USB, UART, RCPWM
-* Zubax Macaroni (coming soon!)
-  * Voltage: 9~55 V
-  * DC current: 20 A continuous, 100 A peak
+* Zubax Macaroni 400 (coming soon!)
+  * Voltage: 9~52 V (3~12 S Li-ion battery)
+  * Power capability: 400 W continuous, 1200 W peak
   * Dual CAN bus, USB, UART, RCPWM
 
 ## Repository Layout
@@ -117,10 +117,14 @@ This command is useful for testing.
 * `cfg`         - view or modify configuration parameters.
 All configuration parameters are stored automatically upon modification, no additional actions needed.
 * `kvconv`      - convert between magnetic flux linkage (a.k.a. Phi) and KV.
+* `sysinfo`     - display general status information of the operating system.
 
 Note that some commands can accept the `-p` argument, in which case they will print real-time values
 in a special format that is understood by the serial plotting tool, located in the `tools` directory
 in this repository.
+
+When submitting bug reports, please always include outputs of the commands `status` and `sysinfo`
+after the failure occurred.
 
 ### Specifying the Motor Parameters
 
