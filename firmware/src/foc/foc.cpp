@@ -304,6 +304,8 @@ void handleMainIRQ(Const period)
         {
             AbsoluteCriticalSectionLocker locker;
 
+            g_pwm_handle.release();
+
             task.applyResultToGlobalContext(g_context);
 
             if (result.exit_code == result.ExitCodeOK)

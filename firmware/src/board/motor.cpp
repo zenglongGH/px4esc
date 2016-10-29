@@ -756,9 +756,9 @@ void printStatus()
     std::printf("\tMain: %s\n", g_irq_timing_stat_main.toString().c_str());
 
 #if defined(DEBUG_BUILD) && DEBUG_BUILD
-    std::printf("Longest critical section:\n"
-                "\tSince boot up (i.e. absolute max): %.3f us\n"
-                "\tSince last power stage activation: %.3f us\n",
+    std::printf("Longest critical section since...\n"
+                "\tboot up, absolute maximum  : %.3f us\n"
+                "\tlast power stage activation: %.3f us\n",
                 double(AbsoluteCriticalSectionLocker::getWorstDuration()) * 1e6,
                 double(AbsoluteCriticalSectionLocker::getWorstDurationSinceReset()) * 1e6);
 #endif

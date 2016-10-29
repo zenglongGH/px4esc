@@ -300,6 +300,7 @@ public:
              */
             const std::uint32_t new_duration = DWT->CYCCNT - entered_at_;
             worst_duration_since_reset_cyc_ = std::max(worst_duration_since_reset_cyc_, new_duration);
+            worst_duration_cyc_ = std::max(worst_duration_cyc_, new_duration);
 #endif
 
             __enable_irq();
@@ -335,7 +336,6 @@ public:
 #if defined(DEBUG_BUILD) && DEBUG_BUILD
     static float getWorstDuration()
     {
-        worst_duration_cyc_ = std::max(worst_duration_cyc_, worst_duration_since_reset_cyc_);
         return float(worst_duration_cyc_) / float(STM32_SYSCLK);
     }
 
@@ -346,7 +346,6 @@ public:
 
     static void resetWorstDuration()
     {
-        worst_duration_cyc_ = std::max(worst_duration_cyc_, worst_duration_since_reset_cyc_);
         worst_duration_since_reset_cyc_ = 0;
     }
 #endif
