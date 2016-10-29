@@ -780,6 +780,13 @@ class HardwareTestCommand : public os::shell::ICommandHandler
             return;
         }
 
+        if (board::motor::PWMHandle::getTotalNumberOfActiveHandles() != 0)
+        {
+            ios.print("ERROR: PWM handle is taken by another component [%u]\n",
+                      board::motor::PWMHandle::getTotalNumberOfActiveHandles());
+            return;
+        }
+
         foc::beginHardwareTest();
 
         if (do_plot)
