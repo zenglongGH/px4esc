@@ -269,7 +269,8 @@ extern void handleMainIRQ(const float period);
 typedef class AbsoluteCriticalSectionLockerImpl_
 {
 #if defined(DEBUG_BUILD) && DEBUG_BUILD
-    static std::uint32_t worst_duration_cycles_;
+    static std::uint32_t worst_duration_cyc_;
+    static std::uint32_t worst_duration_since_reset_cyc_;
 
     std::uint32_t entered_at_;      // NOT INITIALIZED, SEE CONSTRUCTOR
 #endif
@@ -290,7 +291,8 @@ public:
         if (irq_was_enabled_)
         {
 #if defined(DEBUG_BUILD) && DEBUG_BUILD
-            worst_duration_cycles_ = std::max(worst_duration_cycles_, DWT->CYCCNT - entered_at_);
+            // Absolute worst duration is not updated here because we want to minimize latency
+            worst_duration_since_reset_cyc_ = std::max(worst_duration_since_reset_cyc_, DWT->CYCCNT - entered_at_);
 #endif
             __enable_irq();
         }
@@ -309,12 +311,19 @@ public:
 #if defined(DEBUG_BUILD) && DEBUG_BUILD
     static float getWorstDuration()
     {
-        return float(worst_duration_cycles_) / float(STM32_SYSCLK);
+        worst_duration_cyc_ = std::max(worst_duration_cyc_, worst_duration_since_reset_cyc_);
+        return float(worst_duration_cyc_) / float(STM32_SYSCLK);
+    }
+
+    static float getWorstDurationSinceReset()
+    {
+        return float(worst_duration_since_reset_cyc_) / float(STM32_SYSCLK);
     }
 
     static void resetWorstDuration()
     {
-        worst_duration_cycles_ = 0;
+        worst_duration_cyc_ = std::max(worst_duration_cyc_, worst_duration_since_reset_cyc_);
+        worst_duration_since_reset_cyc_ = 0;
     }
 #endif
 } volatile AbsoluteCriticalSectionLocker;

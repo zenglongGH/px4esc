@@ -523,7 +523,8 @@ inline void setActive(bool active)
 
 
 #if defined(DEBUG_BUILD) && DEBUG_BUILD
-std::uint32_t AbsoluteCriticalSectionLockerImpl_::worst_duration_cycles_ = 0;
+std::uint32_t AbsoluteCriticalSectionLockerImpl_::worst_duration_since_reset_cyc_ = 0;
+std::uint32_t AbsoluteCriticalSectionLockerImpl_::worst_duration_cyc_ = 0;
 #endif
 
 
@@ -745,8 +746,11 @@ void printStatus()
     std::printf("\tMain: %s\n", g_irq_timing_stat_main.toString().c_str());
 
 #if defined(DEBUG_BUILD) && DEBUG_BUILD
-    std::printf("Longest critical section since activation: %.3f us\n",
-                double(AbsoluteCriticalSectionLocker::getWorstDuration()) * 1e6);
+    std::printf("Longest critical section:\n"
+                "\tSince boot up (i.e. absolute max): %.3f us\n"
+                "\tSince last power stage activation: %.3f us\n",
+                double(AbsoluteCriticalSectionLocker::getWorstDuration()) * 1e6,
+                double(AbsoluteCriticalSectionLocker::getWorstDurationSinceReset()) * 1e6);
 #endif
 }
 
