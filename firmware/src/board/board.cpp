@@ -304,7 +304,6 @@ void fastLowLevelSystemIntegrityCheckHook()
      *
      * The check below verifies that the deadline is always configured in the future, otherwise it crashes the system.
      */
-#if defined(DEBUG_BUILD) && DEBUG_BUILD
     {
         using TimeType = decltype(st_lld_get_counter());
         static constexpr TimeType HalfRange = std::numeric_limits<TimeType>::max() / 2;
@@ -321,7 +320,6 @@ void fastLowLevelSystemIntegrityCheckHook()
                 ).c_str());
         }
     }
-#endif
 }
 
 }
