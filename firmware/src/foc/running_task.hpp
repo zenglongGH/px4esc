@@ -192,7 +192,7 @@ class RunningTask : public ITask
     const TaskContext context_;
 
     const SetpointController setpoint_controller_;
-    os::helpers::LazyConstructor<MotorRunner> runner_;
+    os::helpers::LazyConstructor<MotorRunner, os::helpers::MemoryInitializationPolicy::NoInit> runner_;
 
     std::uint32_t num_successive_stalls_ = 0;
 

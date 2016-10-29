@@ -312,7 +312,7 @@ public:
              * check the new value, and not the max, since the max could be updated concurrently from another critical
              * section, which would lead us down a wrong stack trace in the debugger.
              */
-            static constexpr std::uint32_t MaxDurationCyc = std::uint32_t(13e-6 * STM32_SYSCLK);
+            static constexpr std::uint32_t MaxDurationCyc = std::uint32_t(12e-6 * STM32_SYSCLK);
             if (new_duration > MaxDurationCyc)
             {
                 chibios_rt::System::halt(os::heapless::concatenate(
