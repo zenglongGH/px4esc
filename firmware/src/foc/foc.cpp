@@ -300,10 +300,10 @@ void handleMainIRQ(Const period)
 
         const auto result = task.onMainIRQ(period, hw_status);
 
-        AbsoluteCriticalSectionLocker locker;
-
         if (result.finished)
         {
+            AbsoluteCriticalSectionLocker locker;
+
             task.applyResultToGlobalContext(g_context);
 
             if (result.exit_code == result.ExitCodeOK)
@@ -322,7 +322,12 @@ void handleMainIRQ(Const period)
         }
         else
         {
-            g_debug_plotter.set(task.getDebugVariables());
+            std::array<Scalar, ITask::NumDebugVariables> vars;
+            {
+                AbsoluteCriticalSectionLocker locker;
+                vars = task.getDebugVariables();
+            }
+            g_debug_plotter.set(vars);
         }
     }
 }

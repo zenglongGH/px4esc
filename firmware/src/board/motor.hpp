@@ -304,7 +304,6 @@ public:
 
             __enable_irq();
 
-#if 1
 #if defined(DEBUG_BUILD) && DEBUG_BUILD
             /*
              * This shim is used only during debugging; when a debugger is attached, it allows to track down all
@@ -319,7 +318,6 @@ public:
                     "ABS CRITSECT TOO LONG [", getWorstDuration() * 1e6F, " us]"
                     ).c_str());
             }
-#endif
 #endif
         }
     }

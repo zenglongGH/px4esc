@@ -301,13 +301,6 @@ public:
         {
             AbsoluteCriticalSectionLocker locker;
 
-            remaining_setpoint_timeout_ -= period;
-            if (remaining_setpoint_timeout_ < 0)
-            {
-                remaining_setpoint_timeout_ = 0;
-                raw_setpoint_ = 0;
-            }
-
             switch (runner_->getState())
             {
             case MotorRunner::State::Spinup:
@@ -367,6 +360,17 @@ public:
                 }
                 break;
             }
+            }
+        }
+
+        {
+            AbsoluteCriticalSectionLocker locker;
+
+            remaining_setpoint_timeout_ -= period;
+            if (remaining_setpoint_timeout_ < 0)
+            {
+                remaining_setpoint_timeout_ = 0;
+                raw_setpoint_ = 0;
             }
         }
 
