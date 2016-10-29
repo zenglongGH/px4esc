@@ -32,8 +32,6 @@
 #include <zubax_chibios/config/config.hpp>
 #include <math/math.hpp>
 
-#include "motor.hpp"
-
 
 namespace board
 {

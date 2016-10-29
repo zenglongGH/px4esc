@@ -512,9 +512,19 @@ inline void setActive(bool active)
     palWritePad(GPIOA, GPIOA_EN_GATE, active);
 
     setRawPWM(0, 0, 0);
+
+    if (active)
+    {
+        AbsoluteCriticalSectionLocker::resetWorstDuration();
+    }
 }
 
 } // namespace
+
+
+#if defined(DEBUG_BUILD) && DEBUG_BUILD
+std::uint32_t AbsoluteCriticalSectionLockerImpl_::worst_duration_cycles_ = 0;
+#endif
 
 
 void init()
@@ -733,6 +743,11 @@ void printStatus()
     std::puts("IRQ timing statistics:");
     std::printf("\tFast: %s\n", g_irq_timing_stat_fast.toString().c_str());
     std::printf("\tMain: %s\n", g_irq_timing_stat_main.toString().c_str());
+
+#if defined(DEBUG_BUILD) && DEBUG_BUILD
+    std::printf("Longest critical section since activation: %.3f us\n",
+                double(AbsoluteCriticalSectionLocker::getWorstDuration()) * 1e6);
+#endif
 }
 
 Status getStatus()

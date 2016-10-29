@@ -268,18 +268,30 @@ extern void handleMainIRQ(const float period);
  */
 typedef class AbsoluteCriticalSectionLockerImpl_
 {
+#if defined(DEBUG_BUILD) && DEBUG_BUILD
+    static std::uint32_t worst_duration_cycles_;
+
+    std::uint32_t entered_at_;      // NOT INITIALIZED, SEE CONSTRUCTOR
+#endif
+
     const bool irq_was_enabled_ = __get_PRIMASK() == 0;
 
 public:
     AbsoluteCriticalSectionLockerImpl_()
     {
         __disable_irq();
+#if defined(DEBUG_BUILD) && DEBUG_BUILD
+        entered_at_ = DWT->CYCCNT;  // Initializing AFTER the critical section is taken, this is important
+#endif
     }
 
     ~AbsoluteCriticalSectionLockerImpl_()
     {
         if (irq_was_enabled_)
         {
+#if defined(DEBUG_BUILD) && DEBUG_BUILD
+            worst_duration_cycles_ = std::max(worst_duration_cycles_, DWT->CYCCNT - entered_at_);
+#endif
             __enable_irq();
         }
     }
@@ -293,6 +305,18 @@ public:
     {
         assert(__get_PRIMASK() != 0);
     }
+
+#if defined(DEBUG_BUILD) && DEBUG_BUILD
+    static float getWorstDuration()
+    {
+        return float(worst_duration_cycles_) / float(STM32_SYSCLK);
+    }
+
+    static void resetWorstDuration()
+    {
+        worst_duration_cycles_ = 0;
+    }
+#endif
 } volatile AbsoluteCriticalSectionLocker;
 
 }
