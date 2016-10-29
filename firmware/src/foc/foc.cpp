@@ -245,24 +245,36 @@ void plotRealTimeValues()
 
 std::array<DebugKeyValueType, NumDebugKeyValuePairs> getDebugKeyValuePairs()
 {
-    Vector<2> Idq = Vector<2>::Zero();
-    Vector<2> Udq = Vector<2>::Zero();
+    bool match = false;
 
     {
-        AbsoluteCriticalSectionLocker locker;
-        if (auto task = g_task_handler.as<RunningTask>())
+        Vector<2> Idq;
+        Vector<2> Udq;
+
         {
-            Idq = task->getIdq();
-            Udq = task->getUdq();
+            AbsoluteCriticalSectionLocker locker;
+            if (auto task = g_task_handler.as<RunningTask>())
+            {
+                match = true;
+                Idq = task->getIdq();
+                Udq = task->getUdq();
+            }
+        }
+
+        if (match)
+        {
+            return {
+                DebugKeyValueType("Id", Idq[0]),
+                DebugKeyValueType("Iq", Idq[1]),
+                DebugKeyValueType("Ud", Udq[0]),
+                DebugKeyValueType("Uq", Udq[1])
+            };
         }
     }
 
-    return {
-        DebugKeyValueType("Id", Idq[0]),
-        DebugKeyValueType("Iq", Idq[1]),
-        DebugKeyValueType("Ud", Udq[0]),
-        DebugKeyValueType("Uq", Udq[1])
-    };
+    // Getters for other tasks may be added later
+
+    return {};
 }
 
 }
