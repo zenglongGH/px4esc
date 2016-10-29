@@ -473,10 +473,20 @@ inline void setRawPWM(const std::uint16_t a, const std::uint16_t b, const std::u
      * normal operation this requirement should be met automatically, because this function will be invoked
      * (very indirectly) from the ADC interrupt handler, which in turn is synchronized with timer update event.
      */
+    /*
+     * This comment was added a few weeks of development later.
+     * So, the above is fine and well, but, see, this stupid delay below is really messing with
+     * critical section duration monitoring.
+     * We could add a check that would be skipping the loop if the critical section is taken, or something,
+     * but we'll postpone this until much later - this thing is not really that necessary.
+     * TODO: Do something about this.
+     */
+#if 0
     while (TIM1->CNT < 10)      // TODO: Use a proper well-defined constant here.
     {
         ;       // Do nothing. We will skip right through this loop during normal operation.
     }
+#endif
 
     TIM1->CCR1 = a;
     TIM1->CCR2 = b;

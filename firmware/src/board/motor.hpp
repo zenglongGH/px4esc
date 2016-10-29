@@ -264,7 +264,10 @@ extern void handleMainIRQ(const float period);
 /**
  * This critical section disables ALL maskable IRQ, including the motor control ones.
  * This is unlike os::CriticalSectionLocker, which keeps them enabled.
- * RTFM: http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0553a/CHDBIBGJ.html
+ * RTFM: http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0553a/CHDBIBGJ.html.
+ * The longest use is tracked.
+ * It is possible to configure the class to crash the firmware if the critical section is taken for an overly long
+ * period time - this is very useful for debugging.
  */
 typedef class AbsoluteCriticalSectionLockerImpl_
 {
@@ -291,10 +294,33 @@ public:
         if (irq_was_enabled_)
         {
 #if defined(DEBUG_BUILD) && DEBUG_BUILD
-            // Absolute worst duration is not updated here because we want to minimize latency
-            worst_duration_since_reset_cyc_ = std::max(worst_duration_since_reset_cyc_, DWT->CYCCNT - entered_at_);
+            /*
+             * Absolute worst duration is not updated here because we want to minimize latency.
+             * Note that the update is performed BEFORE we exit the critical section, this is very important.
+             */
+            const std::uint32_t new_duration = DWT->CYCCNT - entered_at_;
+            worst_duration_since_reset_cyc_ = std::max(worst_duration_since_reset_cyc_, new_duration);
 #endif
+
             __enable_irq();
+
+#if 1
+#if defined(DEBUG_BUILD) && DEBUG_BUILD
+            /*
+             * This shim is used only during debugging; when a debugger is attached, it allows to track down all
+             * blocks of code that acquire very long critical sections. Note that it is very important to actually
+             * check the new value, and not the max, since the max could be updated concurrently from another critical
+             * section, which would lead us down a wrong stack trace in the debugger.
+             */
+            static constexpr std::uint32_t MaxDurationCyc = std::uint32_t(13e-6 * STM32_SYSCLK);
+            if (new_duration > MaxDurationCyc)
+            {
+                chibios_rt::System::halt(os::heapless::concatenate(
+                    "ABS CRITSECT TOO LONG [", getWorstDuration() * 1e6F, " us]"
+                    ).c_str());
+            }
+#endif
+#endif
         }
     }
 

@@ -77,8 +77,6 @@ inline Scalar convertElectricalAngularVelocityToMechanicalRPM(Const eangvel)
 
 void init(const Parameters& params)
 {
-    AbsoluteCriticalSectionLocker locker;
-
     board::motor::beginCalibration();
 
     g_context.params = params;
@@ -86,7 +84,10 @@ void init(const Parameters& params)
     g_context.board.pwm     = board::motor::getPWMParameters();
     g_context.board.limits  = board::motor::getLimits();
 
-    g_task_handler.select<IdleTask>();
+    {
+        AbsoluteCriticalSectionLocker locker;
+        g_task_handler.select<IdleTask>();
+    }
 
     DEBUG_LOG("FOC sizeof: %u %u %u %u\n",
               sizeof(g_task_handler), sizeof(MotorIdentificationTask), sizeof(g_context), sizeof(g_context.params));
