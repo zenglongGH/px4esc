@@ -102,7 +102,9 @@ Writing the following numbers will trigger actions as defined:
 
 #### Connecting via CLI
 
-The CLI (command line interface) is exposed via UART at 115200-8N1 and a USB CDC ACM interface.
+The CLI (command line interface) is exposed via UART at 115200-8N1.
+**At the moment, the USB interface is not yet supported in the firmware**
+(the operating system lacks necessary drivers; they should be released before the end of 2016).
 
 The following commands will be of the most interest
 (most of them will print usage info when executed without arguments):
