@@ -335,12 +335,9 @@ void handleMainIRQ(Const period)
 }
 
 
-void handleFastIRQ(Const period,
-                   const Vector<2>& phase_currents_ab,
+void handleFastIRQ(const Vector<2>& phase_currents_ab,
                    Const inverter_voltage)
 {
-    (void) period;
-
     if (board::motor::isCalibrationInProgress())
     {
         g_pwm_handle.release();

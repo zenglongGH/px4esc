@@ -235,12 +235,10 @@ const Limits& getLimits();
  * The PWM update latency is also minimized: the freshly computed PWM values will be applied on the very next period.
  * This IRQ preempts every other process and maskable IRQ handler in the system.
  *
- * @param period                        Equals @ref getPWMPeriod(), in seconds.
  * @param phase_currents_ab             Instant currents of phases A and B, in Amperes.
  * @param inverter_voltage              Low-pass filtered VBUS voltage of the inverter, in Volts.
  */
-extern void handleFastIRQ(const float period,
-                          const math::Vector<2>& phase_currents_ab,
+extern void handleFastIRQ(const math::Vector<2>& phase_currents_ab,
                           const float inverter_voltage);
 
 /**

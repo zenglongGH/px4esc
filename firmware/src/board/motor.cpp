@@ -842,9 +842,7 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
         g_inverter_voltage += InverterVoltageInnovationWeight * (new_inverter_voltage - g_inverter_voltage);
     }
 
-    handleFastIRQ(g_pwm_params.period,
-                  g_phase_currents,
-                  g_inverter_voltage);
+    handleFastIRQ(g_phase_currents, g_inverter_voltage);
 
     /*
      * Current AGC, calibration, that kind of stuff goes here because it's not very time-critical.
