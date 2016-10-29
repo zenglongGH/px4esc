@@ -99,6 +99,8 @@ public:
                   Const max_voltage,
                   Const electrical_angular_velocity) const
     {
+        const bool zero_setpoint = os::float_eq::closeToZero(target_setpoint);
+
         switch (control_mode)
         {
         case ControlMode::RatiometricCurrent:
@@ -122,8 +124,8 @@ public:
                 new_current = reference - current_ramp_amp_s_ * period;
             }
 
-            // Constraining the minimums, only if the new setpoint and the reference are of the same sign
-            if ((new_current > 0) == (target_setpoint > 0))
+            // Constraining the minimums, only if the sign is the same and the setpoint is non-zero
+            if (((new_current > 0) == (target_setpoint > 0)) && !zero_setpoint)
             {
                 new_current = std::copysign(std::max(min_current_, std::abs(new_current)),
                                             new_current);
@@ -162,8 +164,8 @@ public:
                 new_voltage = reference - voltage_ramp_volt_s_ * period;
             }
 
-            // Constraining the minimums, only if the new setpoint and the reference are of the same sign
-            if ((new_voltage > 0) == (target_setpoint > 0))
+            // Constraining the minimums, only if the sign is the same and the setpoint is non-zero
+            if (((new_voltage > 0) == (target_setpoint > 0)) && !zero_setpoint)
             {
                 new_voltage = std::copysign(std::max(min_voltage_, std::abs(new_voltage)),
                                             new_voltage);
