@@ -270,13 +270,28 @@ extern void handleMainIRQ(const float period);
 typedef class AbsoluteCriticalSectionLockerImpl_
 {
 #if defined(DEBUG_BUILD) && DEBUG_BUILD
+    static constexpr std::uint32_t MaximumDurationAbsoluteUSec      = 12;
+    static constexpr std::uint32_t MaximumDurationWhenActiveUSec    = 3;
+
+    static constexpr std::uint32_t TimerFrequency = STM32_SYSCLK;
+
+    static constexpr std::uint32_t usec2cyc(unsigned usec)
+    {
+        return std::uint32_t(std::uint64_t(usec) * std::uint64_t(TimerFrequency) / 1000000ULL);
+    }
+
+    static constexpr float cyc2sec(std::uint32_t cyc)
+    {
+        return float(cyc) / float(TimerFrequency);
+    }
+
     static std::uint32_t worst_duration_cyc_;
     static std::uint32_t worst_duration_since_reset_cyc_;
 
     std::uint32_t entered_at_;      // NOT INITIALIZED, SEE CONSTRUCTOR
 #endif
 
-    const bool irq_was_enabled_ = __get_PRIMASK() == 0;
+    const volatile bool irq_was_enabled_ = (__get_PRIMASK() & 1) == 0;
 
 public:
     AbsoluteCriticalSectionLockerImpl_()
@@ -285,10 +300,13 @@ public:
 #if defined(DEBUG_BUILD) && DEBUG_BUILD
         entered_at_ = DWT->CYCCNT;  // Initializing AFTER the critical section is taken, this is important
 #endif
+        assertLocked();
     }
 
     ~AbsoluteCriticalSectionLockerImpl_()
     {
+        assertLocked();
+
         if (irq_was_enabled_)
         {
 #if defined(DEBUG_BUILD) && DEBUG_BUILD
@@ -299,9 +317,13 @@ public:
             const std::uint32_t new_duration = DWT->CYCCNT - entered_at_;
             worst_duration_since_reset_cyc_ = std::max(worst_duration_since_reset_cyc_, new_duration);
             worst_duration_cyc_ = std::max(worst_duration_cyc_, new_duration);
+
+            // Driver activation is checked before we exit the critical section - race conditions afoot!
+            const bool driver_active = (PWMHandle::getTotalNumberOfActiveHandles() != 0) && !isCalibrationInProgress();
 #endif
 
             __enable_irq();
+            assertNotLocked();
 
 #if defined(DEBUG_BUILD) && DEBUG_BUILD
             /*
@@ -310,36 +332,45 @@ public:
              * check the new value, and not the max, since the max could be updated concurrently from another critical
              * section, which would lead us down a wrong stack trace in the debugger.
              */
-            static constexpr std::uint32_t MaxDurationCyc = std::uint32_t(12e-6 * STM32_SYSCLK);
-            if (new_duration > MaxDurationCyc)
+            static constexpr auto active_max    = usec2cyc(MaximumDurationWhenActiveUSec);
+            static constexpr auto absolute_max  = usec2cyc(MaximumDurationAbsoluteUSec);
+
+            const auto limit = driver_active ? active_max : absolute_max;
+            if (new_duration > limit)
             {
                 chibios_rt::System::halt(os::heapless::concatenate(
-                    "ABS CRITSECT TOO LONG [", getWorstDuration() * 1e6F, " us]"
-                    ).c_str());
+                    "ABS CRITSECT TOO LONG: ",
+                    cyc2sec(new_duration) * 1e6F, "us > ",
+                    cyc2sec(limit)        * 1e6F, "us").c_str());
             }
 #endif
         }
     }
 
+    inline static bool isLocked()
+    {
+        return (__get_PRIMASK() & 1) == 1;
+    }
+
     inline static void assertNotLocked()
     {
-        assert(__get_PRIMASK() == 0);
+        assert(!isLocked());
     }
 
     inline static void assertLocked()
     {
-        assert(__get_PRIMASK() != 0);
+        assert(isLocked());
     }
 
 #if defined(DEBUG_BUILD) && DEBUG_BUILD
     static float getWorstDuration()
     {
-        return float(worst_duration_cyc_) / float(STM32_SYSCLK);
+        return cyc2sec(worst_duration_cyc_);
     }
 
     static float getWorstDurationSinceReset()
     {
-        return float(worst_duration_since_reset_cyc_) / float(STM32_SYSCLK);
+        return cyc2sec(worst_duration_since_reset_cyc_);
     }
 
     static void resetWorstDuration()
