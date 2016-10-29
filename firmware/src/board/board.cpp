@@ -304,7 +304,10 @@ void fastLowLevelSystemIntegrityCheckHook()
      * correctly, blowing the developer's mind even further.
      *
      * The check below verifies that the deadline is always configured in the future, otherwise it crashes the system.
+     *
+     * Read the discussion here: http://www.chibios.com/forum/viewtopic.php?f=3&t=3651
      */
+#if CH_CFG_ST_TIMEDELTA > 0
     {
         using TimeType = decltype(st_lld_get_counter());
         static constexpr TimeType HalfRange = std::numeric_limits<TimeType>::max() / 2;
@@ -321,6 +324,7 @@ void fastLowLevelSystemIntegrityCheckHook()
                 ).c_str());
         }
     }
+#endif
 }
 
 }

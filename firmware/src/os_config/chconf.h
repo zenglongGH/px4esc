@@ -26,8 +26,6 @@
 
 #define CH_CFG_ST_RESOLUTION            32
 
-#define CH_CFG_ST_FREQUENCY             10000
-
 /*
  * ChibiOS is one of the very few open source RTOS that are fully preemptible and support tickless mode.
  *
@@ -66,10 +64,12 @@
  * event, such as arrival of data via some communication interface or whatever, it will continue to function
  * correctly, blowing the developer's mind even further.
  *
- * In order to work around the problem, we configure the minimum alarm delay to a value that is guaranteed to be
- * much larger than the worst case hard real time IRQ execution duration.
+ * In order to work around the problem, we use the traditional ticked mode.
+ *
+ * Read the discussion here: http://www.chibios.com/forum/viewtopic.php?f=3&t=3651
  */
-#define CH_CFG_ST_TIMEDELTA             (2 * (CH_CFG_ST_FREQUENCY / 1000))
+#define CH_CFG_ST_FREQUENCY             1000
+#define CH_CFG_ST_TIMEDELTA             0
 
 #define PORT_INT_REQUIRED_STACK         4096
 
