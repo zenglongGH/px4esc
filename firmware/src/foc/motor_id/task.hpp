@@ -186,6 +186,7 @@ class MotorIdentificationTask : public ITask
     > sequencer_;
 
     bool started_ = false;
+    bool processing_enabled_ = false;   ///< This is used instead of critical sections to gate PWM IRQ processing
 
 public:
     MotorIdentificationTask(const TaskContext& context,
@@ -238,16 +239,25 @@ public:
             return Result::failure(ExitCodeBadHardwareStatus);
         }
 
-        AbsoluteCriticalSectionLocker::assertNotLocked();   // This is the only brief period where we aren't IRQ-safe.
-
+        AbsoluteCriticalSectionLocker::assertNotLocked();
         sequencer_.getCurrentTask().onMainIRQ(period);
 
-        AbsoluteCriticalSectionLocker locker;           // Once the business processing is finished, lock again ASAP.
+        processing_enabled_ = true;     // This guarantees that the main IRQ is always served first after construction.
 
-        const auto status = sequencer_.getCurrentTask().getStatus();
+        ISubTask::Status status{};
+        {
+            AbsoluteCriticalSectionLocker locker;
+            status = sequencer_.getCurrentTask().getStatus();
+        }
+
         if (status != ISubTask::Status::InProgress)
         {
-            result_ = sequencer_.getCurrentTask().getEstimatedMotorParameters();
+            {
+                AbsoluteCriticalSectionLocker locker;
+                result_ = sequencer_.getCurrentTask().getEstimatedMotorParameters();
+                // Pausing processing to prevent race conditions. Will be restored on the next call.
+                processing_enabled_ = false;
+            }
 
             if (status == ISubTask::Status::Failed)
             {
@@ -255,6 +265,10 @@ public:
                 return Result::failure(Result::ExitCode(sequencer_.getCurrentTaskIndex() + 1));
             }
 
+            /*
+             * Construction of the next task may take a VERY long time (like 50+ microseconds), because some task
+             * classes initialize large data structures or buffers. We don't want to take a critical section here.
+             */
             if (!sequencer_.selectNextTask())
             {
                 return Result::success();
@@ -269,7 +283,7 @@ public:
     {
         AbsoluteCriticalSectionLocker::assertNotLocked();
 
-        if (!started_)
+        if (!processing_enabled_)
         {
             return {};
         }
