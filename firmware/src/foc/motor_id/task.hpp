@@ -175,6 +175,8 @@ class MotorIdentificationTask : public ITask
     static constexpr Result::ExitCode ExitCodeInvalidParameters     = Result::MaxExitCode - 1;
     static constexpr Result::ExitCode ExitCodeInvalidSequence       = Result::MaxExitCode - 2;
 
+    const Mode mode_;
+
     MotorParameters result_;
 
     SubTaskSequencer
@@ -189,23 +191,10 @@ public:
     MotorIdentificationTask(const TaskContext& context,
                             const Mode mode) :
         context_(context),
+        mode_(mode),
         result_(context.params.motor),
         sequencer_(context_, result_)
-    {
-        switch (mode)
-        {
-        case Mode::Static:
-        {
-            sequencer_.setSequence<ResistanceTask, InductanceTask>();
-            break;
-        }
-        case Mode::RotationWithoutMechanicalLoad:
-        {
-            sequencer_.setSequence<ResistanceTask, InductanceTask, MagneticFluxTask>();
-            break;
-        }
-        }
-    }
+    { }
 
     const char* getName() const override { return "motor_id"; }
 
@@ -213,17 +202,32 @@ public:
     {
         if (!started_)
         {
-            started_ = true;
-
-            if (sequencer_.getSequenceLength() < 1)
+            // Note that we're not taking a critical section here.
+            switch (mode_)
             {
+            case Mode::Static:
+            {
+                sequencer_.setSequence<ResistanceTask, InductanceTask>();
+                break;
+            }
+            case Mode::RotationWithoutMechanicalLoad:
+            {
+                sequencer_.setSequence<ResistanceTask, InductanceTask, MagneticFluxTask>();
+                break;
+            }
+            default:
+            {
+                assert(false);
                 return Result::failure(ExitCodeInvalidSequence);
+            }
             }
 
             if (!context_.params.motor_id.isValid())
             {
                 return Result::failure(ExitCodeInvalidParameters);
             }
+
+            started_ = true;
         }
 
         // TODO: We can't check the general hardware status because FAULT tends to go up randomly.
