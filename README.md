@@ -1,5 +1,6 @@
 # PX4ESC
 
+[![Join the chat at https://gitter.im/Zubax/general](https://img.shields.io/badge/GITTER-join%20chat-green.svg?style=flat-square)](https://gitter.im/Zubax/general)
 <a href="https://scan.coverity.com/projects/px4esc">
   <img alt="Coverity Scan Build Status" src="https://scan.coverity.com/projects/10506/badge.svg"/>
 </a>
