@@ -82,8 +82,8 @@ UDEFS += -DGIT_HASH=0x$(GIT_HASH)
 
 BUILD_CONFIG = 1
 
-# 32K bootloader + 16K configuration storage
-APPLICATION_OFFSET = 49152
+# 32K bootloader + 16K configuration storage + 16K user code
+APPLICATION_OFFSET = 65536
 
 DDEFS += -DCORTEX_VTOR_INIT=$(APPLICATION_OFFSET)       \
          -DCRT1_AREAS_NUMBER=0
