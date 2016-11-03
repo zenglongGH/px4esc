@@ -40,8 +40,21 @@ __process_stack_size__  = 0x2000;
 
 MEMORY
 {
-    flash : org = 0x0800c000, len = 464k        /* First 48K reserved for the bootloader and nonvolatile storage */
-    ram   : org = 0x20000100, len = 130816      /* First 256 bytes are reserved for bootloader-app communication. */
+    /*
+     * Flash layout:
+     *   0K.. 32K    32K    Bootloader
+     *  32K.. 48K    16K    Non-volatile storage for configuration parameters
+     *  48K.. 64K    16K    Reserved for future use for user-specific code
+     *  64K..512K   448K    Application
+     */
+    flash : org = 0x08010000, len = 448k
+
+    /*
+     * RAM layout:
+     *    0..256    Reserved space for bootloader-application data exchange
+     *  256..128K   Application
+     */
+    ram   : org = 0x20000100, len = 130816
 }
 
 
