@@ -174,6 +174,7 @@ class MotorIdentificationTask : public ITask
     static constexpr Result::ExitCode ExitCodeBadHardwareStatus     = Result::MaxExitCode - 0;
     static constexpr Result::ExitCode ExitCodeInvalidParameters     = Result::MaxExitCode - 1;
     static constexpr Result::ExitCode ExitCodeInvalidSequence       = Result::MaxExitCode - 2;
+    static constexpr Result::ExitCode ExitCodeHardwareTestFailed    = Result::MaxExitCode - 3;
 
     const Mode mode_;
 
@@ -226,6 +227,11 @@ public:
             if (!context_.params.motor_id.isValid())
             {
                 return Result::failure(ExitCodeInvalidParameters);
+            }
+
+            if (!context_.hw_test_report.isSuccessful())
+            {
+                return Result::failure(ExitCodeHardwareTestFailed);
             }
 
             started_ = true;

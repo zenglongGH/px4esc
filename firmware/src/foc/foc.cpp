@@ -120,7 +120,7 @@ hw_test::Report getHardwareTestReport()
 
 void beginMotorIdentification(motor_id::Mode mode)
 {
-    g_task_handler.from<IdleTask, BeepingTask>().to<MotorIdentificationTask>(mode);
+    g_task_handler.from<IdleTask, BeepingTask, FaultTask>().to<MotorIdentificationTask>(mode);
 }
 
 void beginHardwareTest()
