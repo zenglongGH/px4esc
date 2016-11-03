@@ -37,7 +37,7 @@ class MagneticFluxTask : public ISubTask
     // Voltage reduction during the measurement phase shold be very slow in order to
     // reduce phase delay of the current filter.
     static constexpr Scalar VoltageSlopeLengthSec       = 40.0F;
-    static constexpr Scalar MinVoltage                  = 0.01F;
+    static constexpr Scalar MinVoltage                  = 0.001F;
     static constexpr unsigned IdqMovingAverageLength    = 5;
 
     using Modulator = ThreePhaseVoltageModulator<IdqMovingAverageLength>;
@@ -200,7 +200,7 @@ public:
                 // 2 - triggers false positive
                 // 3 - works fine
                 // 6 - works fine
-                Const dIdt_threshold = prev_I * 4.0F;
+                Const dIdt_threshold = prev_I * 3.0F;
 
                 if (dIdt > dIdt_threshold)
                 {
