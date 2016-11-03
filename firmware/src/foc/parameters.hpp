@@ -125,7 +125,7 @@ struct MotorParameters
 
     static math::Range<> getLqLimits()
     {
-        return {    3e-6F,
+        return {    1e-6F,
                  1000e-6F };
     }
 
