@@ -4,6 +4,7 @@
  *
  *  Needs["PX4ESC`", "tools/mathematica/PX4ESC.m"]
  *  plots = PX4ESC`splitXY[PX4ESC`parseFile["file.txt"]];
+ *  GraphicsColumn[Map[ListLinePlot, plots]]
  *)
 
 BeginPackage["PX4ESC`"]
