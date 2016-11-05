@@ -69,6 +69,17 @@ static const Entry g_entries[] =
         p.rs                      = 0.232F;
         p.lq                      = 161e-6F;
         return p;
+    }),
+
+    Entry("Namiki SOBL23-1207", []()
+    {
+        MotorParameters p;
+        p.num_poles               = 16;
+        p.max_current             = 1.38F;
+        p.phi                     = 0.760e-3F;
+        p.rs                      = 3.45F;
+        p.lq                      = 620.0e-6F;
+        return p;
     })
 };
 
