@@ -119,8 +119,8 @@ struct MotorParameters
 
     static math::Range<> getRsLimits()
     {
-        return { 0.01F,
-                 1.00F };
+        return { 0.002F,
+                20.00F };
     }
 
     static math::Range<> getLqLimits()
