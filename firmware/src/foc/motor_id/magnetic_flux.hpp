@@ -121,8 +121,6 @@ public:
             started_at_ = context_.getTime();
         }
 
-        Const low_pass_filter_innovation = context_.board.pwm.period * 10.0F;
-
         Const prev_I = Idq_.norm();
 
         /*
@@ -141,6 +139,8 @@ public:
                                                         setpoint);
             context_.setPWM(out.pwm_setpoint);
             angular_position_ = out.extrapolated_angular_position;
+
+            Const low_pass_filter_innovation = context_.board.pwm.period * 10.0F;
 
             // Current filter update
             currents_filter_.update(out.Idq);
@@ -175,7 +175,7 @@ public:
 
                 if (phi_ > 0)
                 {
-                    phi_ += low_pass_filter_innovation * (new_phi - phi_);
+                    phi_ += context_.board.pwm.period * (new_phi - phi_);
                 }
                 else
                 {
