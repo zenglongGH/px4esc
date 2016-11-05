@@ -72,7 +72,7 @@ using Default = foc::motor_id::Parameters;
 
 Real g_frac_of_max_current("mid.max_cur_frac",  Default().fraction_of_max_current,                     0.1F,    1.0F);
 Real g_high_frequency     ("mid.hifreq_hertz",  Default().current_injection_frequency,               100.0F, 5000.0F);
-Real g_phi_eradsec        ("mid.phi_eradsec",   Default().phi_estimation_electrical_angular_velocity, 50.0F,  900.0F);
+Real g_phi_eradsec        ("mid.phi_eradsec",   Default().phi_estimation_electrical_angular_velocity, 50.0F, 5000.0F);
 
 }
 
