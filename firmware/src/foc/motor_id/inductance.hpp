@@ -203,6 +203,7 @@ public:
                 // Not enough valid samples collected
                 result_.lq = 0;
                 status_ = Status::Failed;
+                IRQDebugOutputBuffer::setStringPointerFromIRQ("Not enough Lq samples");
             }
         }
     }

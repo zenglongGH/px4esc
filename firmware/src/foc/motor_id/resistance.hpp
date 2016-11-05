@@ -177,6 +177,7 @@ public:
                     // Resistance is too high, aborting
                     result_.rs = 0;
                     switchState(State::Failed);
+                    IRQDebugOutputBuffer::setStringPointerFromIRQ("Rs too high");
                 }
             }
             break;
@@ -273,6 +274,7 @@ public:
             else
             {
                 switchState(State::Failed);
+                IRQDebugOutputBuffer::setStringPointerFromIRQ("At least one Rs sample is invalid");
             }
             break;
         }

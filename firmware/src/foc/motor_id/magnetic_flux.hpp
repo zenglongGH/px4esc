@@ -155,6 +155,7 @@ public:
             // Voltage is not in the valid range, aborting
             result_.phi = 0;
             status_ = Status::Failed;
+            IRQDebugOutputBuffer::setStringPointerFromIRQ("Voltage below the minimum");
             return;
         }
 
@@ -212,6 +213,7 @@ public:
             {
                 // Negative Phi value encountered at any point indicates that the Rs value is likely too high
                 status_ = Status::Failed;
+                IRQDebugOutputBuffer::setStringPointerFromIRQ("Negative Phi, resistance measurement is likely invalid");
             }
         }
     }

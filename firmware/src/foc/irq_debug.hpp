@@ -43,6 +43,7 @@ public:
     static constexpr unsigned NumVariables = 5;
 
 private:
+    const char* string_ptr_ = nullptr;
     std::array<Scalar, NumVariables> vars_{};
     std::array<bool, NumVariables> update_flags_{};
 
@@ -83,6 +84,14 @@ public:
     }
 
     /**
+     * The name says it all. The string will NOT be copied, only the pointer will be stored.
+     */
+    static void setStringPointerFromIRQ(const char* const s)
+    {
+        getInstance().string_ptr_ = s;
+    }
+
+    /**
      * This function can be called only from a regular thread context.
      * Note that the method uses no locking, this is intentional.
      * There are corner cases where it may skip a value due to race condition, but this is acceptable.
@@ -90,6 +99,12 @@ public:
     static void printIfNeeded()
     {
         auto& self = getInstance();
+
+        if (const auto* s = self.string_ptr_)
+        {
+            std::printf("IRQ Message: %s\n", s);
+        }
+
         if (std::any_of(self.update_flags_.begin(), self.update_flags_.end(), [](bool x) { return x; }))
         {
             std::printf("IRQ Vars:");
