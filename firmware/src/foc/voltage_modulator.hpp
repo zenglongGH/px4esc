@@ -53,9 +53,10 @@ public:
     CurrentPIController(Const Lq,
                         Const Rs,
                         Const max_current,
+                        Const bandwidth,
                         Const dt) :
         full_scale_current_(max_current * 3.0F),
-        kp_((math::Pi2 * Lq) / (20.0F * dt)),
+        kp_(bandwidth * (math::Pi2 * Lq) / dt),
         ki_(dt * Rs / Lq),
         voltage_limit_mult_((SquareRootOf3 / 2.0F) / kp_)
     {
@@ -144,6 +145,7 @@ public:
     ThreePhaseVoltageModulator(Const Lq,
                                Const Rs,
                                Const max_current,
+                               Const bandwidth,
                                const board::motor::PWMParameters& pwm_params,
                                const DeadTimeCompensationPolicy dtcomp_policy,
                                const CrossCouplingCompensationPolicy cccomp_policy) :
@@ -151,8 +153,8 @@ public:
         cross_coupling_compensation_policy_(cccomp_policy),
         pwm_params_(pwm_params),
         Lq_(Lq),
-        pid_Id_(Lq, Rs, max_current, pwm_params_.period),
-        pid_Iq_(Lq, Rs, max_current, pwm_params_.period),
+        pid_Id_(Lq, Rs, max_current, bandwidth, pwm_params_.period),
+        pid_Iq_(Lq, Rs, max_current, bandwidth, pwm_params_.period),
         estimated_Idq_filter_(Vector<2>::Zero())
     { }
 

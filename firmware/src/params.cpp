@@ -35,15 +35,18 @@ namespace
 
 using Real = os::config::Param<float>;
 using Natural = os::config::Param<unsigned>;
+using Boolean = os::config::Param<bool>;
 
 
 namespace controller
 {
 
-using Default = foc::ControllerParameters;
+using D = foc::ControllerParameters;
 
-Real g_spinup_duration    ("ctrl.spinup_sec",     Default().nominal_spinup_duration,       0.1F,    10.0F);
-Natural g_num_attempts    ("ctrl.num_attempt",    Default().num_stalls_to_latch,              1, 10000000);
+Real g_spinup_duration    ("ctrl.spinup_sec",   D().nominal_spinup_duration,       0.1F,    10.0F);
+Natural g_num_attempts    ("ctrl.num_attempt",  D().num_stalls_to_latch,              1, 10000000);
+Real g_vm_bandwidth       ("ctrl.vmbandwidth",  D().voltage_modulator_bandwidth,  0.01F,     1.0F);
+Boolean g_vm_ccic         ("ctrl.vm_cci_comp",  D().voltage_modulator_cross_coupling_inductance_compensation);
 
 }
 
@@ -127,8 +130,10 @@ foc::Parameters readFOCParameters()
 
     {
         using namespace controller;
-        out.controller.nominal_spinup_duration = g_spinup_duration.get();
-        out.controller.num_stalls_to_latch = g_num_attempts.get();
+        out.controller.nominal_spinup_duration      = g_spinup_duration.get();
+        out.controller.num_stalls_to_latch          = g_num_attempts.get();
+        out.controller.voltage_modulator_bandwidth  = g_vm_bandwidth.get();
+        out.controller.voltage_modulator_cross_coupling_inductance_compensation = g_vm_ccic.get();
         assert(out.controller.isValid());
     }
     {
@@ -177,8 +182,10 @@ void writeFOCParameters(const foc::Parameters& obj)
 
     {
         using namespace controller;
-        assign(g_spinup_duration,           obj.controller.nominal_spinup_duration);
-        assign(g_num_attempts,              obj.controller.num_stalls_to_latch);
+        assign(g_spinup_duration,   obj.controller.nominal_spinup_duration);
+        assign(g_num_attempts,      obj.controller.num_stalls_to_latch);
+        assign(g_vm_bandwidth,      obj.controller.voltage_modulator_bandwidth);
+        assign(g_vm_ccic,           obj.controller.voltage_modulator_cross_coupling_inductance_compensation);
     }
 
     writeMotorParameters(obj.motor);

@@ -118,9 +118,12 @@ public:
         modulator_(motor_params.lq,
                    motor_params.rs,
                    motor_params.max_current,
+                   controller_params.voltage_modulator_bandwidth,
                    pwm_params,
                    modulator_.DeadTimeCompensationPolicy::Disabled,
-                   modulator_.CrossCouplingCompensationPolicy::Disabled)
+                   controller_params.voltage_modulator_cross_coupling_inductance_compensation ?
+                       modulator_.CrossCouplingCompensationPolicy::Enabled :
+                       modulator_.CrossCouplingCompensationPolicy::Disabled)
     { }
 
     /**

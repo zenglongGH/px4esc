@@ -83,6 +83,7 @@ public:
        modulator_(OneSizeFitsAllLq,
                   result_.rs,
                   result_.max_current,
+                  context.params.controller.voltage_modulator_bandwidth,
                   context.board.pwm,
                   Modulator::DeadTimeCompensationPolicy::Disabled,
                   Modulator::CrossCouplingCompensationPolicy::Disabled)

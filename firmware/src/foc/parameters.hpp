@@ -234,19 +234,29 @@ struct ControllerParameters
     /// If the rotor stalled this many times in a row, latch into FAULT state
     std::uint32_t num_stalls_to_latch = 100;
 
+    /// Multiplier of the P term of the current PI controllers
+    Scalar voltage_modulator_bandwidth = 0.05F;
+
+    /// Use additional correction of the PID DQ voltage outputs; refer to the theory for explanation
+    bool voltage_modulator_cross_coupling_inductance_compensation = false;
 
     bool isValid() const
     {
         return math::Range<>(0.1F, 60.0F).contains(nominal_spinup_duration) &&
+               os::float_eq::positive(voltage_modulator_bandwidth)          &&
                num_stalls_to_latch > 0;
     }
 
     auto toString() const
     {
         return os::heapless::format("Tspinup: %.1f sec\n"
-                                    "Nslatch: %u",
+                                    "Nslatch: %u\n"
+                                    "VM Bndw: %.3f\n"
+                                    "VM CCIC: %s",
                                     double(nominal_spinup_duration),
-                                    unsigned(num_stalls_to_latch));
+                                    unsigned(num_stalls_to_latch),
+                                    double(voltage_modulator_bandwidth),
+                                    voltage_modulator_cross_coupling_inductance_compensation ? "ON" : "OFF");
     }
 };
 
