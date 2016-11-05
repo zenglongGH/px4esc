@@ -82,7 +82,6 @@ public:
        angular_velocity_(context.params.motor_id.current_injection_frequency * math::Pi2),
        modulator_(OneSizeFitsAllLq,
                   result_.rs,
-                  0.0F,
                   result_.max_current,
                   context.board.pwm,
                   Modulator::DeadTimeCompensationPolicy::Disabled,
