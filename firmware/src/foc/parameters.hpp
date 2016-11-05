@@ -202,12 +202,12 @@ struct MotorParameters
 
         return os::heapless::String<240>(
             "Npols: %u\n"
-            "Imax : %-7.1f A\n"
-            "Imin : %-7.1f A\n"
-            "Ispup: %-7.1f A\n"
+            "Imax : %-7.2f A\n"
+            "Imin : %-7.2f A\n"
+            "Ispup: %-7.2f A\n"
             "Phi  : %-7.3f mWb, %.1f RPMM/V\n"
             "Rs   : %-7.3f Ohm\n"
-            "Lq   : %-7.3f uH\n"
+            "Lq   : %-7.2f uH\n"
             "Wmin : %-7.1f rad/s, %.1f RPMM\n"
             "Iramp: %-7.1f A/s\n"
             "Vramp: %-7.1f V/s\n"
