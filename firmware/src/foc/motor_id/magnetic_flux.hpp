@@ -142,7 +142,7 @@ public:
             angular_position_ = out.extrapolated_angular_position;
 
             // Current filter update
-            currents_filter_.update(out.estimated_Idq);
+            currents_filter_.update(out.Idq);
             I_ += low_pass_filter_innovation * (currents_filter_.getValue().norm() - I_);
 
             // Voltage filter update

@@ -105,8 +105,8 @@ public:
         context_.reportDebugVariables({
             last_modulator_output_.reference_Udq[0],
             last_modulator_output_.reference_Udq[1],
-            last_modulator_output_.estimated_Idq[0],
-            last_modulator_output_.estimated_Idq[1],
+            last_modulator_output_.Idq[0],
+            last_modulator_output_.Idq[1],
             Scalar(modulator_.getUdqNormalizationCounter())
         });
     }
@@ -150,7 +150,7 @@ public:
             {
                 averagers_[0].addSample(last_modulator_output_.reference_Udq[0] * dead_time_compensation_mult);
                 averagers_[1].addSample(last_modulator_output_.reference_Udq[1] * dead_time_compensation_mult);
-                averagers_[2].addSample(last_modulator_output_.estimated_Idq[1]);
+                averagers_[2].addSample(last_modulator_output_.Idq[1]);
             }
         }
         else

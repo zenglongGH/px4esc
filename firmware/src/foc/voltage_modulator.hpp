@@ -117,7 +117,7 @@ private:
     CurrentPIController pid_Id_;
     CurrentPIController pid_Iq_;
 
-    math::SimpleMovingAverageFilter<IdqMovingAverageLength, Vector<2>> estimated_Idq_filter_;
+    math::SimpleMovingAverageFilter<IdqMovingAverageLength, Vector<2>> Idq_filter_;
 
     std::uint64_t Udq_normalization_count_ = 0;
 
@@ -125,7 +125,7 @@ public:
     struct Output
     {
         Scalar extrapolated_angular_position = 0;
-        math::Vector<2> estimated_Idq{};
+        math::Vector<2> Idq{};
         math::Vector<2> reference_Udq{};
         math::Vector<3> pwm_setpoint{};
         bool Udq_was_limited = false;
@@ -155,7 +155,7 @@ public:
         Lq_(Lq),
         pid_Id_(Lq, Rs, max_current, bandwidth, pwm_params_.period),
         pid_Iq_(Lq, Rs, max_current, bandwidth, pwm_params_.period),
-        estimated_Idq_filter_(Vector<2>::Zero())
+        Idq_filter_(Vector<2>::Zero())
     { }
 
     Output onNextPWMPeriod(const Vector<2>& phase_currents_ab,
@@ -174,23 +174,23 @@ public:
 
         const auto angle_sincos = math::sincos(out.extrapolated_angular_position);
 
-        const auto estimated_I_alpha_beta = performClarkeTransform(phase_currents_ab);
+        const auto I_alpha_beta = performClarkeTransform(phase_currents_ab);
 
-        const Vector<2> new_Idq = performParkTransform(estimated_I_alpha_beta, angle_sincos);
-        estimated_Idq_filter_.update(new_Idq);
-        out.estimated_Idq = estimated_Idq_filter_.getValue();
+        const Vector<2> new_Idq = performParkTransform(I_alpha_beta, angle_sincos);
+        Idq_filter_.update(new_Idq);
+        out.Idq = Idq_filter_.getValue();
 
         /*
          * Running PIDs, estimating reference voltage in the rotating reference frame
          */
         out.reference_Udq[0] = pid_Id_.computeVoltage(0.0F,
-                                                      out.estimated_Idq[0],
+                                                      out.Idq[0],
                                                       inverter_voltage);
 
         if (setpoint.mode == Setpoint::Mode::Iq)
         {
             out.reference_Udq[1] = pid_Iq_.computeVoltage(setpoint.value,
-                                                          out.estimated_Idq[1],
+                                                          out.Idq[1],
                                                           inverter_voltage);
         }
         else if (setpoint.mode == Setpoint::Mode::Uq)
@@ -205,8 +205,8 @@ public:
 
         if (cross_coupling_compensation_policy_ == CrossCouplingCompensationPolicy::Enabled)
         {
-            out.reference_Udq[0] -= angular_velocity * Lq_ * out.estimated_Idq[1];
-            out.reference_Udq[1] += angular_velocity * Lq_ * out.estimated_Idq[0];
+            out.reference_Udq[0] -= angular_velocity * Lq_ * out.Idq[1];
+            out.reference_Udq[1] += angular_velocity * Lq_ * out.Idq[0];
         }
 
         Const Udq_magnitude_limit = computeLineVoltageLimit(inverter_voltage, pwm_params_.upper_limit);

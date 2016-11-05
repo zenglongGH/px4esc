@@ -93,7 +93,7 @@ private:
     // Mutable entities can be modified from the PWM modulation method
     mutable Modulator modulator_;
     mutable Scalar angular_position_ = 0;
-    mutable Vector<2> estimated_Idq_ = Vector<2>::Zero();
+    mutable Vector<2> Idq_ = Vector<2>::Zero();
     mutable Vector<2> reference_Udq_ = Vector<2>::Zero();
 
 
@@ -139,7 +139,7 @@ public:
         /*
          * Making a local copy of state variables ASAP, before the next fast IRQ fires.
          */
-        const auto Idq = estimated_Idq_;
+        const auto Idq = Idq_;
         const auto Udq = reference_Udq_;
 
         if (state_ != State::Spinup &&
@@ -246,7 +246,7 @@ public:
                                                            angular_velocity_,
                                                            angular_position_,
                                                            sp);
-            estimated_Idq_ = output.estimated_Idq;
+            Idq_ = output.Idq;
             reference_Udq_ = output.reference_Udq;
             angular_position_ = output.extrapolated_angular_position;
 
@@ -285,7 +285,7 @@ public:
     Vector<2> getIdq() const
     {
         AbsoluteCriticalSectionLocker locker;
-        return estimated_Idq_;
+        return Idq_;
     }
 
     Scalar getElectricalAngularVelocity() const
@@ -296,7 +296,7 @@ public:
     Scalar computeInverterPower() const
     {
         AbsoluteCriticalSectionLocker locker;
-        return (reference_Udq_.transpose() * estimated_Idq_)[0] * 1.5F;
+        return (reference_Udq_.transpose() * Idq_)[0] * 1.5F;
     }
 
     Direction getDirection() const { return direction_; }
@@ -307,8 +307,8 @@ public:
         return {
             reference_Udq_[0],
             reference_Udq_[1],
-            estimated_Idq_[0],
-            estimated_Idq_[1],
+            Idq_[0],
+            Idq_[1],
             regular_setpoint_.value,
             observer_.getAngularVelocity()
         };
