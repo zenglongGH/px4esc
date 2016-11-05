@@ -134,9 +134,11 @@ after the failure occurred.
 Using whatever interface available to you (e.g. CAN, CLI),
 assign proper values to the following configuration parameters:
 
-* `m.max_ampere` - maximum phase current [ampere].
+* `m.max_ampere` - maximum phase current, as defined in the motor specification [ampere].
+This parameter MUST be set correctly. Using a value lower than specified will likely cause suboptimal performance,
+and motor identification, if performed, will likely fail or return incorrect results.
 * `m.num_poles` - number of magnetic poles (number of permanent magnets on the rotor).
-This is always an even number.
+This is always an even number. An odd number will be rejected.
 
 All parameters whose names start with `m.` are related to the model of the motor.
 You may want to explicitly specify some other parameters as well, but that is rarely needed.
@@ -157,7 +159,7 @@ Make sure the board is powered from a stable power supply (e.g. lab power supply
 and that the supply voltage is about the same that will be used during normal operation.
 Make extra sure the rotor is not connected to any mechanical load (e.g. propeller) and that it can rotate freely.
 **Even a slightest mechanical load applied to the rotor will render the results of motor identification invalid.**
-The motor itself must be mounted firmly.
+The motor itself must be mounted firmly, which is also absolutely required to ensure reliable identification.
 
 Start the motor identification process using your communication interface as described above.
 Make sure you're using identification in free rotation mode.
