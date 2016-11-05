@@ -147,10 +147,15 @@ struct MotorParameters
 
     Scalar computeMinVoltage() const
     {
-        Const min_rpmm =
-            convertRotationRateElectricalToMechanical(convertAngularVelocityToRPM(min_electrical_ang_vel), num_poles);
+        Const min_rpmm = convertRotationRateElectricalToMechanical(convertAngularVelocityToRPM(min_electrical_ang_vel),
+                                                                   num_poles);
         Const kv = convertFluxLinkageToKV(phi, num_poles);
-        Const min_voltage = min_rpmm / kv;
+        Const min_voltage_from_rpm = min_rpmm / kv;
+
+        Const min_voltage_from_current = min_current * rs * 1.5F;
+
+        Const min_voltage = std::max(min_voltage_from_rpm,
+                                     min_voltage_from_current);
 
         if (math::Range<>(0.01F, 10.0F).contains(min_voltage))
         {
