@@ -39,7 +39,8 @@ class ResistanceTask : public ISubTask
 {
     static constexpr Scalar RotorStabilizationDuration  =  1.0F;
     static constexpr Scalar PhaseMeasurementDuration    = 10.0F;
-    static constexpr Scalar OhmPerSec                   = 0.1F;
+    static constexpr Scalar OhmPerSec                   = 0.2F;
+    static constexpr Scalar MinEstimationCurrent        = 0.5F;
     static constexpr Scalar ValidCurrentThreshold       = 1e-3F;
     static constexpr unsigned MinSamples                = 100000;
 
@@ -115,8 +116,8 @@ public:
                    const MotorParameters& initial_parameters) :
         context_(context),
         result_(initial_parameters),
-        estimation_current_(initial_parameters.max_current *
-                            context.params.motor_id.fraction_of_max_current),
+        estimation_current_(std::max(MinEstimationCurrent,
+                                     initial_parameters.max_current * context.params.motor_id.fraction_of_max_current)),
         currents_filter_(Vector<2>::Zero())
     {
         result_.rs = 0;
@@ -147,37 +148,36 @@ public:
         {
         case State::CoarseMeasurement:
         {
-            // Slowly increasing the voltage until we've reached the required current.
+            // Slowly increasing the voltage until we've reached the required current, or the max voltage is exceeded.
             // We're supplying phase C in order to be able to use both current sensors with maximum resolution.
-            if ((-filtered_currents.sum()) < estimation_current_)
-            {
-                // Very coarse initial estimation
-                result_.rs = std::max(MotorParameters::getRsLimits().min,
-                                      result_.rs + OhmPerSec * context_.board.pwm.period);
-            }
-            else
-            {
-                IRQDebugOutputBuffer::setVariableFromIRQ<0>(result_.rs);
-                switchState(State::PhaseA);
-            }
+            result_.rs = std::max(MotorParameters::getRsLimits().min,
+                                  result_.rs + OhmPerSec * context_.board.pwm.period);
 
             Const voltage = computeLineVoltageForResistanceMeasurement(estimation_current_, result_.rs);
             Const relative_voltage = computeRelativePhaseVoltage(voltage, inverter_voltage);
 
-            if ((relative_voltage < (context_.board.pwm.upper_limit - 0.5F)) &&
-                MotorParameters::getRsLimits().contains(result_.rs))
+            if ((relative_voltage >= context_.board.pwm.upper_limit) ||
+                ((-filtered_currents.sum()) > estimation_current_))
             {
-                context_.setPWM({
-                    0.0F,
-                    0.0F,
-                    relative_voltage
-                });
+                IRQDebugOutputBuffer::setVariableFromIRQ<0>(result_.rs);
+                switchState(State::PhaseA);
             }
             else
             {
-                // Voltage or resistance is too high, aborting
-                result_.rs = 0;
-                switchState(State::Failed);
+                if (MotorParameters::getRsLimits().contains(result_.rs))
+                {
+                    context_.setPWM({
+                        0.0F,
+                        0.0F,
+                        relative_voltage
+                    });
+                }
+                else
+                {
+                    // Resistance is too high, aborting
+                    result_.rs = 0;
+                    switchState(State::Failed);
+                }
             }
             break;
         }
@@ -194,7 +194,8 @@ public:
              * resistance without individual measurements per phase.
              */
             Const voltage = computeLineVoltageForResistanceMeasurement(estimation_current_, result_.rs);
-            Const pwm_channel_setpoint = computeRelativePhaseVoltage(voltage, inverter_voltage);
+            Const pwm_channel_setpoint = std::min(context_.board.pwm.upper_limit,
+                                                  computeRelativePhaseVoltage(voltage, inverter_voltage));
 
             if (state_ == State::PhaseA)
             {
