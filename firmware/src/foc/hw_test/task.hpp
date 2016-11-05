@@ -37,7 +37,7 @@ namespace hw_test
  */
 class HardwareTestingTask : public ITask
 {
-    static constexpr Scalar TestingVoltage          = 0.5F;
+    static constexpr Scalar TestingVoltage          = 0.7F;
     static constexpr Scalar ThresholdCurrent        = 0.01F;
     static constexpr Scalar ZeroThresholdCurrent    = 0.15F;
     static constexpr Scalar StabilizationTime       = 0.3F;
