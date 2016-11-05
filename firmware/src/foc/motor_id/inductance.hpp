@@ -51,7 +51,7 @@ namespace motor_id
 class InductanceTask : public ISubTask
 {
     static constexpr Scalar MeasurementDuration         = 15.0F;
-    static constexpr Scalar MinValidSampleRatio         = 0.99F;
+    static constexpr Scalar MinValidSampleRatio         = 0.9F;
     static constexpr Scalar OneSizeFitsAllLq            = 50.0e-6F;
     static constexpr unsigned IdqMovingAverageLength    = 5;
 
@@ -82,6 +82,7 @@ public:
        angular_velocity_(context.params.motor_id.current_injection_frequency * math::Pi2),
        modulator_(OneSizeFitsAllLq,
                   result_.rs,
+                  0.0F,
                   result_.max_current,
                   context.board.pwm,
                   Modulator::DeadTimeCompensationPolicy::Disabled,
