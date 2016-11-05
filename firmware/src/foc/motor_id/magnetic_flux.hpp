@@ -55,15 +55,14 @@ class MagneticFluxTask : public ISubTask
     Modulator modulator_;
 
     math::SimpleMovingAverageFilter<500, Vector<2>> currents_filter_;
-    math::SimpleMovingAverageFilter<500, Vector<2>> voltage_filter_;
+    math::SimpleMovingAverageFilter<500, Scalar> Ud_filter_;
 
     // State variables
     Scalar angular_velocity_ = 0;
     Scalar angular_position_ = 0;
-    Scalar Uq_;
-    Scalar min_I_ = 0;
-    Scalar I_ = 0;
-    Scalar U_ = 0;
+    Scalar min_Iq_ = std::numeric_limits<Scalar>::infinity();
+    Vector<2> Idq_ = Vector<2>::Zero();
+    Vector<2> Udq_ = Vector<2>::Zero();
     Scalar phi_ = 0;
 
 public:
@@ -81,9 +80,10 @@ public:
                    Modulator::DeadTimeCompensationPolicy::Disabled,
                    Modulator::CrossCouplingCompensationPolicy::Disabled),
         currents_filter_(Vector<2>::Zero()),
-        voltage_filter_(Vector<2>::Zero()),
-        Uq_(initial_Uq_)
+        Ud_filter_(0.0F)
     {
+        Udq_[1] = initial_Uq_;
+
         result_.phi = 0;
 
         if (!context_.params.motor_id.isValid() ||
@@ -99,10 +99,11 @@ public:
     {
         (void) period;
         context_.reportDebugVariables({
+            Udq_[0],
+            Udq_[1],
+            Idq_[0],
+            Idq_[1],
             angular_velocity_,
-            Uq_,
-            I_,
-            U_,
             phi_ * 1e3F
         });
     }
@@ -122,16 +123,16 @@ public:
 
         Const low_pass_filter_innovation = context_.board.pwm.period * 10.0F;
 
-        Const prev_I = I_;
+        Const prev_I = Idq_.norm();
 
         /*
          * Voltage modulation and filter update
          */
-        if (Uq_ > MinVoltage)
+        if (Udq_[1] > MinVoltage)
         {
             Modulator::Setpoint setpoint;
             setpoint.mode = Modulator::Setpoint::Mode::Uq;
-            setpoint.value = Uq_;
+            setpoint.value = Udq_[1];
 
             const auto out = modulator_.onNextPWMPeriod(phase_currents_ab,
                                                         inverter_voltage,
@@ -143,11 +144,11 @@ public:
 
             // Current filter update
             currents_filter_.update(out.Idq);
-            I_ += low_pass_filter_innovation * (currents_filter_.getValue().norm() - I_);
+            Idq_ += low_pass_filter_innovation * (currents_filter_.getValue() - Idq_);
 
-            // Voltage filter update
-            voltage_filter_.update(out.reference_Udq);
-            U_ += low_pass_filter_innovation * (voltage_filter_.getValue().norm() - U_);
+            // Ud filter update (Uq is known exactly since we use it as a setpoint)
+            Ud_filter_.update(out.reference_Udq[0]);
+            Udq_[0] += low_pass_filter_innovation * (Ud_filter_.getValue() - Udq_[0]);
         }
         else
         {
@@ -169,13 +170,7 @@ public:
         else
         {
             {
-                // TODO: Compensation disabled, since it yields lower values than expected
-                Const dead_time_compensation_mult = 1.0F;
-                //Const dead_time_compensation_mult = 1.0F - pwm_dead_time_ / pwm_period_;
-
-                Const U = U_ * dead_time_compensation_mult;
-
-                Const new_phi = (U - I_ * result_.rs) / angular_velocity_;
+                Const new_phi = (Udq_.norm() - Idq_.norm() * result_.rs) / angular_velocity_;
 
                 if (phi_ > 0)
                 {
@@ -187,21 +182,21 @@ public:
                 }
             }
 
-            if ((I_ < min_I_) || (min_I_ <= 0))
+            if (Idq_[1] < min_Iq_)
             {
-                min_I_ = I_;
+                min_Iq_ = Idq_[1];
                 result_.phi = phi_;
             }
 
             if (result_.phi >= 0.0F)
             {
-                Const dIdt = (I_ - prev_I) / context_.board.pwm.period;
+                Const dIdt = (Idq_.norm() - prev_I) / context_.board.pwm.period;
 
                 // TODO: we could automatically learn the worst case di/dt after the acceleration phase?
                 // 2 - triggers false positive
                 // 3 - works fine
                 // 6 - works fine
-                Const dIdt_threshold = prev_I * 3.0F;
+                Const dIdt_threshold = prev_I * 4.0F;
 
                 if (dIdt > dIdt_threshold)
                 {
@@ -210,7 +205,7 @@ public:
                 else
                 {
                     // Minimum is not reached yet, continuing to reduce voltage
-                    Uq_ -= (initial_Uq_ / VoltageSlopeLengthSec) * context_.board.pwm.period;
+                    Udq_[1] -= (initial_Uq_ / VoltageSlopeLengthSec) * context_.board.pwm.period;
                 }
             }
             else
