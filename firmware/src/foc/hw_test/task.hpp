@@ -37,9 +37,10 @@ namespace hw_test
  */
 class HardwareTestingTask : public ITask
 {
-    static constexpr Scalar TestingVoltage      = 0.7F;
-    static constexpr Scalar ThresholdCurrent    = 0.15F;
-    static constexpr Scalar StabilizationTime   = 0.3F;
+    static constexpr Scalar TestingVoltage          = 0.5F;
+    static constexpr Scalar ThresholdCurrent        = 0.01F;
+    static constexpr Scalar ZeroThresholdCurrent    = 0.15F;
+    static constexpr Scalar StabilizationTime       = 0.3F;
 
     using Range = math::Range<>;
 
@@ -165,8 +166,8 @@ public:
 
         case State::ZeroCheck:
         {
-            const bool ok = (std::abs(currents[0]) < ThresholdCurrent) &&
-                            (std::abs(currents[1]) < ThresholdCurrent);
+            const bool ok = (std::abs(currents[0]) < ZeroThresholdCurrent) &&
+                            (std::abs(currents[1]) < ZeroThresholdCurrent);
             if (!ok)
             {
                 registerError(Report::ErrorFlag::CurrentSensorsZeroOffsetError);
