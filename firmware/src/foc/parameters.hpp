@@ -147,10 +147,10 @@ struct MotorParameters
 
     Scalar computeMinVoltage() const
     {
-        Const min_mrpm =
+        Const min_rpmm =
             convertRotationRateElectricalToMechanical(convertAngularVelocityToRPM(min_electrical_ang_vel), num_poles);
         Const kv = convertFluxLinkageToKV(phi, num_poles);
-        Const min_voltage = min_mrpm / kv;
+        Const min_voltage = min_rpmm / kv;
 
         if (math::Range<>(0.01F, 10.0F).contains(min_voltage))
         {
@@ -193,10 +193,10 @@ struct MotorParameters
             kv = convertFluxLinkageToKV(phi, num_poles);
         }
 
-        Scalar min_mrpm = 0;
+        Scalar min_rpmm = 0;
         if ((min_electrical_ang_vel > 0) && num_poles_known)
         {
-            min_mrpm = convertRotationRateElectricalToMechanical(convertAngularVelocityToRPM(min_electrical_ang_vel),
+            min_rpmm = convertRotationRateElectricalToMechanical(convertAngularVelocityToRPM(min_electrical_ang_vel),
                                                                  num_poles);
         }
 
@@ -205,10 +205,10 @@ struct MotorParameters
             "Imax : %-7.1f A\n"
             "Imin : %-7.1f A\n"
             "Ispup: %-7.1f A\n"
-            "Phi  : %-7.3f mWb, %.1f MRPM/V\n"
+            "Phi  : %-7.3f mWb, %.1f RPMM/V\n"
             "Rs   : %-7.3f Ohm\n"
             "Lq   : %-7.3f uH\n"
-            "Wmin : %-7.1f rad/s, %.1f MRPM\n"
+            "Wmin : %-7.1f rad/s, %.1f RPMM\n"
             "Iramp: %-7.1f A/s\n"
             "Vramp: %-7.1f V/s\n"
             "Valid: %s").format(
@@ -219,7 +219,7 @@ struct MotorParameters
             double(phi) * 1e3, double(kv),
             double(rs),
             double(lq) * 1e6,
-            double(min_electrical_ang_vel), double(min_mrpm),
+            double(min_electrical_ang_vel), double(min_rpmm),
             double(current_ramp_amp_per_s),
             double(voltage_ramp_volt_per_s),
             isValid() ? "YES" : "NO");

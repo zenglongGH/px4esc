@@ -268,7 +268,7 @@ inline Scalar convertFluxLinkageToKV(Const flux_linkage,
 }
 
 /**
- * @param kv            Positive, in MRPM/V; MRPM is mechanical RPM.
+ * @param kv            Positive, in RPMM/V; RPMM is mechanical RPM.
  * @param num_poles     Positive, even.
  * @return              Field flux linkage if inputs are valid; zero and assertion failure if not.
  */

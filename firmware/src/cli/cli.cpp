@@ -202,7 +202,7 @@ public:
                             double(info.inverter_power_filtered / voltage),
                             double(voltage));
 
-                std::printf("%6.0f MRPM  %3.0f %%    %5u stalls\n",
+                std::printf("%6.0f RPMM  %3.0f %%    %5u stalls\n",
                             double(info.mechanical_rpm),
                             double(info.demand_factor_filtered * 100.0F),
                             static_cast<unsigned>(info.stall_count));
@@ -216,7 +216,7 @@ public:
             if (foc::isMotorIdentificationInProgress(&info))
             {
                 std::printf("MOTOR ID, %.0f %% complete\n", double(info.progress * 100.0F));
-                std::printf("%5.1f W     %6.2f A     %4.1f V     %5.0f MRPM\n",
+                std::printf("%5.1f W     %6.2f A     %4.1f V     %5.0f RPMM\n",
                             double(info.inverter_power_filtered),
                             double(info.inverter_power_filtered / voltage),
                             double(voltage),
@@ -532,8 +532,8 @@ class SetpointCommand : public os::shell::ICommandHandler
             break;
         }
 
-        case foc::ControlMode::RatiometricMRPM:
-        case foc::ControlMode::MRPM:
+        case foc::ControlMode::RatiometricRPMM:
+        case foc::ControlMode::RPMM:
         {
             sp = 0;
             ios.puts("ERROR: CONTROL MODE NOT IMPLEMENTED YET");
@@ -720,8 +720,8 @@ class KVConvertCommand : public os::shell::ICommandHandler
     {
         if (argc < 3)
         {
-            ios.print("Usage: %s <KV [MRPM/V] | field-flix-linkage [mWb]> <num-poles>\n", argv[0]);
-            ios.print("Where: KV is in MRPM/V (MRPM - mechanical RPM),\n"
+            ios.print("Usage: %s <KV [RPMM/V] | field-flix-linkage [mWb]> <num-poles>\n", argv[0]);
+            ios.print("Where: KV is in RPMM/V (RPMM - mechanical RPM),\n"
                       "       Flux linkage is in milli Weber\n");
             return;
         }
@@ -741,11 +741,11 @@ class KVConvertCommand : public os::shell::ICommandHandler
 
         ios.print("Num poles: %d\n", int(num_poles));
 
-        ios.print("%.4f mWb --> %.1f MRPM/V \n",
+        ios.print("%.4f mWb --> %.1f RPMM/V \n",
                   double(kv_mWb),
                   double(foc::convertFluxLinkageToKV(kv_mWb * 1e-3F, unsigned(num_poles))));
 
-        ios.print("%.1f MRPM/V --> %.4f mWb \n",
+        ios.print("%.1f RPMM/V --> %.4f mWb \n",
                   double(kv_mWb),
                   double(foc::convertKVToFluxLinkage(kv_mWb, unsigned(num_poles))) * 1e3);
     }

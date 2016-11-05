@@ -38,11 +38,11 @@ namespace foc
 enum class ControlMode
 {
     RatiometricCurrent,         ///< Value in [-1, 1] that defines the current setpoint relative to the maximum
-    RatiometricMRPM,            ///< Ditto, RPM setpoint relative to the maximum
+    RatiometricRPMM,            ///< Ditto, RPM setpoint relative to the maximum
     RatiometricVoltage,         ///< Ditto, voltage setpoint relative to the inverter supply voltage (Vbus)
 
     Current,                    ///< Ampere
-    MRPM,                       ///< Mechanical RPM
+    RPMM,                       ///< Mechanical RPM
     Voltage                     ///< Voltage applied in the quadrature axis
 };
 
@@ -134,8 +134,8 @@ public:
             return new_current;
         }
 
-        case ControlMode::RatiometricMRPM:
-        case ControlMode::MRPM:
+        case ControlMode::RatiometricRPMM:
+        case ControlMode::RPMM:
         {
             (void) electrical_angular_velocity;
             assert(false);              // TODO: Implement
