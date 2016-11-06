@@ -255,6 +255,9 @@ os::watchdog::Timer init()
 
     aux_cmd_iface::init();
 
+    // Logging!
+    foc::addLogSink([](const char* s) { uavcan_node::log(uavcan_node::LogLevel::INFO, "IRQ", s); });
+
     return watchdog;
 }
 
@@ -507,7 +510,7 @@ int main()
     /*
      * Confirming initialization
      */
-    chibios_rt::BaseThread::setPriority(LOWPRIO + 1);
+    chibios_rt::BaseThread::setPriority(LOWPRIO + 5);
 
     ::usleep(10000);
     foc::beep(5000.0F, 0.1F);

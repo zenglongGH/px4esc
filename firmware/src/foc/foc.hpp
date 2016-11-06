@@ -31,6 +31,7 @@
 #include <math/math.hpp>
 #include <cstdint>
 #include <utility>
+#include <functional>
 
 
 namespace foc
@@ -171,14 +172,18 @@ inline void stop()
  * The request will be ignored if the controller is in not in the inactive state.
  * Units are SI (Hertz, seconds).
  */
-void beep(Const frequency,
-          Const duration);
+void beep(Const frequency, Const duration);
 
 /**
- * This command is intended for use with CLI plotting tool.
- * Refer to the project tools directory for more info.
+ * Add a function callback that will be invoked from the FOC thread every time the FOC module logs an event.
+ * Every event is output to the CLI by default, no need to add that handler explicitly.
  */
-void plotRealTimeValues();
+void addLogSink(const std::function<void (const char*)>& sink);
+
+/**
+ * If true, the FOC module will be printing lines formatted in a special way into stdout.
+ */
+void setPlottingEnabled(bool en);
 
 /**
  * Named debug values.

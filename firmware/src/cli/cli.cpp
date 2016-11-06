@@ -35,7 +35,6 @@
 
 #include <foc/foc.hpp>
 #include <foc/transforms.hpp>
-#include <foc/irq_debug.hpp>
 #include <motor_database/motor_database.hpp>
 #include <params.hpp>
 
@@ -49,6 +48,19 @@ namespace
 {
 
 RebootRequestCallback g_reboot_request_callback;
+
+struct RAIIPlottingEnabler
+{
+    RAIIPlottingEnabler(bool en = true)
+    {
+        foc::setPlottingEnabled(en);
+    }
+
+    ~RAIIPlottingEnabler()
+    {
+        foc::setPlottingEnabled(false);
+    }
+};
 
 
 class RebootCommand : public os::shell::ICommandHandler
@@ -433,7 +445,7 @@ class SpinCommand : public os::shell::ICommandHandler
                 const math::Vector<3> modulated = (setpoint.array() - setpoint.mean()) * inverter_voltage;
 
                 ios.print("$%.4f,%.3f,%.3f\n",
-                          double(ST2US(std::uint64_t(chVTGetSystemTimeX()))) * 1e-6,
+                          double(ST2US(std::uint64_t(chVTGetSystemTimeX()))) * 1e-6,    // TODO this thing overflows
                           double(modulated[0]),
                           double(modulated[0] - modulated[1]));
             }
@@ -554,17 +566,17 @@ class SetpointCommand : public os::shell::ICommandHandler
 
         if (do_plot)
         {
-            ios.print("Press any key to stop\n");
+            RAIIPlottingEnabler enabler;
+
+            ios.puts("PRESS ANY KEY TO STOP");
 
             while (ios.getChar(1) > 0)
             {
                 ;   // Clearing the input buffer
             }
 
-            while (ios.getChar(0) <= 0)
+            while (ios.getChar(100) <= 0)
             {
-                foc::plotRealTimeValues();
-
                 if (!foc::isRunning())
                 {
                     break;
@@ -661,6 +673,8 @@ class MotorIdentificationCommand : public os::shell::ICommandHandler
             ;   // Clearing the input buffer
         }
 
+        RAIIPlottingEnabler plotting_enabler(do_plot);
+
         foc::beginMotorIdentification(mode);
 
         bool aborted = false;
@@ -668,22 +682,16 @@ class MotorIdentificationCommand : public os::shell::ICommandHandler
         foc::MotorIdentificationStateInfo info;
         while (foc::isMotorIdentificationInProgress(&info))
         {
-            if (do_plot)
-            {
-                foc::plotRealTimeValues();
-            }
-            else
+            if (!do_plot)
             {
                 ios.print("\r%u %% \r", unsigned(info.progress * 100.0F));
             }
 
-            if (ios.getChar(do_plot ? 0 : 1000) > 0)
+            if (ios.getChar(500) > 0)
             {
                 foc::stop();
                 aborted = true;
             }
-
-            foc::IRQDebugOutputBuffer::printIfNeeded();
         }
 
         // Handling the result
@@ -791,11 +799,11 @@ class HardwareTestCommand : public os::shell::ICommandHandler
 
         if (do_plot)
         {
+            RAIIPlottingEnabler enabler;
             while (foc::isHardwareTestInProgress())
             {
-                foc::plotRealTimeValues();
+                ::usleep(100000);
             }
-            foc::plotRealTimeValues();
         }
         else
         {
@@ -895,19 +903,27 @@ class PlotCommand : public os::shell::ICommandHandler
 {
     const char* getName() const override { return "plot"; }
 
-    void execute(os::shell::BaseChannelWrapper& ios, int, char**) override
+    void execute(os::shell::BaseChannelWrapper& ios, int argc, char** argv) override
     {
-        ios.puts("PRESS ANY KEY TO STOP PLOTTING");
-        ::sleep(1);               // Making sure the human has enough time to read the message
-
-        while (ios.getChar(1) > 0)
+        if (argc <= 1)
         {
-            ;   // Clearing the input buffer
+            foc::setPlottingEnabled(false);
+            ios.print("Plotting stopped.\n"
+                      "To start plotting:\n"
+                      "\t%s on\n", argv[0]);
         }
-
-        while (ios.getChar(0) <= 0)
+        else
         {
-            foc::plotRealTimeValues();
+            if (os::heapless::String<30>(argv[1]).toLowerCase() == "on")
+            {
+                ios.puts("Plotting now. Execute without arguments to stop.");
+                ::usleep(300000);
+                foc::setPlottingEnabled(true);
+            }
+            else
+            {
+                ios.puts("ERROR: Invalid argument");
+            }
         }
     }
 } static cmd_plot;
@@ -1049,8 +1065,6 @@ class CLIThread : public chibios_rt::BaseStaticThread<2048>
         {
             os::shell::BaseChannelWrapper wrapper(os::getStdIOStream());
             shell_.runFor(wrapper, 100);
-
-            foc::IRQDebugOutputBuffer::printIfNeeded();
         }
 
         logger.puts("Stopped");
@@ -1094,7 +1108,7 @@ public:
 void init(const RebootRequestCallback& reboot_callback)
 {
     g_reboot_request_callback = reboot_callback;
-    (void) g_cli_thread.start(LOWPRIO);
+    (void) g_cli_thread.start(LOWPRIO + 3);
 }
 
 }
