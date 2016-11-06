@@ -25,9 +25,9 @@
 #pragma once
 
 #include "common.hpp"
+#include "flux_linkage.hpp"
 #include "resistance.hpp"
 #include "inductance.hpp"
-#include "magnetic_flux.hpp"
 
 
 namespace foc
@@ -183,7 +183,7 @@ class MotorIdentificationTask : public ITask
     SubTaskSequencer
     < ResistanceTask
     , InductanceTask
-    , MagneticFluxTask
+    , FluxLinkageTask
     > sequencer_;
 
     bool started_ = false;
@@ -214,7 +214,7 @@ public:
             }
             case Mode::RotationWithoutMechanicalLoad:
             {
-                sequencer_.setSequence<ResistanceTask, InductanceTask, MagneticFluxTask>();
+                sequencer_.setSequence<ResistanceTask, InductanceTask, FluxLinkageTask>();
                 break;
             }
             default:

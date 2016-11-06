@@ -32,7 +32,7 @@ namespace foc
 namespace motor_id
 {
 
-class MagneticFluxTask : public ISubTask
+class FluxLinkageTask : public ISubTask
 {
     // Voltage reduction during the measurement phase shold be very slow in order to
     // reduce phase delay of the current filter.
@@ -66,7 +66,7 @@ class MagneticFluxTask : public ISubTask
     Scalar phi_ = 0;
 
 public:
-    MagneticFluxTask(SubTaskContextReference context,
+    FluxLinkageTask(SubTaskContextReference context,
                      const MotorParameters& initial_parameters) :
         context_(context),
         result_(initial_parameters),
