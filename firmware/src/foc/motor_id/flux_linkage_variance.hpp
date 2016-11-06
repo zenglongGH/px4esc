@@ -40,7 +40,7 @@ class FluxLinkageVarianceTask : public ISubTask
     static constexpr Scalar AccelerationDurationSec         = 40.0F;
     static constexpr Scalar InitialRelativeVoltageSetpoint  = 0.1F;     // Starting with 10% power
     static constexpr Scalar RelativeMinimumLowerPhi         = 0.5F;
-    static constexpr Scalar DelayBetweenAttempts            = 0.5F;
+    static constexpr Scalar DelayBetweenAttempts            = 1.0F;
 
     SubTaskContextReference context_;
     MotorParameters result_;
@@ -122,7 +122,7 @@ public:
             Idq[0],
             Idq[1],
             runner_->getElectricalAngularVelocity(),
-            lower_phi_
+            lower_phi_ * 1e3F
         });
 
         Udq_[1] += (hw_status.inverter_voltage / AccelerationDurationSec) * period;
@@ -133,6 +133,12 @@ public:
             // TODO: Phi variance computation
 
             status_ = Status::Succeeded;
+            return;
+        }
+
+        if (lower_phi_ / result_.phi < RelativeMinimumLowerPhi)
+        {
+            status_ = Status::Failed;   // Lower phi is too low
             return;
         }
 
@@ -149,6 +155,10 @@ public:
         switch (runner_->getState())
         {
         case MotorRunner::State::Spinup:
+        {
+            break;
+        }
+
         case MotorRunner::State::Running:
         {
             break;
@@ -171,11 +181,6 @@ public:
             IRQDebugOutputBuffer::setStringPointerFromIRQ("Stalled; trying lower phi");
             IRQDebugOutputBuffer::setVariableFromIRQ<0>(result_.phi);
             IRQDebugOutputBuffer::setVariableFromIRQ<1>(lower_phi_);
-
-            if (lower_phi_ / result_.phi < RelativeMinimumLowerPhi)
-            {
-                status_ = Status::Failed;   // Lower phi is too low
-            }
             break;
         }
         }

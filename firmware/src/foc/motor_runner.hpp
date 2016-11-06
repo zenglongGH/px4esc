@@ -313,6 +313,15 @@ public:
             observer_.getAngularVelocity()
         };
     }
+
+    /**
+     * Returns a MUTABLE REFERENCE to the observer object.
+     * This is PRONE TO RACE CONDITIONS, make sure you know what you're doing.
+     */
+    observer::Observer& getObserver()
+    {
+        return observer_;
+    }
 };
 
 }
