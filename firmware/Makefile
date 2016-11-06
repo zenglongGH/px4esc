@@ -96,7 +96,7 @@ DDEFS += -DCORTEX_VTOR_INIT=$(APPLICATION_OFFSET)       \
 #   Rest - Other RTOS IRQ
 DDEFS += -DCORTEX_PRIORITY_SVCALL=2
 
-USE_LTO := no
+USE_LTO := yes
 
 SERIAL_CLI_PORT_NUMBER = 3
 
@@ -107,8 +107,8 @@ SERIAL_CLI_PORT_NUMBER = 3
 USE_OPT += -Wdouble-promotion -Wswitch-enum -Wfloat-equal -fno-strict-aliasing -fno-strict-overflow
 USE_CPPOPT += -Wconversion -Wno-error=conversion -Wsign-promo -Wframe-larger-than=1024
 
-RELEASE_OPT = -O2 -fomit-frame-pointer
-DEBUG_OPT = -O2 -g3 -DDISABLE_WATCHDOG=1
+RELEASE_OPT = -O3 -fomit-frame-pointer
+DEBUG_OPT = -O3 -g3 -DDISABLE_WATCHDOG=1
 
 LDSCRIPT = ld.ld
 

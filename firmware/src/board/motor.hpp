@@ -270,8 +270,8 @@ extern void handleMainIRQ(const float period);
 typedef class AbsoluteCriticalSectionLockerImpl_
 {
 #if defined(DEBUG_BUILD) && DEBUG_BUILD
-    static constexpr std::uint32_t MaximumDurationAbsoluteUSec      = 12;
-    static constexpr std::uint32_t MaximumDurationWhenActiveUSec    = 3;
+    static constexpr std::uint32_t MaximumDurationAbsoluteUSec      = 15;
+    static constexpr std::uint32_t MaximumDurationWhenActiveUSec    = 4;
 
     static constexpr std::uint32_t TimerFrequency = STM32_SYSCLK;
 
