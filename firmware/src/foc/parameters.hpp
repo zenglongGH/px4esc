@@ -108,7 +108,7 @@ struct MotorParameters
      * Voltage setpoint slope. [volt/second]
      * Used only in voltage control modes.
      */
-    Scalar voltage_ramp_volt_per_s = 10;
+    Scalar voltage_ramp_volt_per_s = 300;
 
 
     static math::Range<> getPhiLimits()
