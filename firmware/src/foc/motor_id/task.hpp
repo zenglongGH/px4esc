@@ -28,6 +28,7 @@
 #include "resistance.hpp"
 #include "inductance.hpp"
 #include "flux_linkage.hpp"
+#include "flux_linkage_variance.hpp"
 
 
 namespace foc
@@ -184,6 +185,7 @@ class MotorIdentificationTask : public ITask
     < ResistanceTask
     , InductanceTask
     , FluxLinkageTask
+    , FluxLinkageVarianceTask
     > sequencer_;
 
     bool started_ = false;
@@ -214,7 +216,7 @@ public:
             }
             case Mode::RotationWithoutMechanicalLoad:
             {
-                sequencer_.setSequence<ResistanceTask, InductanceTask, FluxLinkageTask>();
+                sequencer_.setSequence<ResistanceTask, InductanceTask, FluxLinkageTask, FluxLinkageVarianceTask>();
                 break;
             }
             default:
