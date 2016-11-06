@@ -25,9 +25,9 @@
 #pragma once
 
 #include "common.hpp"
-#include "flux_linkage.hpp"
 #include "resistance.hpp"
 #include "inductance.hpp"
+#include "flux_linkage.hpp"
 
 
 namespace foc
@@ -246,7 +246,7 @@ public:
         }
 
         AbsoluteCriticalSectionLocker::assertNotLocked();
-        sequencer_.getCurrentTask().onMainIRQ(period);
+        sequencer_.getCurrentTask().onMainIRQ(period, hw_status);
 
         processing_enabled_ = true;     // This guarantees that the main IRQ is always served first after construction.
 

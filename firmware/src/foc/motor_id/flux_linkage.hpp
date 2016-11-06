@@ -34,8 +34,7 @@ namespace motor_id
 
 class FluxLinkageTask : public ISubTask
 {
-    // Voltage reduction during the measurement phase shold be very slow in order to
-    // reduce phase delay of the current filter.
+    // Voltage reduction during the measurement phase shold be very slow in order to reduce phase delay of the filters.
     static constexpr Scalar VoltageSlopeLengthSec       = 40.0F;
     static constexpr Scalar MinVoltage                  = 0.001F;
     static constexpr unsigned IdqMovingAverageLength    = 5;
@@ -67,7 +66,7 @@ class FluxLinkageTask : public ISubTask
 
 public:
     FluxLinkageTask(SubTaskContextReference context,
-                     const MotorParameters& initial_parameters) :
+                    const MotorParameters& initial_parameters) :
         context_(context),
         result_(initial_parameters),
         initial_Uq_((initial_parameters.max_current * context.params.motor_id.fraction_of_max_current) *
@@ -95,7 +94,7 @@ public:
         }
     }
 
-    void onMainIRQ(Const period) override
+    void onMainIRQ(Const period, const board::motor::Status&) override
     {
         (void) period;
         context_.reportDebugVariables({
@@ -108,8 +107,7 @@ public:
         });
     }
 
-    void onNextPWMPeriod(const Vector<2>& phase_currents_ab,
-                         Const inverter_voltage) override
+    void onNextPWMPeriod(const Vector<2>& phase_currents_ab, Const inverter_voltage) override
     {
         if (status_ != Status::InProgress)
         {

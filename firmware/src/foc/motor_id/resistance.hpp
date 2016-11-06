@@ -129,13 +129,12 @@ public:
         }
     }
 
-    void onMainIRQ(Const period) override
+    void onMainIRQ(Const period, const board::motor::Status&) override
     {
         (void) period;
     }
 
-    void onNextPWMPeriod(const Vector<2>& phase_currents_ab,
-                         Const inverter_voltage) override
+    void onNextPWMPeriod(const Vector<2>& phase_currents_ab, Const inverter_voltage) override
     {
         currents_filter_.update(phase_currents_ab);
         const auto filtered_currents = currents_filter_.getValue();

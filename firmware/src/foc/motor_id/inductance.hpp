@@ -98,7 +98,7 @@ public:
        }
     }
 
-    void onMainIRQ(Const period) override
+    void onMainIRQ(Const period, const board::motor::Status&) override
     {
         (void) period;
         AbsoluteCriticalSectionLocker locker;
@@ -111,8 +111,7 @@ public:
         });
     }
 
-    void onNextPWMPeriod(const Vector<2>& phase_currents_ab,
-                         Const inverter_voltage) override
+    void onNextPWMPeriod(const Vector<2>& phase_currents_ab, Const inverter_voltage) override
     {
         if (status_ != Status::InProgress)
         {

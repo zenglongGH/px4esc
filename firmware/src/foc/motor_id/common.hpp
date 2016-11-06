@@ -75,7 +75,7 @@ public:
      * This method is invoked every main IRQ, which happens every N-th period of PWM.
      * @param period    Invocation period [seconds]
      */
-    virtual void onMainIRQ(Const period) = 0;
+    virtual void onMainIRQ(Const period, const board::motor::Status& hw_status) = 0;
 
     /**
      * This method is invoked at every PWM period, from the highest priority IRQ.
