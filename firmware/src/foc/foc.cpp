@@ -48,8 +48,6 @@ namespace
 
 chibios_rt::Mutex g_mutex;
 
-os::Logger g_logger("FOC");
-
 TaskContext g_context;
 
 board::motor::PWMHandle g_pwm_handle;
@@ -86,6 +84,11 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
 
     volatile bool plotting_enabled_ = false;
 
+    static os::Logger& getLogger()
+    {
+        static os::Logger logger("FOC");
+        return logger;
+    }
 
     void main() override
     {
@@ -93,7 +96,9 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
 
         setName("foc_logger");
 
-        g_logger.puts("Started");
+        IRQDebugOutputBuffer::addOutputCallback([](const char* s) { getLogger().println("IRQ: %s", s); });
+
+        getLogger().puts("Started");
 
         while (!os::isRebootRequested())
         {
@@ -115,7 +120,7 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
             }
         }
 
-        g_logger.puts("Goodbye");
+        getLogger().puts("Goodbye");
     }
 
 public:
@@ -145,8 +150,6 @@ void init(const Parameters& params)
         AbsoluteCriticalSectionLocker locker;
         g_task_handler.select<IdleTask>();
     }
-
-    IRQDebugOutputBuffer::addOutputCallback([](const char* s) { g_logger.println("IRQ: %s", s); });
 
     g_thread.start(LOWPRIO);
 
