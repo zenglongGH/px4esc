@@ -223,6 +223,7 @@ void setSetpoint(ControlMode control_mode,
     {
         if (os::float_eq::closeToZero(value))
         {
+            g_pwm_handle.release();   // This helps to avoid holding long critical sections with activated power stage
             g_task_handler.from<FaultTask, MotorIdentificationTask>().to<IdleTask>();
         }
         else
