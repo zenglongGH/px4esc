@@ -25,7 +25,10 @@
 #pragma once
 
 #include <math/math.hpp>
+#include <zubax_chibios/os.hpp>
+#include <zubax_chibios/util/heapless.hpp>
 #include <array>
+#include <functional>
 
 
 namespace foc
@@ -40,12 +43,17 @@ using math::Const;
 class IRQDebugOutputBuffer
 {
 public:
+    using OutputCallback = std::function<void (const char*)>;
+
     static constexpr unsigned NumVariables = 5;
 
 private:
     const char* string_ptr_ = nullptr;
+
     std::array<Scalar, NumVariables> vars_{};
     std::array<bool, NumVariables> update_flags_{};
+
+    std::array<OutputCallback, 4> subscribers_;
 
 
     IRQDebugOutputBuffer(const IRQDebugOutputBuffer&) = delete;
@@ -57,6 +65,23 @@ private:
     {
         static IRQDebugOutputBuffer inst;
         return inst;
+    }
+
+    static chibios_rt::Mutex& getMutex()
+    {
+        static chibios_rt::Mutex mu;
+        return mu;
+    }
+
+    void broadcast(const os::heapless::String<>& s)
+    {
+        for (auto& x: subscribers_)
+        {
+            if (x)
+            {
+                x(s.c_str());
+            }
+        }
     }
 
 public:
@@ -96,29 +121,53 @@ public:
      * Note that the method uses no locking, this is intentional.
      * There are corner cases where it may skip a value due to race condition, but this is acceptable.
      */
-    static void printIfNeeded()
+    static void poll()
     {
+        os::MutexLocker locker(getMutex());
+
         auto& self = getInstance();
 
         if (const auto* s = self.string_ptr_)
         {
             self.string_ptr_ = nullptr;
-            std::printf("IRQ Message: %s\n", s);
+            self.broadcast(s);
         }
 
         if (std::any_of(self.update_flags_.begin(), self.update_flags_.end(), [](bool x) { return x; }))
         {
-            std::printf("IRQ Vars:");
+            os::heapless::String<> s("Vars:");
+
             for (unsigned i = 0; i < NumVariables; i++)
             {
-                const bool updated = self.update_flags_[i];
-                const auto value = self.vars_[i];
-                self.update_flags_[i] = false;
-
-                std::printf("   %u/%s: %g", i, updated ? "new" : "old", double(value));
+                if (self.update_flags_[i])
+                {
+                    self.update_flags_[i] = false;
+                    s.concatenate("  ", i, ":", self.vars_[i]);
+                }
             }
-            std::puts("");
+
+            self.broadcast(s);
         }
+    }
+
+    /**
+     * Registers a method that will be invoked when a new message is generated.
+     */
+    static void addOutputCallback(const OutputCallback& cb)
+    {
+        os::MutexLocker locker(getMutex());
+
+        for (auto& x: getInstance().subscribers_)
+        {
+            if (!x)
+            {
+                x = cb;
+                return;
+            }
+        }
+
+        DEBUG_LOG("COULD NOT INSTALL IRQ OUTPUT HANDLER\n");
+        assert(false);
     }
 };
 

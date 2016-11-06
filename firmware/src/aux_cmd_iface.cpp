@@ -61,8 +61,10 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
     {
         assert(duration < WatchdogTimeout);
         watchdog_.reset();
+        foc::IRQDebugOutputBuffer::poll();
         ::usleep(unsigned(duration * 1e6F));
         watchdog_.reset();
+        foc::IRQDebugOutputBuffer::poll();
     }
 
     template <typename... Args>
@@ -177,6 +179,10 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
 
         // First things first
         g_param_cmd.set(CmdNone);
+
+        foc::IRQDebugOutputBuffer::addOutputCallback([](const char* const s) {
+            uavcan_node::log(uavcan_node::LogLevel::INFO, "IRQ", s);
+        });
 
         while (!os::isRebootRequested())
         {

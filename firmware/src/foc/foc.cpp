@@ -241,7 +241,7 @@ void beep(Const frequency, Const duration)
 void plotRealTimeValues()
 {
     g_debug_plotter.print();
-    IRQDebugOutputBuffer::printIfNeeded();
+    IRQDebugOutputBuffer::poll();
 }
 
 std::array<DebugKeyValueType, NumDebugKeyValuePairs> getDebugKeyValuePairs()
