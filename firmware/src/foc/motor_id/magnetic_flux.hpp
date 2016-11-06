@@ -160,6 +160,16 @@ public:
         }
 
         /*
+         * Phi computation (only if spinning fast enough to avoid division by zero)
+         */
+        if (angular_velocity_ > 1.0F)
+        {
+            Const new_phi = (Udq_.norm() - Idq_.norm() * result_.rs) / angular_velocity_;
+
+            phi_ += context_.board.pwm.period * (new_phi - phi_);
+        }
+
+        /*
          * Acceleration/measurement
          */
         if (angular_velocity_ < context_.params.motor_id.phi_estimation_electrical_angular_velocity)
@@ -170,19 +180,6 @@ public:
         }
         else
         {
-            {
-                Const new_phi = (Udq_.norm() - Idq_.norm() * result_.rs) / angular_velocity_;
-
-                if (phi_ > 0)
-                {
-                    phi_ += context_.board.pwm.period * (new_phi - phi_);
-                }
-                else
-                {
-                    phi_ = new_phi;
-                }
-            }
-
             if (Idq_[1] < min_Iq_)
             {
                 min_Iq_ = Idq_[1];
