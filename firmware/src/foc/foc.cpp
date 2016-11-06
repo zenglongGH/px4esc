@@ -35,6 +35,7 @@
 #include "hw_test/task.hpp"
 #include "motor_id/task.hpp"
 
+#include <unistd.h>
 
 /*
  * Documents:
@@ -44,6 +45,10 @@ namespace foc
 {
 namespace
 {
+
+chibios_rt::Mutex g_mutex;
+
+os::Logger g_logger("FOC");
 
 TaskContext g_context;
 
@@ -72,11 +77,63 @@ inline Scalar convertElectricalAngularVelocityToMechanicalRPM(Const eangvel)
                                                      g_context.params.motor.num_poles);
 }
 
+
+class Thread : public chibios_rt::BaseStaticThread<2048>
+{
+    static constexpr float WatchdogTimeout = 2.0F;
+
+    mutable os::watchdog::Timer watchdog_;
+
+    volatile bool plotting_enabled_ = false;
+
+
+    void main() override
+    {
+        watchdog_.startMSec(unsigned(WatchdogTimeout * 1e3F));
+
+        setName("foc_logger");
+
+        g_logger.puts("Started");
+
+        while (!os::isRebootRequested())
+        {
+            watchdog_.reset();
+
+            {
+                os::MutexLocker ml(g_mutex);
+
+                IRQDebugOutputBuffer::poll();
+
+                if (plotting_enabled_)
+                {
+                    g_debug_plotter.print();
+                }
+                else
+                {
+                    ::usleep(10000);
+                }
+            }
+        }
+
+        g_logger.puts("Goodbye");
+    }
+
+public:
+    virtual ~Thread() { }
+
+    void setPlottingEnabled(bool x)
+    {
+        plotting_enabled_ = x;
+    }
+} g_thread;
+
 } // namespace
 
 
 void init(const Parameters& params)
 {
+    os::MutexLocker ml(g_mutex);
+
     board::motor::beginCalibration();
 
     g_context.params = params;
@@ -88,6 +145,10 @@ void init(const Parameters& params)
         AbsoluteCriticalSectionLocker locker;
         g_task_handler.select<IdleTask>();
     }
+
+    IRQDebugOutputBuffer::addOutputCallback([](const char* s) { g_logger.println("IRQ: %s", s); });
+
+    g_thread.start(LOWPRIO);
 
     DEBUG_LOG("FOC sizeof: %u %u %u %u\n",
               sizeof(g_task_handler), sizeof(MotorIdentificationTask), sizeof(g_context), sizeof(g_context.params));
@@ -238,10 +299,15 @@ void beep(Const frequency, Const duration)
     g_task_handler.from<IdleTask>().to<BeepingTask>(frequency, duration);
 }
 
-void plotRealTimeValues()
+void addLogSink(const std::function<void (const char*)>& sink)
 {
-    g_debug_plotter.print();
-    IRQDebugOutputBuffer::poll();
+    os::MutexLocker ml(g_mutex);
+    IRQDebugOutputBuffer::addOutputCallback(sink);
+}
+
+void setPlottingEnabled(bool en)
+{
+    g_thread.setPlottingEnabled(en);
 }
 
 std::array<DebugKeyValueType, NumDebugKeyValuePairs> getDebugKeyValuePairs()
