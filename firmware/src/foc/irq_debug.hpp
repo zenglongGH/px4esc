@@ -102,6 +102,7 @@ public:
 
         if (const auto* s = self.string_ptr_)
         {
+            self.string_ptr_ = nullptr;
             std::printf("IRQ Message: %s\n", s);
         }
 
