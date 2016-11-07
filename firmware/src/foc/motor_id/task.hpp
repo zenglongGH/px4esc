@@ -108,7 +108,7 @@ public:
         sequence_length_ = sizeof...(TaskTypes);
         current_task_index_ = 0;
 
-        current_task_ = Tasks::findTypeByID(*this, current_task_index_);
+        current_task_ = Tasks::findTypeByID(*this, sequence_[0]);
     }
 
     bool selectNextTask()
@@ -117,7 +117,7 @@ public:
         {
             destroyCurrentTask();
             current_task_index_++;
-            current_task_ = Tasks::findTypeByID(*this, current_task_index_);
+            current_task_ = Tasks::findTypeByID(*this, sequence_[current_task_index_]);
             return true;
         }
         return false;
