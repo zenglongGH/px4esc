@@ -46,7 +46,7 @@ using board::motor::AbsoluteCriticalSectionLocker;
  */
 class MotorRunner final
 {
-    static constexpr unsigned IdqMovingAverageLength = 5;
+    static constexpr unsigned IdqMovingAverageLength = 10;
 
     static constexpr Scalar MaximumSpinupDurationFraction          = 1.5F;
     static constexpr Scalar SpinupAngularVelocityHysteresis        = 3.0F;
