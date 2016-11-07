@@ -164,7 +164,7 @@ Make extra sure the rotor is not connected to any mechanical load (e.g. propelle
 The motor itself must be mounted firmly, which is also absolutely required to ensure reliable identification.
 
 Start the motor identification process using your communication interface as described above.
-Make sure you're using identification in free rotation mode.
+Make sure you're performing full identification, i.e. use identification mode that estimates the most parameters.
 The LED will turn blue. The software will take a few minutes to examine the motor. Sit tight.
 During the process the motor may twitch, squeak, vibrate, and slowly rotate.
 **Make sure nothing unnecessary is in contact with the motor during identification.**
