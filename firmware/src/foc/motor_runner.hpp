@@ -182,8 +182,8 @@ public:
                     const bool reverse = isReversed();
                     const bool forward = !reverse;
 
-                    if ((forward && (regular_setpoint_.value <= 0)) ||
-                        (reverse && (regular_setpoint_.value >= 0)))
+                    if ((forward && !os::float_eq::positive(regular_setpoint_.value)) ||
+                        (reverse && !os::float_eq::negative(regular_setpoint_.value)))
                     {
                         state_ = State::Stopped;    // Setpoint zeroed or flipped, this is a deliberate stop
                     }
