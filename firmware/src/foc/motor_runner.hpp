@@ -310,7 +310,7 @@ public:
             Idq_[0],
             Idq_[1],
             regular_setpoint_.value,
-            observer_.getAngularVelocity()
+            observer_.getAngularVelocity() * 1e-3F      // Krad/sec
         };
     }
 

@@ -68,6 +68,30 @@ class SetpointController
     Const current_ramp_amp_s_;
     Const voltage_ramp_volt_s_;
 
+    static Scalar applySlopeControl(Const period,       ///< sec
+                                    Const ramp,         ///< units/sec
+                                    Const new_setpoint, ///< units
+                                    Const old_setpoint) ///< units
+    {
+        Const step = period * ramp;
+
+        if (std::abs(new_setpoint - old_setpoint) > step)
+        {
+            if (new_setpoint > old_setpoint)
+            {
+                return old_setpoint + step;
+            }
+            else
+            {
+                return old_setpoint - step;
+            }
+        }
+        else
+        {
+            return new_setpoint;
+        }
+    }
+
 public:
     SetpointController(Const max_current,
                        Const min_current,
@@ -114,15 +138,7 @@ public:
             }
             new_current = math::Range<>(-max_current_, max_current_).constrain(new_current);
 
-            // Applying the ramp
-            if (new_current > reference)
-            {
-                new_current = reference + current_ramp_amp_s_ * period;
-            }
-            else
-            {
-                new_current = reference - current_ramp_amp_s_ * period;
-            }
+            new_current = applySlopeControl(period, current_ramp_amp_s_, new_current, reference);
 
             // Constraining the minimums, only if the sign is the same and the setpoint is non-zero
             if (((new_current > 0) == (target_setpoint > 0)) && !zero_setpoint)
@@ -154,15 +170,7 @@ public:
             }
             new_voltage = math::Range<>(-max_voltage, max_voltage).constrain(new_voltage);
 
-            // Applying the ramp
-            if (new_voltage > reference)
-            {
-                new_voltage = reference + voltage_ramp_volt_s_ * period;
-            }
-            else
-            {
-                new_voltage = reference - voltage_ramp_volt_s_ * period;
-            }
+            new_voltage = applySlopeControl(period, voltage_ramp_volt_s_, new_voltage, reference);
 
             // Constraining the minimums, only if the sign is the same and the setpoint is non-zero
             if (((new_voltage > 0) == (target_setpoint > 0)) && !zero_setpoint)
