@@ -97,9 +97,11 @@ which serves as a rudimentary command execution interface.
 Writing the following numbers will trigger actions as defined:
 
 * 0..X - load a pre-defined motor model under the specified index.
-* 1000 - perform the hardware self-test.
-* 1001 - perform motor identification, static mode.
-* 1002 - perform motor identification, free rotation mode.
+* 1000..X - perform motor identification, modes are as follows:
+    * 1000 - resistance, inductance
+    * 1001 - flux linkage (requires resistance and inductance to be known)
+    * 1002 - resistance, inductance, flux linkage
+* 2000 - perform the hardware self-test.
 
 #### Connecting via CLI
 

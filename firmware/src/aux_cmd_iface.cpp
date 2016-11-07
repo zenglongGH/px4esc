@@ -37,12 +37,9 @@ namespace
 {
 
 constexpr int CmdNone                   = -1;
-
 constexpr int CmdLoadMotorParamsFromDB  = 0;
-
-constexpr int CmdHardwareTest           = 1000;
-constexpr int CmdMotorIDStatic          = 1001;
-constexpr int CmdMotorIDRotating        = 1002;
+constexpr int CmdMotorIDBase            = 1000;
+constexpr int CmdHardwareTest           = 2000;
 
 
 os::config::Param<int> g_param_cmd("exec_aux_command", -1, -1, 9999);
@@ -151,17 +148,14 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
         {
             doLoadMotorParams(unsigned(cmd - CmdLoadMotorParamsFromDB));
         }
+        else if (cmd >= CmdMotorIDBase &&
+                 cmd < (CmdMotorIDBase + int(foc::motor_id::NumModes)))
+        {
+            doMotorID(static_cast<foc::motor_id::Mode>(cmd - CmdMotorIDBase));
+        }
         else if (cmd == CmdHardwareTest)
         {
             doHardwareTest();
-        }
-        else if (cmd == CmdMotorIDStatic)
-        {
-            doMotorID(foc::motor_id::Mode::Static);
-        }
-        else if (cmd == CmdMotorIDRotating)
-        {
-            doMotorID(foc::motor_id::Mode::RotationWithoutMechanicalLoad);
         }
         else
         {

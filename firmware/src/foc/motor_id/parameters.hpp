@@ -46,15 +46,24 @@ enum class Mode
      * In this mode, the motor will not rotate, therefore it doesn't matter what load it is connected to.
      * Estimated parameters: Rs, L.
      */
-    Static,
+    R_L,
 
     /**
      * In this mode, the motor WILL SPIN.
      * In order to achieve correct results, the motor MUST NOT BE CONNECTED TO ANY MECHANICAL LOAD.
+     * Estimated parameters: Phi.
+     * Parameters Rs and L MUST BE KNOWN (see the previoous mode).
+     */
+    Phi,
+
+    /**
+     * This mode combines R_L and Phi.
      * Estimated parameters: Rs, L, Phi.
      */
-    RotationWithoutMechanicalLoad
+    R_L_Phi
 };
+
+static constexpr unsigned NumModes = 3;     ///< Please maintain this carefully
 
 /**
  * Parameters used by the motor parameters estimator logic.

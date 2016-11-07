@@ -209,12 +209,17 @@ public:
             // Note that we're not taking a critical section here.
             switch (mode_)
             {
-            case Mode::Static:
+            case Mode::R_L:
             {
                 sequencer_.setSequence<ResistanceTask, InductanceTask>();
                 break;
             }
-            case Mode::RotationWithoutMechanicalLoad:
+            case Mode::Phi:
+            {
+                sequencer_.setSequence<FluxLinkageTask, FluxLinkageVarianceTask>();
+                break;
+            }
+            case Mode::R_L_Phi:
             {
                 sequencer_.setSequence<ResistanceTask, InductanceTask, FluxLinkageTask, FluxLinkageVarianceTask>();
                 break;

@@ -344,7 +344,7 @@ class SpinCommand : public os::shell::ICommandHandler
                      "This command is inteneded for testing and debugging purposes. Usage:");
             ios.print("\t%s <angular velocity, rad/sec electrical> [voltage magnitude] [-p]\n"
                       "Voltage magnitude defaults to %.fV. Press any key to stop rotation.\n"
-                      "Option -p will plot the real time values.\n",
+                      "Option -p will plot real time data.\n",
                       argv[0], double(DefaultVoltage));
             return;
         }
@@ -477,7 +477,7 @@ class SetpointCommand : public os::shell::ICommandHandler
                      " - v      Voltage\n"
                      " - (none) Ratiometric Voltage");
             ios.puts("Execute without arguments to stop the motor.");
-            ios.puts("Option -p will plot the real time values.");
+            ios.puts("Option -p will plot real time data.");
             ios.print("\t%s [setpoint=0 [a|ra|v] [-p]]\n", argv[0]);
             return;
         }
@@ -623,9 +623,10 @@ class MotorIdentificationCommand : public os::shell::ICommandHandler
     {
         if (argc <= 1)
         {
-            ios.print("Perform motor identification using the specified mode.\n");
-            ios.print("Option -p will plot the real time values.\n");
-            ios.print("\t%s static|rotating [-p]\n", argv[0]);
+            ios.puts("Perform motor identification using the specified mode.");
+            ios.puts("Option -p will plot real time data.");
+            ios.print("\t%s r_l | phi | r_l_phi [-p]\n", argv[0]);
+            ios.puts("Use mode r_l_phi to perform full identification.");
             return;
         }
 
@@ -643,16 +644,11 @@ class MotorIdentificationCommand : public os::shell::ICommandHandler
         }
 
         // Parsing mode
-        const os::heapless::String<> mode_string(argv[1]);
+        const os::heapless::String<20> mode_string(argv[1]);
         foc::motor_id::Mode mode{};
-        if (mode_string == "static")
-        {
-            mode = foc::motor_id::Mode::Static;
-        }
-        else if (mode_string == "rotating")
-        {
-            mode = foc::motor_id::Mode::RotationWithoutMechanicalLoad;
-        }
+        if      (mode_string.toLowerCase() == "r_l")        { mode = foc::motor_id::Mode::R_L;      }
+        else if (mode_string.toLowerCase() == "phi")        { mode = foc::motor_id::Mode::Phi;      }
+        else if (mode_string.toLowerCase() == "r_l_phi")    { mode = foc::motor_id::Mode::R_L_Phi;  }
         else
         {
             ios.print("ERROR: Invalid identification mode: %s\n", mode_string.c_str());
