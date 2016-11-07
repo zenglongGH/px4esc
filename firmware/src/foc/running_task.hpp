@@ -419,7 +419,8 @@ public:
             }
         }
 
-        // TODO: Return Dmitry's formula back
+        out.back() = board::motor::getInverterVoltage();
+
         return out;
     }
 
