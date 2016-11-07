@@ -88,7 +88,7 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
             "HW test result: %s", report.toString().c_str());
     }
 
-    void doMotorID(foc::motor_id::Mode mode) const
+    void doMotorID(const foc::motor_id::Mode mode) const
     {
         // Aborting immediately if busy
         if (!foc::isInactive())
@@ -108,6 +108,7 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
         }
 
         // Identification
+        DEBUG_LOG("%s: Motor ID mode %d\n", g_logger.getName(), int(mode));
         foc::beginMotorIdentification(mode);
 
         while (foc::isMotorIdentificationInProgress())
@@ -159,7 +160,7 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
         }
         else
         {
-            g_logger.println("INVALID COMMAND %d", cmd);
+            log(uavcan_node::LogLevel::ERROR, "Invalid command %d", cmd);
         }
     }
 
@@ -179,7 +180,6 @@ class Thread : public chibios_rt::BaseStaticThread<2048>
             const auto cmd = g_param_cmd.get();
             if (cmd >= 0)
             {
-                DEBUG_LOG("%s: %d\n", g_logger.getName(), cmd);
                 g_param_cmd.set(CmdNone);
                 execute(cmd);
             }
