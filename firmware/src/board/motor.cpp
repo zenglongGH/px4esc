@@ -59,7 +59,7 @@ static_assert(MainIRQPriority < CORTEX_PRIORITY_SVCALL, "Main IRQ must be able t
  */
 constexpr float MainIRQMinPeriod = 65e-6F;
 
-constexpr float InverterVoltageInnovationWeight = 0.1F;         ///< Has to account for possible aliasing effect
+constexpr float InverterVoltageInnovationWeight = 0.01F;        ///< Has to account for possible aliasing effect
 constexpr float TemperatureInnovationWeight     = 0.001F;       ///< The input is noisy, high damping is necessary
 
 /*
