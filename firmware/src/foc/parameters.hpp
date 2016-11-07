@@ -81,6 +81,13 @@ struct MotorParameters
     Scalar phi = 0;
 
     /**
+     * Dependency of the flux linkage on quadrature current, expressed in weber per ampere, which is henry.
+     * Positive value means that the flux linkage decreases with higher current.
+     * Zero means that the flux linkage and current are independent, which is the default assumption.
+     */
+    Scalar phi_degradation_henry = 0;
+
+    /**
      * Phase resistance (half of phase-to-phase resistance) at the typical working temperature. [ohm]
      * This is a mandatory parameter; it can be estimated using the motor identification procedure.
      */
@@ -115,6 +122,12 @@ struct MotorParameters
     {
         return {   0.02e-3F,
                  100.00e-3F };
+    }
+
+    static math::Range<> getPhiDegradationHenryLimits()
+    {
+        return { 0.0F,
+                 1.0e-3F };
     }
 
     static math::Range<> getRsLimits()
@@ -172,19 +185,20 @@ struct MotorParameters
         static const auto is_positive = [](Const x) { return (x > 0) && std::isfinite(x); };
 
         return
-            (num_poles >= 2)                         &&
-            (num_poles % 2 == 0)                     &&
-            is_positive(max_current)                 &&
-            is_positive(min_current)                 &&
-            is_positive(spinup_current)              &&
-            (max_current > min_current)              &&
-            (max_current >= spinup_current)          &&
-            (spinup_current > min_current)           &&
-            getPhiLimits().contains(phi)             &&
-            getRsLimits().contains(rs)               &&
-            getLqLimits().contains(lq)               &&
-            is_positive(min_electrical_ang_vel)      &&
-            is_positive(current_ramp_amp_per_s)      &&
+            (num_poles >= 2)                                                        &&
+            (num_poles % 2 == 0)                                                    &&
+            is_positive(max_current)                                                &&
+            is_positive(min_current)                                                &&
+            is_positive(spinup_current)                                             &&
+            (max_current > min_current)                                             &&
+            (max_current >= spinup_current)                                         &&
+            (spinup_current > min_current)                                          &&
+            getPhiDegradationHenryLimits().contains(phi_degradation_henry)          &&
+            getPhiLimits().contains(phi)                                            &&
+            getRsLimits().contains(rs)                                              &&
+            getLqLimits().contains(lq)                                              &&
+            is_positive(min_electrical_ang_vel)                                     &&
+            is_positive(current_ramp_amp_per_s)                                     &&
             is_positive(voltage_ramp_volt_per_s);
     }
 
@@ -211,6 +225,7 @@ struct MotorParameters
             "Imin : %-7.2f A\n"
             "Ispup: %-7.2f A\n"
             "Phi  : %-7.3f mWb, %.1f RPMM/V\n"
+            "PhiDI: %-7.3f mH\n"
             "Rs   : %-7.3f Ohm\n"
             "Lq   : %-7.2f uH\n"
             "Wmin : %-7.1f rad/s, %.1f RPMM\n"
@@ -222,6 +237,7 @@ struct MotorParameters
             double(min_current),
             double(spinup_current),
             double(phi) * 1e3, double(kv),
+            double(phi_degradation_henry) * 1e3,
             double(rs),
             double(lq) * 1e6,
             double(min_electrical_ang_vel), double(min_rpmm),

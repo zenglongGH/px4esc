@@ -115,7 +115,8 @@ enum class DirectionConstraint
  */
 class Observer
 {
-    Scalar phi_;
+    Const phi_;
+    Const phi_degradation_henry_;
     Const ld_;
     Const lq_;
     Const r_;
@@ -138,15 +139,11 @@ class Observer
 
 public:
     Observer(const Parameters& parameters,
-             Const field_flux,
+             Const flux_linkage,
+             Const flux_linkage_degradation_henry,
              Const stator_phase_inductance_direct,
              Const stator_phase_inductance_quadrature,
              Const stator_phase_resistance);
-
-    void setPhi(Const p)
-    {
-        phi_ = p;
-    }
 
     void update(Const dt,
                 const Vector<2>& idq,

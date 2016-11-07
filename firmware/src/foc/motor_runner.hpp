@@ -111,6 +111,7 @@ public:
 
         observer_(observer_params,
                   motor_params.phi,
+                  motor_params.phi_degradation_henry,
                   motor_params.lq,      // TODO: MOVE THE ASSUMPTION THAT Lq = Ld INTO THE OBSERVER
                   motor_params.lq,
                   motor_params.rs),

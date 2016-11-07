@@ -36,12 +36,14 @@ using math::makeRow;
 
 
 Observer::Observer(const Parameters& parameters,
-                   Const field_flux,
+                   Const flux_linkage,
+                   Const flux_linkage_degradation_henry,
                    Const stator_phase_inductance_direct,
                    Const stator_phase_inductance_quadrature,
                    Const stator_phase_resistance) :
     // Motor model
-    phi_(field_flux),
+    phi_(flux_linkage),
+    phi_degradation_henry_(flux_linkage_degradation_henry),
     ld_(stator_phase_inductance_direct),
     lq_(stator_phase_inductance_quadrature),
     r_(stator_phase_resistance),
@@ -83,13 +85,14 @@ void Observer::update(Const dt,
     Const ud = udq[0];
     Const uq = udq[1];
     Const R = r_;
-    Const Fi = phi_;
 
     /*
-     * Copy-pasted from Matlab source with minor syntax changes.
+     * Mostly copy-pasted from Matlab source with minor syntax changes.
      */
     Const w = x_[StateIndexAngularVelocity];
     Const Theta = x_[StateIndexAngularPosition];
+
+    Const Fi = phi_ - std::min(phi_ * 0.5F, phi_degradation_henry_ * std::abs(idq[1]));
 
     Const Td = Ld / R;
     Const Tq = Lq / R;

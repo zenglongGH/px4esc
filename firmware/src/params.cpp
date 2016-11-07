@@ -59,7 +59,11 @@ Natural g_num_poles       ("m.num_poles",       0,                              
 Real g_max_current        ("m.max_ampere",      0.0F,                         0.0F,      200.0F);
 Real g_min_current        ("m.min_ampere",      0.0F,                         0.0F,       50.0F);
 Real g_spinup_current     ("m.spinup_ampere",   0.0F,                         0.0F,       50.0F);
-Real g_field_flux         ("m.phi_milliweber",  0.0F,                         0.0F, D::getPhiLimits().max * 1e3F);
+Real g_flux_linkage       ("m.phi_milliweber",  0.0F,                         0.0F, D::getPhiLimits().max * 1e3F);
+Real g_flux_linkage_degrad("m.phi_degrad_mh",
+                           D().phi_degradation_henry * 1e3F,
+                           D::getPhiDegradationHenryLimits().min * 1e3F,
+                           D::getPhiDegradationHenryLimits().max * 1e3F);
 Real g_phase_resistance   ("m.rs_ohm",          0.0F,                         0.0F, D::getRsLimits().max);
 Real g_inductance_quadr   ("m.lq_microhenry",   0.0F,                         0.0F, D::getLqLimits().max * 1e6F);
 Real g_min_electr_ang_vel ("m.min_eradsec",     D().min_electrical_ang_vel,  10.0F,     1000.0F);
@@ -142,9 +146,10 @@ foc::Parameters readFOCParameters()
         out.motor.max_current             = g_max_current.get();
         out.motor.min_current             = g_min_current.get();
         out.motor.spinup_current          = g_spinup_current.get();
-        out.motor.phi                     = g_field_flux.get() * 1e-3F;
+        out.motor.phi                     = g_flux_linkage.get()        * 1e-3F;
+        out.motor.phi_degradation_henry   = g_flux_linkage_degrad.get() * 1e-3F;
         out.motor.rs                      = g_phase_resistance.get();
-        out.motor.lq                      = g_inductance_quadr.get() * 1e-6F;
+        out.motor.lq                      = g_inductance_quadr.get()    * 1e-6F;
         out.motor.min_electrical_ang_vel  = g_min_electr_ang_vel.get();
         out.motor.current_ramp_amp_per_s  = g_current_ramp.get();
         out.motor.voltage_ramp_volt_per_s = g_voltage_ramp.get();
@@ -236,9 +241,10 @@ void writeMotorParameters(const foc::MotorParameters& obj)
     assign(g_max_current,        obj.max_current);
     assign(g_min_current,        obj.min_current);
     assign(g_spinup_current,     obj.spinup_current);
-    assign(g_field_flux,         obj.phi * 1e3F);
+    assign(g_flux_linkage,       obj.phi                    * 1e3F);
+    assign(g_flux_linkage_degrad,obj.phi_degradation_henry  * 1e3F);
     assign(g_phase_resistance,   obj.rs);
-    assign(g_inductance_quadr,   obj.lq * 1e6F);
+    assign(g_inductance_quadr,   obj.lq                     * 1e6F);
     assign(g_min_electr_ang_vel, obj.min_electrical_ang_vel);
     assign(g_current_ramp,       obj.current_ramp_amp_per_s);
     assign(g_voltage_ramp,       obj.voltage_ramp_volt_per_s);
