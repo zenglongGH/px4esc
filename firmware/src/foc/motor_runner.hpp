@@ -70,7 +70,7 @@ public:
 
     using Setpoint = Modulator::Setpoint;
 
-    using DebugVariables = std::array<Scalar, 6>;
+    using DebugVariables = std::array<Scalar, 7>;
 
 private:
     const ControllerParameters controller_params_;
@@ -304,12 +304,14 @@ public:
     DebugVariables getDebugVariables() const
     {
         AbsoluteCriticalSectionLocker locker;
+        const auto estimated_Idq = observer_.getIdq();
         return {
             reference_Udq_[0],
             reference_Udq_[1],
             Idq_[0],
             Idq_[1],
-            regular_setpoint_.value,
+            estimated_Idq[0],
+            estimated_Idq[1],
             observer_.getAngularVelocity() * 1e-3F      // Krad/sec
         };
     }

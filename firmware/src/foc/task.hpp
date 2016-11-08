@@ -72,7 +72,7 @@ protected:
     ITask() { }
 
 public:
-    static constexpr unsigned NumDebugVariables = 7;
+    static constexpr unsigned NumDebugVariables = 8;
 
     /**
      * Task update result.

@@ -177,7 +177,7 @@ public:
 class IRQDebugPlotter
 {
 public:
-    static constexpr unsigned NumVariables = 7;
+    static constexpr unsigned NumVariables = 8;
 
 private:
     std::array<Scalar, NumVariables> vars_ = {};
@@ -217,7 +217,7 @@ public:
             vars_copy = vars_;
         }
 
-        std::printf("$%.4f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
+        std::printf("$%.4f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
                     double(getAbsoluteTimeInSeconds()),
                     double(vars_copy[0]),
                     double(vars_copy[1]),
@@ -225,7 +225,8 @@ public:
                     double(vars_copy[3]),
                     double(vars_copy[4]),
                     double(vars_copy[5]),
-                    double(vars_copy[6]));
+                    double(vars_copy[6]),
+                    double(vars_copy[7]));
     }
 };
 
