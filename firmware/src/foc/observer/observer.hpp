@@ -115,7 +115,7 @@ enum class DirectionConstraint
  */
 class Observer
 {
-    Scalar phi_;
+    Const phi_;
     Const ld_;
     Const lq_;
     Const r_;
@@ -143,16 +143,13 @@ public:
              Const stator_phase_inductance_quadrature,
              Const stator_phase_resistance);
 
-    void setPhi(Const p)
-    {
-        phi_ = p;
-    }
-
     void update(Const dt,
                 const Vector<2>& idq,
                 const Vector<2>& udq);
 
     void setDirectionConstraint(DirectionConstraint dc) { direction_constraint_ = dc; }
+
+    const Matrix<4, 4>& getP() const { return P_; }
 
     Vector<2> getIdq() const { return x_.block<2, 1>(0, 0); }
 
