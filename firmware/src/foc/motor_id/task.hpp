@@ -28,7 +28,7 @@
 #include "resistance.hpp"
 #include "inductance.hpp"
 #include "flux_linkage.hpp"
-#include "flux_linkage_variance.hpp"
+#include "fine_tuning.hpp"
 
 
 namespace foc
@@ -185,7 +185,7 @@ class MotorIdentificationTask : public ITask
     < ResistanceTask
     , InductanceTask
     , FluxLinkageTask
-    , FluxLinkageVarianceTask
+    , FineTuningTask
     > sequencer_;
 
     bool started_ = false;
@@ -216,12 +216,12 @@ public:
             }
             case Mode::Phi:
             {
-                sequencer_.setSequence<FluxLinkageTask, FluxLinkageVarianceTask>();
+                sequencer_.setSequence<FluxLinkageTask, FineTuningTask>();
                 break;
             }
             case Mode::R_L_Phi:
             {
-                sequencer_.setSequence<ResistanceTask, InductanceTask, FluxLinkageTask, FluxLinkageVarianceTask>();
+                sequencer_.setSequence<ResistanceTask, InductanceTask, FluxLinkageTask, FineTuningTask>();
                 break;
             }
             default:

@@ -34,12 +34,12 @@ namespace foc
 namespace motor_id
 {
 
-class FluxLinkageVarianceTask : public ISubTask
+class FineTuningTask : public ISubTask
 {
-    // Acceleration during the measurement phase shold be very slow in order to reduce phase delay of the filters.
-    static constexpr Scalar AccelerationDurationSec         = 40.0F;
-    static constexpr Scalar InitialRelativeVoltageSetpoint  = 0.1F;     // Starting with 10% power
-    static constexpr Scalar RelativeMinimumLowerPhi         = 0.5F;
+    static constexpr Scalar AccelerationDurationSec         = 10.0F;
+    static constexpr Scalar InitialRelativeSetpoint         = 0.1F;     // Starting with 10% power
+    static constexpr Scalar RelativeMinimumLowerPhi         = 0.6F;
+    static constexpr Scalar PhiReductionPerAttempt          = 0.03F;
     static constexpr Scalar DelayBetweenAttempts            = 1.0F;
 
     SubTaskContextReference context_;
@@ -47,40 +47,35 @@ class FluxLinkageVarianceTask : public ISubTask
 
     Status status_ = Status::InProgress;
 
-    Vector<2> Udq_ = Vector<2>::Zero();
-
-    Scalar lower_phi_ = 0;
-    Scalar lower_phi_current_ = 0;
-
     Scalar remaining_delay_ = DelayBetweenAttempts;
 
     volatile bool processing_enabled_ = false;
 
     os::helpers::LazyConstructor<MotorRunner, os::helpers::MemoryInitializationPolicy::NoInit> runner_;
 
-    void constructRunner(Const phi)
+    MotorRunner::Setpoint setpoint_;
+
+    int remaining_attempts_ = 10;
+
+    void constructRunner()
     {
         runner_.destroy();
 
         auto ctl_params = context_.params.controller;
         ctl_params.voltage_modulator_cross_coupling_inductance_compensation = false;    // Forcing compensation OFF
 
-        auto model = result_;
-        model.phi = phi;
-
         runner_.construct(ctl_params,
-                          model,
+                          result_,
                           context_.params.observer,
                           context_.board.pwm,
                           MotorRunner::Direction::Forward);
     }
 
 public:
-    FluxLinkageVarianceTask(SubTaskContextReference context,
-                            const MotorParameters& initial_parameters) :
+    FineTuningTask(SubTaskContextReference context,
+                   const MotorParameters& initial_parameters) :
         context_(context),
-        result_(initial_parameters),
-        lower_phi_(initial_parameters.phi)
+        result_(initial_parameters)
     {
         if (!context_.params.motor_id.isValid() ||
             !result_.getRsLimits().contains(result_.rs) ||
@@ -106,59 +101,45 @@ public:
             processing_enabled_ = false;
             context_.reportDebugVariables({});
 
-            Udq_[0] = 0.0F;
-            Udq_[1] = InitialRelativeVoltageSetpoint * hw_status.inverter_voltage;  // Back to the beginning
+            setpoint_.mode = setpoint_.Mode::Iq;
+            setpoint_.value = InitialRelativeSetpoint * result_.max_current;  // Back to the beginning
 
-            constructRunner(lower_phi_);
+            constructRunner();
 
             return;     // Can't do much else on this cycle, we don't want the IRQ to stretch forever
         }
 
-        const Vector<2> Idq = runner_->getIdq();
+        {
+            const Vector<2> Udq = runner_->getUdq();
+            const Vector<2> Idq = runner_->getIdq();
 
-        context_.reportDebugVariables({
-            Udq_[0],
-            Udq_[1],
-            Idq[0],
-            Idq[1],
-            runner_->getElectricalAngularVelocity(),
-            lower_phi_ * 1e3F
-        });
+            context_.reportDebugVariables({
+                Udq[0],
+                Udq[1],
+                Idq[0],
+                Idq[1],
+                runner_->getElectricalAngularVelocity(),
+                result_.phi * 1e3F
+            });
+        }
 
-        Udq_[1] += (hw_status.inverter_voltage / AccelerationDurationSec) * period;
-        if (Udq_[1] >= hw_status.inverter_voltage)
+        setpoint_.value += (result_.max_current / AccelerationDurationSec) * period;
+        if (setpoint_.value >= result_.max_current)
         {
             runner_.destroy();
-
-            // TODO: Phi variance computation
-
             status_ = Status::Succeeded;
             return;
         }
-
-        if (lower_phi_ / result_.phi < RelativeMinimumLowerPhi)
-        {
-            status_ = Status::Failed;   // Lower phi is too low
-            return;
-        }
-
-        runner_->setSetpoint({ Udq_[1], MotorRunner::Setpoint::Mode::Uq });
+        runner_->setSetpoint(setpoint_);
 
         processing_enabled_ = true;
-
         runner_->updateStateEstimation(period, hw_status);
-
-        Udq_[0] += period * 10.0F * (runner_->getUdq()[0] - Udq_[0]);
 
         AbsoluteCriticalSectionLocker locker;
 
         switch (runner_->getState())
         {
         case MotorRunner::State::Spinup:
-        {
-            break;
-        }
-
         case MotorRunner::State::Running:
         {
             break;
@@ -176,11 +157,19 @@ public:
             runner_.destroy();
             remaining_delay_ = DelayBetweenAttempts;
 
-            lower_phi_ *= 0.96F;
+            if (remaining_attempts_ == 0)
+            {
+                status_ = Status::Failed;
+            }
+            else
+            {
+                remaining_attempts_--;
 
-            IRQDebugOutputBuffer::setStringPointerFromIRQ("Stalled; trying lower phi");
-            IRQDebugOutputBuffer::setVariableFromIRQ<0>(result_.phi);
-            IRQDebugOutputBuffer::setVariableFromIRQ<1>(lower_phi_);
+                result_.phi -= result_.phi * PhiReductionPerAttempt;
+
+                IRQDebugOutputBuffer::setStringPointerFromIRQ("Stalled; trying lower phi");
+                IRQDebugOutputBuffer::setVariableFromIRQ<0>(result_.phi);
+            }
             break;
         }
         }
