@@ -23,6 +23,7 @@
  */
 
 #include "observer.hpp"
+#include <zubax_chibios/os.hpp>
 
 
 namespace foc
@@ -36,31 +37,33 @@ using math::makeRow;
 
 
 Observer::Observer(const Parameters& parameters,
-                   Const field_flux,
+                   Const flux_linkage,
                    Const stator_phase_inductance_direct,
                    Const stator_phase_inductance_quadrature,
                    Const stator_phase_resistance) :
     // Motor model
-    phi_(field_flux),
+    phi_(flux_linkage),
     ld_(stator_phase_inductance_direct),
     lq_(stator_phase_inductance_quadrature),
     r_(stator_phase_resistance),
 
     // Filter constants
     cross_coupling_comp_(parameters.cross_coupling_compensation),
-    Q_(parameters.Q),
-    R_(parameters.R),
     C_(makeMatrix(makeRow(1, 0, 0, 0),
                   makeRow(0, 1, 0, 0))),
 
     // Filter state
-    P_(parameters.P0)
+    P_(parameters.P0),
+    Q_(parameters.Q),
+    R_(parameters.R),
+
+    z_covariance_(Matrix<2, 2>::Identity())
 {
-    assert(std::isfinite(phi_));
-    assert(std::isfinite(ld_));
-    assert(std::isfinite(lq_));
-    assert(std::isfinite(r_));
-    assert(std::isfinite(cross_coupling_comp_));
+    ASSERT_ALWAYS(os::float_eq::positive(phi_)  &&
+                  os::float_eq::positive(ld_)   &&
+                  os::float_eq::positive(lq_)   &&
+                  os::float_eq::positive(r_)    &&
+                  !os::float_eq::negative(cross_coupling_comp_));
 }
 
 
@@ -115,7 +118,24 @@ void Observer::update(Const dt,
 
     const Matrix<4, 2> K = Pout * C_.transpose() * (C_ * Pout * C_.transpose() + R_).inverse();
 
-    x_ = Xout + K * (y - C_ * Xout);
+    const Vector<2> z = y - C_ * Xout;
+
+    z_covariance_.update(z * z.transpose());
+    const Matrix<2, 2> z_cov = z_covariance_.getValue();
+
+    Q_ = K * z_cov * K.transpose();
+//    R_ = z_cov - C_ * Pout.inverse() * C_.transpose();    // This is horribly slow because of the inverse
+
+    // TODO rewrite properly
+    Q_(0, 0) = math::Range<>(  0.01F,   100.0F).constrain(Q_(0, 0));
+    Q_(1, 1) = math::Range<>(  0.01F,   100.0F).constrain(Q_(1, 1));
+    Q_(2, 2) = math::Range<>(100.0F,  10000.0F).constrain(Q_(2, 2));
+    Q_(3, 3) = math::Range<>(  0.1F,    100.0F).constrain(Q_(3, 3));
+
+//    R_(0, 0) = math::Range<>(  0.01F,   100.0F).constrain(R_(0, 0));
+//    R_(1, 1) = math::Range<>(  0.01F,   100.0F).constrain(R_(1, 1));
+
+    x_ = Xout + K * z;
     x_[StateIndexAngularPosition] = math::normalizeAngle(x_[StateIndexAngularPosition]);
 
     P_ = (Matrix<4, 4>::Identity() - K * C_) * Pout;

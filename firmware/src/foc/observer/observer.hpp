@@ -103,9 +103,9 @@ struct Parameters
  */
 enum class DirectionConstraint
 {
-    None,   //!< None
-    Forward,//!< Forward
-    Reverse //!< Reverse
+    None,
+    Forward,
+    Reverse
 };
 
 /**
@@ -125,9 +125,6 @@ class Observer
 
     Const cross_coupling_comp_;
 
-    const Matrix<4, 4> Q_;
-    const Matrix<2, 2> R_;
-
     const Matrix<2, 4> C_;
 
     DirectionConstraint direction_constraint_ = DirectionConstraint::None;
@@ -136,9 +133,14 @@ class Observer
     Vector<4> x_ = Vector<4>::Zero();
     Matrix<4, 4> P_;
 
+    Matrix<4, 4> Q_;
+    Matrix<2, 2> R_;
+
+    math::SimpleMovingAverageFilter<100, Matrix<2, 2>> z_covariance_;
+
 public:
     Observer(const Parameters& parameters,
-             Const field_flux,
+             Const flux_linkage,
              Const stator_phase_inductance_direct,
              Const stator_phase_inductance_quadrature,
              Const stator_phase_resistance);
