@@ -892,7 +892,17 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
     checkInvariants();
 
     // This check allows to catch majority of cases when we skip an IRQ. The multiplier was very carefully crafted.
-    assert(time_stat_updater.getElapsedTime() < (g_pwm_params.period * 1.8F));
+#if DEBUG_BUILD
+    {
+        const float elapsed = time_stat_updater.getElapsedTime();
+        const float limit = g_pwm_params.period * 1.9F;
+        if (elapsed > limit)
+        {
+            chibios_rt::System::halt(os::heapless::concatenate(
+                "FAST IRQ TOO LONG: ", elapsed * 1e6F, "us > ", limit * 1e6F, "us").c_str());
+        }
+    }
+#endif
 }
 
 /// MAIN IRQ (every N-th PWM period)
@@ -904,7 +914,8 @@ CH_FAST_IRQ_HANDLER(STM32_TIM8_CC_HANDLER)
 
     board::RAIIToggler<board::setTestPointA> tp_toggler;
 
-    handleMainIRQ(g_pwm_params.period * float(g_fast_irq_to_main_irq_period_ratio));
+    const float period = g_pwm_params.period * float(g_fast_irq_to_main_irq_period_ratio);
+    handleMainIRQ(period);
 
     /*
      * Temperature processing.
@@ -918,8 +929,17 @@ CH_FAST_IRQ_HANDLER(STM32_TIM8_CC_HANDLER)
     }
 
     // This check allows to catch majority of cases when we skip an IRQ. The multiplier was very carefully crafted.
-    assert(time_stat_updater.getElapsedTime() <
-           (g_pwm_params.period * float(g_fast_irq_to_main_irq_period_ratio) * 1.5F));
+#if DEBUG_BUILD
+    {
+        const float elapsed = time_stat_updater.getElapsedTime();
+        const float limit = period * 1.5F;
+        if (elapsed > limit)
+        {
+            chibios_rt::System::halt(os::heapless::concatenate(
+                "MAIN IRQ TOO LONG: ", elapsed * 1e6F, "us > ", limit * 1e6F, "us").c_str());
+        }
+    }
+#endif
 }
 
 }
