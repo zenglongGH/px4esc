@@ -156,6 +156,8 @@ public:
         {
             target_.updateWithNewMeasurement(measurer_.sample());
         }
+
+        float getElapsedTime() const { return measurer_.sample(); }
     };
 };
 
@@ -888,6 +890,9 @@ CH_FAST_IRQ_HANDLER(STM32_ADC_HANDLER)
     ADC1->SR = 0;               // Reset the IRQ flags
 
     checkInvariants();
+
+    // This check allows to catch majority of cases when we skip an IRQ. The multiplier was very carefully crafted.
+    assert(time_stat_updater.getElapsedTime() < (g_pwm_params.period * 1.8F));
 }
 
 /// MAIN IRQ (every N-th PWM period)
@@ -911,6 +916,10 @@ CH_FAST_IRQ_HANDLER(STM32_TIM8_CC_HANDLER)
         g_inverter_temperature_sensor_voltage +=
             TemperatureInnovationWeight * (new_temperature - g_inverter_temperature_sensor_voltage);
     }
+
+    // This check allows to catch majority of cases when we skip an IRQ. The multiplier was very carefully crafted.
+    assert(time_stat_updater.getElapsedTime() <
+           (g_pwm_params.period * float(g_fast_irq_to_main_irq_period_ratio) * 1.5F));
 }
 
 }
