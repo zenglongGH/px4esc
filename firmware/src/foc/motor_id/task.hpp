@@ -216,10 +216,20 @@ public:
             }
             case Mode::Phi:
             {
-                sequencer_.setSequence<FluxLinkageTask, FineTuningTask>();
+                sequencer_.setSequence<FluxLinkageTask>();
+                break;
+            }
+            case Mode::FineTuning:
+            {
+                sequencer_.setSequence<FineTuningTask>();
                 break;
             }
             case Mode::R_L_Phi:
+            {
+                sequencer_.setSequence<ResistanceTask, InductanceTask, FluxLinkageTask>();
+                break;
+            }
+            case Mode::R_L_Phi_FineTuning:
             {
                 sequencer_.setSequence<ResistanceTask, InductanceTask, FluxLinkageTask, FineTuningTask>();
                 break;

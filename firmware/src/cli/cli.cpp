@@ -625,8 +625,8 @@ class MotorIdentificationCommand : public os::shell::ICommandHandler
         {
             ios.puts("Perform motor identification using the specified mode.");
             ios.puts("Option -p will plot real time data.");
-            ios.print("\t%s r_l | phi | r_l_phi [-p]\n", argv[0]);
-            ios.puts("Use mode r_l_phi to perform full identification.");
+            ios.print("\t%s r_l | phi | fine | r_l_phi | r_l_phi_fine [-p]\n", argv[0]);
+            ios.puts("Use mode r_l_phi_fine to perform full identification.");
             return;
         }
 
@@ -646,9 +646,11 @@ class MotorIdentificationCommand : public os::shell::ICommandHandler
         // Parsing mode
         const os::heapless::String<20> mode_string(argv[1]);
         foc::motor_id::Mode mode{};
-        if      (mode_string.toLowerCase() == "r_l")        { mode = foc::motor_id::Mode::R_L;      }
-        else if (mode_string.toLowerCase() == "phi")        { mode = foc::motor_id::Mode::Phi;      }
-        else if (mode_string.toLowerCase() == "r_l_phi")    { mode = foc::motor_id::Mode::R_L_Phi;  }
+        if      (mode_string.toLowerCase() == "r_l")            { mode = foc::motor_id::Mode::R_L;                  }
+        else if (mode_string.toLowerCase() == "phi")            { mode = foc::motor_id::Mode::Phi;                  }
+        else if (mode_string.toLowerCase() == "fine")           { mode = foc::motor_id::Mode::FineTuning;           }
+        else if (mode_string.toLowerCase() == "r_l_phi")        { mode = foc::motor_id::Mode::R_L_Phi;              }
+        else if (mode_string.toLowerCase() == "r_l_phi_fine")   { mode = foc::motor_id::Mode::R_L_Phi_FineTuning;   }
         else
         {
             ios.print("ERROR: Invalid identification mode: %s\n", mode_string.c_str());
