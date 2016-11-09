@@ -204,6 +204,8 @@ class FileDumpWriter(threading.Thread):
             x, values = self._q.get()
             ts = time.monotonic()
             if (ts - prev_ts > 2) or not self._f:
+                if self._f:
+                    self._f.close()
                 self._f = open('latest_data.log', 'w', encoding='utf8')
                 self._f.write('Started at %.6f real, %.6f mono\n' % (time.time(), ts))
             prev_ts = ts
