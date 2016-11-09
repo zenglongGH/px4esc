@@ -13,6 +13,7 @@ import threading
 import time
 import serial
 import glob
+import queue
 
 from PyQt5.QtWidgets import QVBoxLayout, QWidget, QApplication, QMainWindow, QAction
 from PyQt5.QtCore import Qt, QTimer
@@ -25,11 +26,6 @@ except ImportError:
     import pyqtgraph
 
 from pyqtgraph import PlotWidget, mkPen, InfiniteLine
-
-try:
-    import readline
-except ImportError:
-    print('Install the readline package to get better CLI experience', file=sys.stderr)
 
 
 if len(sys.argv) > 1:
@@ -195,6 +191,28 @@ class Window(QMainWindow):
         return self._plot
 
 
+class FileDumpWriter(threading.Thread):
+    def __init__(self):
+        super(FileDumpWriter, self).__init__(name='FileDumpWriter', daemon=True)
+        self._f = None
+        self._q = queue.Queue()
+        self.start()
+
+    def run(self):
+        prev_ts = time.monotonic()
+        while True:
+            x, values = self._q.get()
+            ts = time.monotonic()
+            if (ts - prev_ts > 2) or not self._f:
+                self._f = open('latest_data.log', 'w', encoding='utf8')
+                self._f.write('Started at %.6f real, %.6f mono\n' % (time.time(), ts))
+            prev_ts = ts
+            self._f.write('$%.6f,%s\n' % (x, ','.join(map(str, values))))
+
+    def add(self, x, values):
+        self._q.put((x, values))
+
+
 class SerialReader:
     def __init__(self, port, baudrate, timeout=None, value_prefix='$'):
         self._value_prefix = value_prefix
@@ -208,7 +226,7 @@ class SerialReader:
             items = eval(line[len(self._value_prefix):])
             if items and len(items) > 1:
                 timestamp, items = items[0], items[1:]
-                value_handler(timestamp, map(float, items))
+                value_handler(timestamp, list(map(float, items)))
 
     def run(self, value_handler, raw_handler):
         while True:
@@ -234,6 +252,7 @@ class CLIInputReader(threading.Thread):
 
 
 def value_handler(x, values):
+    dumper.add(x, values)
     for i, val in enumerate(values):
         try:
             window.plot.update_values(i, [x], [val])
@@ -246,6 +265,8 @@ app = QApplication(sys.argv)
 window = Window()
 
 reader = SerialReader(SER_PORT, SER_BAUDRATE)
+
+dumper = FileDumpWriter()
 
 cli = CLIInputReader(lambda line: reader._port.write((line + '\r\n').encode()))
 
