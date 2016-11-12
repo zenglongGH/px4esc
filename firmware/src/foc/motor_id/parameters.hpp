@@ -91,7 +91,7 @@ struct Parameters
     Scalar current_injection_frequency = 1000.0F;
 
     /// Electrical angular velocity used for magnetic flux linkage identification, radian/second
-    Scalar phi_estimation_electrical_angular_velocity = 150.0F;
+    Scalar phi_estimation_electrical_angular_velocity = 300.0F;
 
 
     bool isValid() const

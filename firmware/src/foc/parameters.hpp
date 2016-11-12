@@ -240,7 +240,7 @@ struct ControllerParameters
     std::uint32_t num_stalls_to_latch = 100;
 
     /// Multiplier of the P term of the current PI controllers
-    Scalar voltage_modulator_bandwidth = 0.05F;
+    Scalar voltage_modulator_bandwidth = 0.01F;
 
     /// Use additional correction of the PID DQ voltage outputs; refer to the theory for explanation
     bool voltage_modulator_cross_coupling_inductance_compensation = false;

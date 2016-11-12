@@ -45,7 +45,7 @@ using D = foc::ControllerParameters;
 
 Real g_spinup_duration    ("ctrl.spinup_sec",   D().nominal_spinup_duration,       0.1F,    10.0F);
 Natural g_num_attempts    ("ctrl.num_attempt",  D().num_stalls_to_latch,              1, 10000000);
-Real g_vm_bandwidth       ("ctrl.vmbandwidth",  D().voltage_modulator_bandwidth,  0.01F,     1.0F);
+Real g_vm_bandwidth       ("ctrl.vmbandwidth",  D().voltage_modulator_bandwidth, 0.001F,     1.0F);
 Boolean g_vm_ccic         ("ctrl.vm_cci_comp",  D().voltage_modulator_cross_coupling_inductance_compensation);
 
 }
