@@ -25,6 +25,7 @@
 #pragma once
 
 #include "common.hpp"
+#include <numeric>
 
 
 namespace foc
@@ -261,7 +262,9 @@ public:
                 IRQDebugOutputBuffer::setVariableFromIRQ(i, r_samples[i]);
             }
 
-            result_.rs = r_samples[1];  // Taking the median
+            // We used to compute the median here, but this approach appears to be suboptimal
+            //result_.rs = r_samples[1];  // Taking the median
+            result_.rs = std::accumulate(std::begin(r_samples), std::end(r_samples), 0.0F) / 3.0F; // Computing mean
 
             // If at least one sample is invalid, throw out all measurements!
             if (std::all_of(std::begin(r_samples), std::end(r_samples),
