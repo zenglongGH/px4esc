@@ -25,6 +25,7 @@
 #pragma once
 
 #include "common.hpp"
+#include "delay.hpp"
 #include "resistance.hpp"
 #include "inductance.hpp"
 #include "flux_linkage.hpp"
@@ -140,6 +141,8 @@ public:
  */
 class MotorIdentificationTask : public ITask
 {
+    using CoolDownDelayTask = SecondsDelayTask<30>;
+
     struct ContextImplementation : public SubTaskContext
     {
         std::uint32_t pwm_period_counter = 0;
@@ -165,6 +168,12 @@ class MotorIdentificationTask : public ITask
                         debug_values.begin());
         }
 
+        void clearDebugVariables()
+        {
+            AbsoluteCriticalSectionLocker locker;
+            std::fill(debug_values.begin(), debug_values.end(), 0);
+        }
+
         Scalar getTime() const override
         {
             // Locking is not necessary because the read is atomic
@@ -182,7 +191,8 @@ class MotorIdentificationTask : public ITask
     MotorParameters result_;
 
     SubTaskSequencer
-    < ResistanceTask
+    < CoolDownDelayTask
+    , ResistanceTask
     , InductanceTask
     , FluxLinkageTask
     , FineTuningTask
@@ -211,7 +221,9 @@ public:
             {
             case Mode::R_L:
             {
-                sequencer_.setSequence<ResistanceTask, InductanceTask>();
+                sequencer_.setSequence<ResistanceTask,
+                                       CoolDownDelayTask,
+                                       InductanceTask>();
                 break;
             }
             case Mode::Phi:
@@ -226,12 +238,22 @@ public:
             }
             case Mode::R_L_Phi:
             {
-                sequencer_.setSequence<ResistanceTask, InductanceTask, FluxLinkageTask>();
+                sequencer_.setSequence<ResistanceTask,
+                                       CoolDownDelayTask,
+                                       InductanceTask,
+                                       CoolDownDelayTask,
+                                       FluxLinkageTask>();
                 break;
             }
             case Mode::R_L_Phi_FineTuning:
             {
-                sequencer_.setSequence<ResistanceTask, InductanceTask, FluxLinkageTask, FineTuningTask>();
+                sequencer_.setSequence<ResistanceTask,
+                                       CoolDownDelayTask,
+                                       InductanceTask,
+                                       CoolDownDelayTask,
+                                       FluxLinkageTask,
+                                       CoolDownDelayTask,
+                                       FineTuningTask>();
                 break;
             }
             default:
@@ -292,6 +314,7 @@ public:
              * Construction of the next task may take a VERY long time (like 50+ microseconds), because some task
              * classes initialize large data structures or buffers. We don't want to take a critical section here.
              */
+            context_.clearDebugVariables();
             if (!sequencer_.selectNextTask())
             {
                 return Result::success();
