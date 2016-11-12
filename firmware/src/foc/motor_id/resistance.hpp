@@ -37,8 +37,8 @@ namespace motor_id
  */
 class ResistanceTask : public ISubTask
 {
-    static constexpr Scalar RotorStabilizationDuration  =  1.0F;
-    static constexpr Scalar PhaseMeasurementDuration    = 10.0F;
+    static constexpr Scalar RotorStabilizationDuration  = 1.0F;
+    static constexpr Scalar PhaseMeasurementDuration    = 4.0F;
     static constexpr Scalar OhmPerSec                   = 0.2F;
     static constexpr Scalar MinEstimationCurrent        = 0.5F;
     static constexpr Scalar ValidCurrentThreshold       = 1e-3F;
