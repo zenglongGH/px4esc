@@ -340,7 +340,7 @@ class SpinCommand : public os::shell::ICommandHandler
 
         if (argc <= 1)
         {
-            ios.puts("Spin the motor by means of blind rotation of the voltage vector.\n"
+            ios.puts("Rotate voltage vector of the specified magnitude at the specified angular velocity.\n"
                      "This command is inteneded for testing and debugging purposes. Usage:");
             ios.print("\t%s <angular velocity, rad/sec electrical> [voltage magnitude] [-p]\n"
                       "Voltage magnitude defaults to %.fV. Press any key to stop rotation.\n"
@@ -415,7 +415,7 @@ class SpinCommand : public os::shell::ICommandHandler
         float min_inverter_voltage = board::motor::getStatus().inverter_voltage;
         float max_inverter_voltage = min_inverter_voltage;
 
-        while (ios.getChar(do_plot ? 0 : 1) <= 0)
+        while (ios.getChar(1) <= 0)
         {
             // Computing dt (it may be very small or even zero but that's alright)
             const auto new_ts = chVTGetSystemTimeX();
@@ -444,8 +444,8 @@ class SpinCommand : public os::shell::ICommandHandler
             {
                 const math::Vector<3> modulated = (setpoint.array() - setpoint.mean()) * inverter_voltage;
 
-                ios.print("$%.4f,%.3f,%.3f\n",
-                          double(ST2US(std::uint64_t(chVTGetSystemTimeX()))) * 1e-6,    // TODO this thing overflows
+                ios.print("$%.3f,%.3f,%.3f\n",
+                          double(chVTGetSystemTimeX()) / double(CH_CFG_ST_FREQUENCY),  // TODO this overflows
                           double(modulated[0]),
                           double(modulated[0] - modulated[1]));
             }

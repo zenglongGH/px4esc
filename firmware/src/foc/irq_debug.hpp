@@ -217,7 +217,7 @@ public:
             vars_copy = vars_;
         }
 
-        std::printf("$%.4f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
+        std::printf("$%.3f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f\n",
                     double(getAbsoluteTimeInSeconds()),
                     double(vars_copy[0]),
                     double(vars_copy[1]),
