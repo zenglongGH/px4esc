@@ -426,9 +426,9 @@ class SpinCommand : public os::shell::ICommandHandler
             angle = math::normalizeAngle(angle + angular_velocity * dt);
 
             const auto inverter_voltage = board::motor::getInverterVoltage();
+            const auto angle_sincos = math::sincos(angle);
 
-            const auto Ualphabeta = foc::performInverseParkTransform({0.0F, voltage},
-                                                                     math::sincos(angle));
+            const auto Ualphabeta = foc::performInverseParkTransform({0.0F, voltage}, angle_sincos);
 
             const auto setpoint = foc::performSpaceVectorTransform(Ualphabeta, inverter_voltage).first;
 
@@ -442,12 +442,15 @@ class SpinCommand : public os::shell::ICommandHandler
 
             if (do_plot)
             {
-                const math::Vector<3> modulated = (setpoint.array() - setpoint.mean()) * inverter_voltage;
+                const auto Ialphabeta = foc::performClarkeTransform(board::motor::getPhaseCurrentsAB());
+                const auto Idq = foc::performParkTransform(Ialphabeta, angle_sincos);
 
-                ios.print("$%.3f,%.3f,%.3f\n",
+                // Ud, Uq, Id, Iq
+                ios.print("$%.3f,0,%.2f,%.2f,%.2f\n",
                           double(chVTGetSystemTimeX()) / double(CH_CFG_ST_FREQUENCY),  // TODO this overflows
-                          double(modulated[0]),
-                          double(modulated[0] - modulated[1]));
+                          double(voltage),
+                          double(Idq[0]),
+                          double(Idq[1]));
             }
         }
 
