@@ -342,9 +342,10 @@ class SpinCommand : public os::shell::ICommandHandler
         {
             ios.puts("Rotate voltage vector of the specified magnitude at the specified angular velocity.\n"
                      "This command is inteneded for testing and debugging purposes. Usage:");
-            ios.print("\t%s <angular velocity, rad/sec electrical> [voltage magnitude] [-p]\n"
+            ios.print("\t%s <angular velocity, rad/sec electrical> [voltage magnitude] [-p] [-a accel]\n"
                       "Voltage magnitude defaults to %.fV. Press any key to stop rotation.\n"
-                      "Option -p will plot real time data.\n",
+                      "Option -p will plot real time data.\n"
+                      "Option -a <accel> specified acceleration in rad/(sec*sec).\n",
                       argv[0], double(DefaultVoltage));
             return;
         }
@@ -353,7 +354,7 @@ class SpinCommand : public os::shell::ICommandHandler
          * Parsing the arguments
          */
         using namespace std;
-        const float angular_velocity = strtof(argv[1], nullptr);
+        float angular_velocity = strtof(argv[1], nullptr);
         if (os::float_eq::closeToZero(angular_velocity))
         {
             ios.print("ERROR: Invalid angular velocity\n");
@@ -361,19 +362,41 @@ class SpinCommand : public os::shell::ICommandHandler
         }
 
         float voltage = DefaultVoltage;
+        float acceleration = 0.0F;
         bool do_plot = false;
 
-        for (int i = 2; i < argc; i++)
         {
-            const os::heapless::String<> arg(argv[i]);
+            bool next_acceleration = false;
 
-            if (arg == "-p")
+            for (int i = 2; i < argc; i++)
             {
-                do_plot = true;
+                const os::heapless::String<> arg(argv[i]);
+
+                if (next_acceleration)
+                {
+                    acceleration = strtof(argv[i], nullptr);
+                    next_acceleration = false;
+                    continue;
+                }
+
+                if (arg == "-p")
+                {
+                    do_plot = true;
+                }
+                else if (arg == "-a")
+                {
+                    next_acceleration = true;
+                }
+                else
+                {
+                    voltage = strtof(arg.c_str(), nullptr);
+                }
             }
-            else
+
+            if (next_acceleration)
             {
-                voltage = strtof(arg.c_str(), nullptr);
+                ios.print("ERROR: Expected acceleration\n");
+                return;
             }
         }
 
@@ -399,8 +422,8 @@ class SpinCommand : public os::shell::ICommandHandler
          */
         os::TemporaryPriorityChanger priority_adjustment_expert(HIGHPRIO - 5);
 
-        ios.print("Spinning at %.1f rad/s, %.1f V. Type any character to stop.\n",
-                  double(angular_velocity), double(voltage));
+        ios.print("Spinning at %.1f rad/s, %.2f rad/s^2, %.1f V. Type any character to stop.\n",
+                  double(angular_velocity), double(acceleration), double(voltage));
 
         while (ios.getChar(0) > 0)
         {
@@ -424,6 +447,7 @@ class SpinCommand : public os::shell::ICommandHandler
 
             // Computing PWM settings
             angle = math::normalizeAngle(angle + angular_velocity * dt);
+            angular_velocity += acceleration * dt;
 
             const auto inverter_voltage = board::motor::getInverterVoltage();
             const auto angle_sincos = math::sincos(angle);
@@ -445,12 +469,12 @@ class SpinCommand : public os::shell::ICommandHandler
                 const auto Ialphabeta = foc::performClarkeTransform(board::motor::getPhaseCurrentsAB());
                 const auto Idq = foc::performParkTransform(Ialphabeta, angle_sincos);
 
-                // Ud, Uq, Id, Iq
-                ios.print("$%.3f,0,%.2f,%.2f,%.2f\n",
+                // Ud, Uq, Id, Iq, angvel
+                ios.print("$%.3f,0,%.2f,%.2f,%.2f,%.2f\n",
                           double(chVTGetSystemTimeX()) / double(CH_CFG_ST_FREQUENCY),  // TODO this overflows
                           double(voltage),
-                          double(Idq[0]),
-                          double(Idq[1]));
+                          double(Idq[0]), double(Idq[1]),
+                          double(angular_velocity));
             }
         }
 
