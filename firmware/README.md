@@ -17,6 +17,8 @@ Once the build is finished, submit the resulting archive to Coverity Scan.
 Development requires a machine with Linux or OSX; if you're using Windows, you're on your own.
 In order to build the firmware, you're going to need GCC cross toolchain version 5.3 or newer.
 You can get one from <https://launchpad.net/gcc-arm-embedded>, or from any other place if you know what you're doing.
+You can also use
+[Bistromathic - a Linux virtual machine pre-configured for embedded development](https://files.zubax.com/vm/bistromathic.ova).
 
 Clone the repository and initialize all submodules, then run `make`:
 
