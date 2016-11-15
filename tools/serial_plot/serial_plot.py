@@ -34,7 +34,7 @@ else:
     SER_PORT = glob.glob('/dev/serial/by-id/usb-*Black_Magic_Probe*-if02')[0]
     print('Selected port', SER_PORT)
 
-SER_BAUDRATE = 115200
+SER_BAUDRATE = 921600
 
 
 # Borrowed from the UAVCAN GUI Tool
