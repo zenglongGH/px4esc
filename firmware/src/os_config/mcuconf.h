@@ -65,7 +65,7 @@
 #define STM32_PLLN_VALUE                    180
 #define STM32_PLLP_VALUE                    2
 #define STM32_PLLQ_VALUE                    7
-// PLL I2S is not used; output clocks are set to the minimum
+// PLL I2S is disabled; output clocks are set to the minimum
 #define STM32_PLLI2SM_VALUE                 4
 #define STM32_PLLI2SN_VALUE                 180
 #define STM32_PLLI2SR_VALUE                 7
@@ -74,7 +74,7 @@
 // PLL SAI is used to clock USB via the 48 MHz domain
 #define STM32_PLLSAIM_VALUE                 4
 #define STM32_PLLSAIN_VALUE                 96
-#define STM32_PLLSAIP_VALUE                 2
+#define STM32_PLLSAIP_VALUE                 4
 #define STM32_PLLSAIQ_VALUE                 15
 
 #define STM32_HPRE                          STM32_HPRE_DIV1
@@ -118,14 +118,11 @@
 /*
  * USB driver system settings.
  */
-#define STM32_USB_USE_OTG1                  FALSE
-#define STM32_USB_USE_OTG2                  FALSE
-#define STM32_USB_OTG1_IRQ_PRIORITY         14
-#define STM32_USB_OTG2_IRQ_PRIORITY         14
+#define STM32_USB_USE_OTG1                  TRUE
+#define STM32_USB_OTG1_IRQ_PRIORITY         5
 #define STM32_USB_OTG1_RX_FIFO_SIZE         512
-#define STM32_USB_OTG2_RX_FIFO_SIZE         1024
-#define STM32_USB_OTG_THREAD_PRIO           LOWPRIO
-#define STM32_USB_OTG_THREAD_STACK_SIZE     128
+#define STM32_USB_OTG_THREAD_PRIO           (LOWPRIO + 1)
+#define STM32_USB_OTG_THREAD_STACK_SIZE     256
 #define STM32_USB_OTGFIFO_FILL_BASEPRI      0
 
 #endif /* _MCUCONF_H_ */

@@ -23,6 +23,7 @@
  */
 
 #include "cli.hpp"
+#include "usb_cdc.hpp"
 
 #include <board/board.hpp>
 #include <bootloader_interface/bootloader_interface.hpp>
@@ -1079,17 +1080,33 @@ class CLIThread : public chibios_rt::BaseStaticThread<2048>
     {
         setName("cli");
 
-        /*
-         * TODO: Add USB support in the future. At the moment this is not possible, because USB requires 48 MHz
-         *       clock, and the application requires 180 MHz core clock; both can be obtained only if SAI is
-         *       used to clock the USB controller. Unfortunately, the current version of ChibiOS does not support
-         *       this configuration, but the necessary code is already in the upstream, so we'll just wait until
-         *       it gets released, and then add USB support here.
-         */
+        const auto usb_port = usb_cdc::getSerialUSBDriver();
+        const auto uart_port = &STDOUT_SD;
+
         while (!os::isRebootRequested())
         {
+            // Switching interfaces if necessary
+            const bool using_usb = reinterpret_cast<::BaseChannel*>(os::getStdIOStream()) ==
+                                   reinterpret_cast<::BaseChannel*>(usb_port);
+            const bool usb_connected = usb_cdc::getState() == usb_cdc::State::Connected;
+
+            if (using_usb != usb_connected)
+            {
+                logger.println("Switching to %s", usb_connected ? "USB" : "UART");
+                os::setStdIOStream(usb_connected ?
+                                   reinterpret_cast<::BaseChannel*>(usb_port) :
+                                   reinterpret_cast<::BaseChannel*>(uart_port));
+                // Flushing the input queue
+                const auto ios = os::getStdIOStream();
+                while (chnGetTimeout(ios, TIME_IMMEDIATE) >= 0)
+                {
+                    ;
+                }
+            }
+
+            // Running shell on either interface
             os::shell::BaseChannelWrapper wrapper(os::getStdIOStream());
-            shell_.runFor(wrapper, 100);
+            shell_.runFor(wrapper, 200);
         }
 
         logger.puts("Stopped");
@@ -1133,6 +1150,9 @@ public:
 void init(const RebootRequestCallback& reboot_callback)
 {
     g_reboot_request_callback = reboot_callback;
+
+    usb_cdc::init(board::readUniqueID());
+
     (void) g_cli_thread.start(LOWPRIO + 3);
 }
 
