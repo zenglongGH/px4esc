@@ -38,6 +38,7 @@
 #define HAL_USE_MAC                 FALSE
 #define HAL_USE_MMC_SPI             FALSE
 #define HAL_USE_PWM                 FALSE
+#define HAL_USE_QSPI                FALSE
 #define HAL_USE_RTC                 FALSE
 #define HAL_USE_SDC                 FALSE
 #define HAL_USE_SERIAL              TRUE
@@ -47,7 +48,7 @@
 #define HAL_USE_USB                 FALSE
 #define HAL_USE_WDG                 FALSE
 
-#define SERIAL_DEFAULT_BITRATE      921600
-#define SERIAL_BUFFERS_SIZE         1024
+#define SERIAL_DEFAULT_BITRATE      115200
+#define SERIAL_BUFFERS_SIZE         512
 
 #include <zubax_chibios/sys/halconf_tail.h>

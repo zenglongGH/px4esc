@@ -1001,8 +1001,8 @@ class SystemInfoCommand : public os::shell::ICommandHandler
 
         static const auto gauge_free_stack = [](const ::thread_t* tp)
         {
-            const std::uint8_t* limit = reinterpret_cast<std::uint8_t*>(tp->p_stklimit);
-            const unsigned current = reinterpret_cast<unsigned>(tp->p_ctx.r13);
+            const std::uint8_t* limit = reinterpret_cast<std::uint8_t*>(tp->wabase);
+            const unsigned current = reinterpret_cast<unsigned>(tp->ctx.sp);
             unsigned num_bytes = 0;
             while ((*limit++ == CH_DBG_STACK_FILL_VALUE) &&
                    (reinterpret_cast<unsigned>(limit) < current))
@@ -1018,7 +1018,7 @@ class SystemInfoCommand : public os::shell::ICommandHandler
             ::thread_t* tp = chRegFirstThread();
             do
             {
-                total_cumulative += tp->p_stats.cumulative;
+                total_cumulative += tp->stats.cumulative;
                 tp = chRegNextThread(tp);
             }
             while (tp != nullptr);
@@ -1031,21 +1031,21 @@ class SystemInfoCommand : public os::shell::ICommandHandler
         ::thread_t* tp = chRegFirstThread();
         do
         {
-            decltype(tp->p_stats) stats;
+            decltype(tp->stats) stats;
 
             {
                 os::CriticalSectionLocker locker;
-                stats = tp->p_stats;
+                stats = tp->stats;
             }
 
             const auto average_load = unsigned((100 * stats.cumulative + 50) / total_cumulative);
             const auto average_timing = convertStatTickCountToSeconds(double(stats.cumulative) / double(stats.n));
 
             ios.print("%-16s %-9s %5u  %3u   %3u%% | %7.3f %7.3f %8.3f\n",
-                      tp->p_name,
-                      ThreadStateNames[tp->p_state],
+                      tp->name,
+                      ThreadStateNames[tp->state],
                       gauge_free_stack(tp),
-                      static_cast<unsigned>(tp->p_prio),
+                      static_cast<unsigned>(tp->prio),
                       average_load,
                       average_timing * 1e3,
                       convertStatTickCountToSeconds(stats.best) * 1e3,

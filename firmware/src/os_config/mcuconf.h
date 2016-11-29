@@ -59,11 +59,24 @@
 #define STM32_LSE_ENABLED                   FALSE
 #define STM32_CLOCK48_REQUIRED              TRUE
 #define STM32_SW                            STM32_SW_PLL
+
 #define STM32_PLLSRC                        STM32_PLLSRC_HSE
 #define STM32_PLLM_VALUE                    4
 #define STM32_PLLN_VALUE                    180
 #define STM32_PLLP_VALUE                    2
 #define STM32_PLLQ_VALUE                    7
+// PLL I2S is not used; output clocks are set to the minimum
+#define STM32_PLLI2SM_VALUE                 4
+#define STM32_PLLI2SN_VALUE                 180
+#define STM32_PLLI2SR_VALUE                 7
+#define STM32_PLLI2SP_VALUE                 8
+#define STM32_PLLI2SQ_VALUE                 15
+// PLL SAI is used to clock USB via the 48 MHz domain
+#define STM32_PLLSAIM_VALUE                 4
+#define STM32_PLLSAIN_VALUE                 96
+#define STM32_PLLSAIP_VALUE                 2
+#define STM32_PLLSAIQ_VALUE                 15
+
 #define STM32_HPRE                          STM32_HPRE_DIV1
 #define STM32_PPRE1                         STM32_PPRE1_DIV4
 #define STM32_PPRE2                         STM32_PPRE2_DIV2
@@ -73,6 +86,7 @@
 #define STM32_MCO1PRE                       STM32_MCO1PRE_DIV1
 #define STM32_MCO2SEL                       STM32_MCO2SEL_HSE
 #define STM32_MCO2PRE                       STM32_MCO2PRE_DIV5
+#define STM32_CK48MSEL                      STM32_CK48MSEL_PLLSAI
 #define STM32_PVD_ENABLE                    FALSE
 #define STM32_PLS                           STM32_PLS_LEV0
 #define STM32_BKPRAM_ENABLE                 FALSE

@@ -35,9 +35,6 @@
   * Based on a ChibiOS demo app.
   */
 
-__main_stack_size__     = 0x2000;
-__process_stack_size__  = 0x2000;
-
 MEMORY
 {
     /*
