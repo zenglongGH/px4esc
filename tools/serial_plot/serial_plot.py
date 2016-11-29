@@ -31,7 +31,8 @@ from pyqtgraph import PlotWidget, mkPen, InfiniteLine
 if len(sys.argv) > 1:
     SER_PORT = sys.argv[1]
 else:
-    SER_PORT = glob.glob('/dev/serial/by-id/usb-*Black_Magic_Probe*-if02')[0]
+    SER_PORT = (glob.glob('/dev/serial/by-id/usb-*_PX4ESC_*-if00') +
+                glob.glob('/dev/serial/by-id/usb-*Black_Magic_Probe*-if02'))[0]
     print('Selected port', SER_PORT)
 
 SER_BAUDRATE = 115200
