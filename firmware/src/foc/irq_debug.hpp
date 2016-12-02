@@ -195,13 +195,6 @@ private:
     }
 
 public:
-    template <unsigned Index, typename Value>
-    void set(const Value x)
-    {
-        static_assert(Index < NumVariables, "Debug variable index out of range");
-        vars_[Index] = Scalar(x);
-    }
-
     template <typename Container>
     void set(const Container cont)
     {
